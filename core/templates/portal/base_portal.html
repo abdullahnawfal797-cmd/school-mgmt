@@ -1,401 +1,171 @@
 ﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}منظومة الإدارة المدرسية الحديثة{% endblock %}</title>
-    <!-- Bootstrap RTL & Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#5a31f4">
-
     <style>
-        :root {
-            --primary-purple: #5e35b1;
-            --primary-gradient: linear-gradient(135deg, #673ab7 0%, #512da8 100%);
-            --bg-light: #f4f5fa;
-            --card-radius: 20px;
-        }
+    :root {
+        --primary: #5e35b1;
+        --primary-grad: linear-gradient(135deg, #673ab7 0%, #512da8 100%);
+        --bg: #f4f6fb;
+        --card-border: #e8ecf4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        background-color: var(--bg);
+        font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+        color: #2e384d;
+        padding-bottom: 50px;
+        direction: rtl;
+    }
+    .container { max-width: 1250px; margin: 0 auto; padding: 0 15px; }
+    .app-header {
+        background: var(--primary-grad);
+        color: #fff;
+        border-radius: 0 0 20px 20px;
+        padding: 18px 25px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 15px rgba(94, 53, 177, 0.25);
+    }
+    .d-flex { display: flex !important; }
+    .justify-content-between { justify-content: space-between !important; }
+    .align-items-center { align-items: center !important; }
+    .flex-wrap { flex-wrap: wrap !important; }
+    .gap-2 { gap: 8px !important; }
+    .gap-3 { gap: 15px !important; }
+    .mb-0 { margin-bottom: 0 !important; }
+    .mb-2 { margin-bottom: 8px !important; }
+    .mb-3 { margin-bottom: 14px !important; }
+    .mb-4 { margin-bottom: 22px !important; }
+    .fw-bold { font-weight: 700 !important; }
+    .text-muted { color: #6c757d !important; }
+    .text-primary { color: #5e35b1 !important; }
+    .small { font-size: 0.85rem !important; }
+    .opacity-75 { opacity: 0.75 !important; }
+    
+    .card-custom {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid var(--card-border);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.03);
+        padding: 18px 22px;
+    }
 
-        body {
-            background-color: var(--bg-light);
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-            color: #2e384d;
-            padding-bottom: 80px;
-        }
+    /* شبكة الأزرار والأقسام */
+    .portal-section-title {
+        font-size: 0.95rem;
+        font-weight: bold;
+        color: #556987;
+        margin: 18px 0 10px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .portal-section-title::before {
+        content: "";
+        display: inline-block;
+        width: 4px;
+        height: 16px;
+        background: var(--primary);
+        border-radius: 2px;
+    }
+    .portal-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap: 12px;
+        margin-bottom: 15px;
+    }
+    .portal-btn-card {
+        background: #ffffff;
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 16px 12px;
+        text-align: center;
+        text-decoration: none;
+        color: #2d3748;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    .portal-btn-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 16px rgba(94, 53, 177, 0.12);
+        border-color: #5e35b1;
+        color: #5e35b1;
+        background: #faf9fe;
+    }
+    .portal-btn-card .card-icon {
+        font-size: 24px;
+        line-height: 1;
+        display: inline-block;
+        margin-bottom: 4px;
+    }
+    .portal-btn-card .card-label {
+        font-size: 0.92rem;
+        font-weight: 600;
+    }
 
-        /* شريط العنوان العلوي */
-        .app-header {
-            background: var(--primary-gradient);
-            color: white;
-            border-radius: 0 0 25px 25px;
-            padding: 20px 15px 25px 15px;
-            box-shadow: 0 10px 20px rgba(94, 53, 177, 0.15);
-            margin-bottom: 25px;
-        }
+    /* أزرار الإحصائيات السفلية */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    .stat-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid var(--card-border);
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .stat-card.green { border-top: 4px solid #10b981; }
+    .stat-card.yellow { border-top: 4px solid #f59e0b; }
+    .stat-card.blue { border-top: 4px solid #3b82f6; }
+    .stat-card.purple { border-top: 4px solid #8b5cf6; }
+    .stat-number { font-size: 1.6rem; font-weight: bold; color: #1e293b; margin-top: 5px; }
 
-        /* البطاقات وتأثيراتها */
-        .card-custom {
-            background: #ffffff;
-            border-radius: var(--card-radius);
-            border: none;
-            box-shadow: 0 8px 24px rgba(149, 157, 165, 0.08);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .card-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(149, 157, 165, 0.15);
-        }
-
-        /* أيقونات شبكة القائمة الرئيسية */
-        .app-grid-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border-radius: 22px;
-            padding: 18px 10px;
-            text-decoration: none;
-            color: #333;
-            background: #fff;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.04);
-            transition: all 0.2s ease;
-            height: 100%;
-        }
-
-        .app-grid-btn:hover {
-            transform: scale(1.03);
-            color: var(--primary-purple);
-        }
-
-        .app-icon-circle {
-            width: 55px;
-            height: 55px;
-            border-radius: 18px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-
-        /* ألوان أيقونات الهوية المدرسية */
-        .icon-purple {
-            background-color: #ede7f6;
-            color: #5e35b1;
-        }
-
-        .icon-coral {
-            background-color: #fbe9e7;
-            color: #ff5722;
-        }
-
-        .icon-mint {
-            background-color: #e0f2f1;
-            color: #00897b;
-        }
-
-        .icon-blue {
-            background-color: #e3f2fd;
-            color: #1e88e5;
-        }
-
-        .icon-amber {
-            background-color: #fff8e1;
-            color: #ff8f00;
-        }
-
-        .icon-pink {
-            background-color: #fce4ec;
-            color: #d81b60;
-        }
-
-        /* شريط التنقل السفلي للموبايل */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #ffffff;
-            height: 68px;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            border-top: 1px solid #eaeaea;
-            box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.04);
-            z-index: 1050;
-        }
-
-        .bottom-nav a {
-            color: #8c98a4;
-            text-decoration: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .bottom-nav a i {
-            font-size: 20px;
-            margin-bottom: 2px;
-        }
-
-        .bottom-nav a.active {
-            color: var(--primary-purple);
-        }
-
-        /* تنسيق طباعة المستندات */
-        @media print {
-            .no-print,
-            .bottom-nav,
-            .app-header {
-                display: none !important;
-            }
-
-            body {
-                background: white !important;
-                padding-bottom: 0;
-            }
-        }
-    </style>
+    .btn-header {
+        background: #fff;
+        color: #5e35b1;
+        text-decoration: none;
+        padding: 6px 18px;
+        border-radius: 50px;
+        font-weight: bold;
+        font-size: 0.88rem;
+    }
+    .form-select {
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background-color: #fff;
+        font-family: inherit;
+    }
+</style>
     {% block extra_css %}{% endblock %}
 </head>
-
 <body>
-
-    <!-- الترويسة العلوية -->
-    <header class="app-header no-print">
+    <header class="app-header">
         <div class="container d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-3">
-                <!-- الأيقونة السرية للمالك (النقر 7 مرات هنا) -->
-                <span id="secret-owner-trigger" style="cursor: pointer; user-select: none;" title="وزارة التربية">
-                    <i class="bi bi-mortarboard-fill fs-3 text-white"></i>
-                </span>
-                <div>
-                    <h5 class="mb-0 fw-bold">نظام الإدارة المدرسية الحديث</h5>
-                    <small class="opacity-75">جمهورية العراق - وزارة التربية</small>
-                </div>
+            <div>
+                <h3 class="mb-0 fw-bold">نظام الإدارة المدرسية الحديث</h3>
+                <small class="opacity-75">جمهورية العراق - وزارة التربية</small>
             </div>
-
-            <!-- أزرار الإعدادات والدعم الفني -->
-            <div class="d-flex align-items-center gap-2">
-                <!-- زر الدعم الفني ومعلومات النظام (أيقونة دائرية) -->
-                <button type="button" class="btn btn-sm btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center" 
-                        style="width: 38px; height: 38px;" data-bs-toggle="modal" data-bs-target="#systemInfoModal" title="حول المنظومة والأمان والدعم الفني">
-                    <i class="bi bi-info-circle-fill text-primary fs-5"></i>
-                </button>
-
-                <!-- قائمة الإعدادات الداخلية المستقلة -->
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-light text-primary rounded-pill px-3 fw-bold dropdown-toggle shadow-sm"
-                        type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-gear-fill me-1"></i> النظام
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-3 mt-2 text-end">
-                        <li>
-                            <a class="dropdown-item py-2" href="{% url 'portal_settings' %}">
-                                <i class="bi bi-sliders text-primary me-2"></i> إعدادات وهوية المدرسة
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-2" href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#activationModal">
-                                <i class="bi bi-patch-check-fill text-warning me-2"></i> تفعيل الترخيص والاشتراك
-                            </a>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-                        <li>
-                            <a class="dropdown-item py-2 text-muted" href="{% url 'portal_dashboard' %}">
-                                <i class="bi bi-house-door me-2"></i> العودة للرئيسية
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+            <div>
+                <a href="{% url 'portal_settings' %}" class="btn-header">إعدادات النظام</a>
             </div>
         </div>
     </header>
-
-    <!-- المحتوى الأساسي -->
     <main class="container">
-        {% if messages %}
-        <div class="no-print mb-3">
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show rounded-4 shadow-sm" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
         {% block content %}{% endblock %}
     </main>
-
-    <!-- نافذة حول المنظومة، الأمان، والتحديثات القادمة -->
-    <div class="modal fade" id="systemInfoModal" tabindex="-1" aria-hidden="true" dir="rtl">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content rounded-4 border-0 shadow">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-primary">
-                        <i class="bi bi-shield-check me-2"></i>منظومة مدرستي - الدعم والأمان
-                    </h5>
-                    <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body py-3">
-                    <div class="d-flex justify-content-between align-items-center p-2 px-3 rounded-3 mb-3 bg-light border">
-                        <span class="text-muted small fw-bold">الإصدار المثبت حالياً:</span>
-                        <span class="badge bg-primary px-3 py-2 rounded-pill">v1.0.0 المستقر (2026)</span>
-                    </div>
-
-                    <div class="mb-3">
-                        <h6 class="fw-bold text-dark mb-1"><i class="bi bi-lock-fill text-success me-1"></i> أمان وحفظ البيانات:</h6>
-                        <p class="text-muted small mb-0 lh-base">
-                            بيانات مدرستكم وطلابكم وسجلات الدرجات آمنة ومحفوظة محلياً بالكامل داخل قاعدة بيانات مشفرة على هذا الجهاز ولا ترفع لأي خادم خارجي. التحديثات الدورية لا تقوم بمسح أو حذف أي سجلات سابقة نهائياً.
-                        </p>
-                    </div>
-
-                    <div class="mb-3">
-                        <h6 class="fw-bold text-dark mb-1"><i class="bi bi-stars text-warning me-1"></i> التحديثات القادمة المخططة:</h6>
-                        <ul class="text-muted small mb-0 ps-3 lh-base">
-                            <li>أتمتة الجداول المدرسية الذكية وتفادي تضارب الحصص تلقائياً.</li>
-                            <li>توسيع سجلات القيد العام وبطاقات أولياء الأمور المباشرة.</li>
-                        </ul>
-                    </div>
-
-                    <div class="card border-primary border-opacity-25 bg-primary bg-opacity-10 p-3 rounded-3 text-center">
-                        <h6 class="fw-bold text-primary mb-2">الدعم الفني والمساعدة المباشرة</h6>
-                        <p class="small text-muted mb-3">في حال مواجهة أي استفسار أو مشكلة تقنية، تواصل مع المطور مباشرة:</p>
-                        <div class="d-flex justify-content-center gap-2 flex-wrap">
-                            <a href="https://wa.me/9647723457175" target="_blank" class="btn btn-success btn-sm rounded-pill px-3 fw-bold">
-                                <i class="bi bi-whatsapp me-1"></i> واتساب: 07723457175
-                            </a>
-                            <a href="mailto:abdullahnawfal@gmail.com" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold">
-                                <i class="bi bi-envelope me-1"></i> البريد الإلكتروني
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer border-0 pt-0 justify-content-center">
-                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إغلاق</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة إدخال كود التفعيل المخصصة لمدير المدرسة مع رمز الجهاز -->
-    <div class="modal fade" id="activationModal" tabindex="-1" aria-hidden="true" dir="rtl">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content rounded-4 border-0 shadow">
-                <div class="modal-header border-0 pb-0">
-                    <h6 class="modal-title fw-bold text-primary">
-                        <i class="bi bi-patch-check-fill me-2"></i>تفعيل اشتراك المنظومة
-                    </h6>
-                    <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="{% url 'portal_license_activate' %}">
-                    {% csrf_token %}
-                    <div class="modal-body py-3 text-center">
-                        <div class="bg-light p-3 rounded-3 mb-3 border">
-                            <label class="small text-muted fw-bold d-block mb-2">رمز الجهاز الخاص بحاسبتكم (Machine ID):</label>
-                            <div class="d-flex justify-content-center align-items-center gap-2 mb-2">
-                                <code class="fs-4 fw-bold text-dark px-3 py-1 bg-white border rounded-3 letter-spacing" id="clientMachineId">{{ machine_id|default:"IQ-SYSTEM-NODE" }}</code>
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" onclick="copyClientMachineId()" title="نسخ الرمز">
-                                    <i class="bi bi-clipboard me-1"></i> نسخ
-                                </button>
-                            </div>
-                            <small class="text-muted d-block" style="font-size: 11px;">
-                                أرسل هذا الرمز عبر واتساب إلى الأستاذ <strong class="text-primary">عبدالله نوفل</strong> على الرقم: <strong class="text-success dir-ltr">07723457175</strong> لاستلام مفتاح التفعيل
-                            </small>
-                        </div>
-
-                        <p class="small text-muted mb-2">أدخل مفتاح الترخيص المعتمد لتجديد وتفعيل كافة صلاحيات النظام وحفظ السجلات:</p>
-                        <input type="text" name="license_key" class="form-control form-control-lg text-center fw-bold text-uppercase rounded-3" placeholder="XXXX-XXXX-XXXX-XXXX" required autocomplete="off">
-                    </div>
-                    <div class="modal-footer border-0 pt-0 justify-content-center">
-                        <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold">
-                            تفعيل النظام الآن
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- شريط القوائم السفلي للأجهزة الذكية (Mobile Nav) -->
-    <nav class="bottom-nav d-md-none no-print">
-        <a href="{% url 'portal_dashboard' %}"
-            class="{% if request.resolver_match.url_name == 'portal_dashboard' %}active{% endif %}">
-            <i class="bi bi-grid-fill"></i>
-            <span>الرئيسية</span>
-        </a>
-        <a href="{% url 'portal_general_registry' %}"
-            class="{% if request.resolver_match.url_name == 'portal_general_registry' %}active{% endif %}">
-            <i class="bi bi-person-lines-fill"></i>
-            <span>القيد</span>
-        </a>
-        <a href="{% url 'portal_letter_builder' %}"
-            class="{% if request.resolver_match.url_name == 'portal_letter_builder' %}active{% endif %}">
-            <i class="bi bi-file-earmark-text-fill"></i>
-            <span>المخاطبات</span>
-        </a>
-        <a href="{% url 'portal_exam_halls' %}"
-            class="{% if request.resolver_match.url_name == 'portal_exam_halls' %}active{% endif %}">
-            <i class="bi bi-card-checklist"></i>
-            <span>القاعات</span>
-        </a>
-        <a href="{% url 'portal_promotion' %}"
-            class="{% if request.resolver_match.url_name == 'portal_promotion' %}active{% endif %}">
-            <i class="bi bi-arrow-repeat"></i>
-            <span>الترحيل</span>
-        </a>
-    </nav>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        // كود الـ 7 نقرات السرية للمالك
-        let clickCount = 0;
-        let clickTimer = null;
-        const trigger = document.getElementById('secret-owner-trigger');
-
-        if (trigger) {
-            trigger.addEventListener('click', function () {
-                clickCount++;
-                clearTimeout(clickTimer);
-
-                clickTimer = setTimeout(() => {
-                    clickCount = 0;
-                }, 2500);
-
-                if (clickCount === 7) {
-                    clickCount = 0;
-                    window.location.href = "{% url 'portal_owner_generator' %}";
-                }
-            });
-        }
-
-        // نسخ رمز الجهاز
-        function copyClientMachineId() {
-            const text = document.getElementById('clientMachineId').innerText.trim();
-            navigator.clipboard.writeText(text);
-            alert("تم نسخ رمز الجهاز بنجاح: " + text);
-        }
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js');
-            });
-        }
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
-
 </html>
-
