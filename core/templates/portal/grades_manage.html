@@ -1,0 +1,69 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}رصد الدرجات (أرقام صحيحة بدون كسور){% endblock %}
+
+{% block content %}
+<div class="card card-custom p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold text-primary mb-0"><i class="bi bi-award-fill me-2"></i>رصد درجات طالب (تقريب تلقائي لأقرب
+            عدد صحيح)</h5>
+        <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary rounded-pill"><i
+                class="bi bi-arrow-right"></i> رجوع</a>
+    </div>
+    <form method="POST" class="row g-2">
+        {% csrf_token %}
+        <div class="col-md-3">
+            <select name="student_id" class="form-select" required>
+                <option value="">-- اختر الطالب --</option>
+                {% for st in students %}<option value="{{ st.id }}">{{ st.full_name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="subject_id" class="form-select" required>
+                <option value="">-- المادة --</option>
+                {% for sub in subjects %}<option value="{{ sub.id }}">{{ sub.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-1"><input type="number" name="first_term" class="form-control" placeholder="سعي 1"></div>
+        <div class="col-md-1"><input type="number" name="midyear" class="form-control" placeholder="نصف سنة"></div>
+        <div class="col-md-1"><input type="number" name="second_term" class="form-control" placeholder="سعي 2"></div>
+        <div class="col-md-1"><input type="number" name="final_exam" class="form-control" placeholder="النهائي"></div>
+        <div class="col-md-2"><button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold">احتساب
+                ورصد</button></div>
+    </form>
+</div>
+
+<div class="card card-custom p-4">
+    <h6 class="fw-bold text-secondary mb-3">سجل الدرجات المرصودة (أعداد صحيحة معتمدة)</h6>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle text-center mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>الطالب</th>
+                    <th>المادة</th>
+                    <th>السعي السنوي</th>
+                    <th>الدرجة النهائية</th>
+                    <th>الحالة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for g in grades %}
+                <tr>
+                    <td class="text-start fw-bold">{{ g.student.full_name }}</td>
+                    <td>{{ g.subject.name }}</td>
+                    <td class="fw-bold text-secondary">{{ g.annual_effort|floatformat:0 }}</td>
+                    <td class="fw-bold text-primary fs-6">{{ g.final_grade|floatformat:0 }}</td>
+                    <td>
+                        {% if g.status == 'passed' %}<span class="badge bg-success">ناجح</span>
+                        {% elif g.status == 'passed_by_decision' %}<span class="badge bg-info text-dark">ناجح
+                            بالقرار</span>
+                        {% else %}<span class="badge bg-danger">راسب / مكمل</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+

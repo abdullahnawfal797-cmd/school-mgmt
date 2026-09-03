@@ -1,0 +1,128 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}إدارة المواد والكتب المنهجية{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <!-- بطاقة إضافة مادة جديدة -->
+    <div class="col-12 col-lg-5">
+        <div class="card card-custom p-4 border-start border-primary border-4 shadow-sm h-100">
+            <h5 class="fw-bold text-primary mb-3">
+                <i class="bi bi-book-half me-2"></i>إضافة مادة دراسية جديدة
+            </h5>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">اسم المادة المنهجية:</label>
+                    <input type="text" name="name" class="form-control"
+                        placeholder="مثال: الرياضيات / اللغة العربية / الفيزياء" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-bold">رمز المادة الإحصائي / الوزاري (Code):</label>
+                    <input type="text" name="code" class="form-control font-monospace"
+                        placeholder="مثال: MATH-01 / ARAB-01" required>
+                </div>
+                <button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold py-2">
+                    <i class="bi bi-plus-circle me-1"></i> حفظ المادة الدراسية
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول عرض وتعديل المواد -->
+    <div class="col-12 col-lg-7">
+        <div class="card card-custom p-4 shadow-sm h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-collection-fill text-primary me-2"></i>قائمة المواد المعتمدة
+                </h5>
+                <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+                    <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
+                </a>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 10%;">ت</th>
+                            <th style="width: 45%;">اسم المادة</th>
+                            <th style="width: 25%;">الرمز التعريفي</th>
+                            <th style="width: 20%;">الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in subjects %}
+                        <tr>
+                            <td class="fw-bold">{{ forloop.counter }}</td>
+                            <td class="text-start fw-bold pe-3">
+                                <i class="bi bi-journal-text text-primary me-1"></i> {{ sub.name }}
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border font-monospace fs-6">{{ sub.code }}</span>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3"
+                                    data-bs-toggle="modal" data-bs-target="#editSubjectModal{{ sub.id }}">
+                                    <i class="bi bi-pencil-square"></i> تعديل
+                                </button>
+
+                                <!-- نافذة تعديل المادة -->
+                                <div class="modal fade text-start" id="editSubjectModal{{ sub.id }}" tabindex="-1"
+                                    aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content rounded-4 border-0 shadow">
+                                            <div class="modal-header bg-light">
+                                                <h6 class="modal-title fw-bold text-dark">
+                                                    <i class="bi bi-pencil-square text-warning me-1"></i> تعديل المادة:
+                                                    {{ sub.name }}
+                                                </h6>
+                                                <button type="button" class="btn-close"
+                                                    data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form method="POST" action="{% url 'portal_subject_edit' sub.id %}">
+                                                {% csrf_token %}
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">اسم المادة:</label>
+                                                        <input type="text" name="name" class="form-control"
+                                                            value="{{ sub.name }}" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">الرمز الوزاري /
+                                                            الكود:</label>
+                                                        <input type="text" name="code"
+                                                            class="form-control font-monospace" value="{{ sub.code }}"
+                                                            required>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer bg-light">
+                                                    <button type="button" class="btn btn-secondary btn-sm rounded-pill"
+                                                        data-bs-dismiss="modal">إلغاء</button>
+                                                    <button type="submit"
+                                                        class="btn btn-warning btn-sm rounded-pill px-4 fw-bold">حفظ
+                                                        التعديل</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-muted py-4">لم يتم تسجيل أي مواد دراسية حتى الآن.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-3 text-muted small">
+                إجمالي المواد المنهجية: <strong>{{ subjects|length }}</strong> مواد
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,74 @@
+{% extends 'portal/base_portal.html' %}
+
+{% block title %}تفعيل رخصة المنظومة المدرسية{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+    <div class="col-12 col-lg-8">
+        <div class="card card-custom p-4 border-top border-danger border-4 shadow-lg text-center">
+
+            <div class="mb-3">
+                <span class="badge bg-danger p-3 rounded-circle fs-2">
+                    <i class="bi bi-shield-lock-fill"></i>
+                </span>
+            </div>
+
+            <h3 class="fw-bold text-danger mb-2">انتهت فترة الاستخدام التجريبي المجاني</h3>
+            <p class="text-muted mb-4">
+                بيانات مؤسستكم المدرسية وسجلات الطلاب والدرجات <strong>محفوظة بالكامل وفي أمان تام</strong>. للاستمرار
+                في استخدام المنظومة وطباعة الوثائق، يرجى تفعيل الاشتراك السنوي أو الدائم.
+            </p>
+
+            <!-- بطاقة معرف الجهاز للتفعيل -->
+            <div class="alert alert-light border text-center p-3 mb-4 rounded-3">
+                <span class="text-muted small d-block mb-1">المُعرّف الرقمي الخاص بهذه الحاسبة (Machine ID):</span>
+                <span class="fs-4 fw-bold text-primary font-monospace tracking-wide">{{ machine_id }}</span>
+                <small class="text-muted d-block mt-1">زوّدنا بهذا الكود عند الاتصال لتوليد مفتاح التفعيل الفوري
+                    لمدرستكم.</small>
+            </div>
+
+            <!-- طرق التسديد المتاحة ورقم الاتصال -->
+            <div class="row g-3 mb-4 text-start">
+                <div class="col-12 col-md-6">
+                    <div class="p-3 bg-light rounded-3 h-100 border">
+                        <h6 class="fw-bold text-dark"><i class="bi bi-cash-stack text-success me-2"></i>1. التسديد
+                            المباشر (كاش):</h6>
+                        <p class="small text-muted mb-0">يمكنكم الدفع المباشر عبر مندوبنا المعتمد أو المراجعة، وسيصلكم
+                            الكود فوراً.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="p-3 bg-light rounded-3 h-100 border">
+                        <h6 class="fw-bold text-dark"><i class="bi bi-credit-card-2-front text-primary me-2"></i>2.
+                            التحويل عبر الماستر كارد:</h6>
+                        <p class="small text-muted mb-0">تحويل المبلغ إلى بطاقة الماستر كارد مباشرة واستلام كود التفعيل
+                            عبر الواتساب بدقائق.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- زر الاتصال المباشر -->
+            <div
+                class="alert alert-primary d-flex align-items-center justify-content-center gap-2 p-3 rounded-pill mb-4">
+                <i class="bi bi-telephone-outbound-fill fs-5"></i>
+                <span class="fw-bold">للتفعيل والاشتراك، اتصل بالإدارة مباشرة أو عبر الواتساب:</span>
+                <a href="tel:{{ phone_contact }}" class="fw-bold fs-5 text-decoration-none text-danger">{{ phone_contact
+                    }}</a>
+            </div>
+
+            <!-- حقل إدخال كود التفعيل -->
+            <form method="POST" class="mt-2">
+                {% csrf_token %}
+                <div class="input-group input-group-lg mb-3">
+                    <input type="text" name="license_key" class="form-control text-center font-monospace"
+                        placeholder="أدخل مفتاح التفعيل هنا (مثال: LIFE-XXXX-XXXX)" required>
+                    <button class="btn btn-success px-4 fw-bold" type="submit">
+                        <i class="bi bi-key-fill me-1"></i> تفعيل المنظومة الآن
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,169 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}سجل أولياء الأمور والاتصال{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4" dir="rtl">
+    <div class="col-12">
+        <div class="card card-custom p-4 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <div>
+                    <h5 class="fw-bold text-primary mb-0">
+                        <i class="bi bi-people-fill me-2"></i>دليل أولياء الأمور وأرقام التواصل
+                    </h5>
+                    <span class="text-muted small">سجل بيانات التواصل والمتابعة لأولياء أمور الطلبة</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" onclick="window.print()" class="btn btn-success btn-sm rounded-pill px-3 shadow-sm fw-bold">
+                        <i class="bi bi-printer-fill me-1"></i> طباعة الدليل
+                    </button>
+                    <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
+                    </a>
+                </div>
+            </div>
+
+            <!-- شريط البحث -->
+            <form method="GET" class="row g-2 mb-4 d-print-none">
+                <div class="col-12 col-md-10">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control fw-bold" value="{{ query }}"
+                            placeholder="ابحث باسم ولي الأمر، رقم الهاتف، أو اسم الطالب...">
+                    </div>
+                </div>
+                <div class="col-12 col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold">بحث</button>
+                    {% if query %}
+                    <a href="{% url 'portal_parents_manage' %}" class="btn btn-outline-secondary rounded-pill">إلغاء</a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- جدول أولياء الأمور -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 14px;">
+                    <thead class="table-light fw-bold">
+                        <tr>
+                            <th style="width: 5%;">ت</th>
+                            <th style="width: 25%;">اسم ولي الأمر</th>
+                            <th style="width: 20%;">رقم الهاتف</th>
+                            <th style="width: 20%;">السكن / العنوان</th>
+                            <th style="width: 20%;">الطلبة المرتبطين (الأبناء)</th>
+                            <th style="width: 10%;" class="d-print-none">تعديل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in parents %}
+                        <tr>
+                            <td class="fw-bold">{{ forloop.counter }}</td>
+                            <td class="fw-bold text-start ps-3 text-dark">
+                                <i class="bi bi-person-badge text-primary me-1"></i>
+                                {{ p.user.get_full_name|default:p.user.username }}
+                            </td>
+                            <td>
+                                {% if p.phone %}
+                                <a href="tel:{{ p.phone }}" class="text-decoration-none font-monospace fw-bold text-success">
+                                    <i class="bi bi-telephone-fill me-1"></i>{{ p.phone }}
+                                </a>
+                                {% else %}
+                                <span class="text-muted small">غير مسجل</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted small fw-bold">
+                                {{ p.address|default:"غير محدد" }}
+                            </td>
+                            <td class="text-start ps-2">
+                                {% if p.student_set.all %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for st in p.student_set.all %}
+                                    <span class="badge bg-light text-dark border p-2">
+                                        <i class="bi bi-mortarboard-fill text-primary me-1"></i>
+                                        {{ st.user.get_full_name }}
+                                        <small class="text-muted">({{ st.current_class.name|default:"بدون صف" }})</small>
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted small">لا يوجد طلبة مرتبطين</span>
+                                {% endif %}
+                            </td>
+                            <td class="d-print-none">
+                                <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3"
+                                    onclick="openEditParentModal('{{ p.id }}', '{{ p.user.first_name|escapejs }}', '{{ p.phone|default:''|escapejs }}', '{{ p.address|default:''|escapejs }}')">
+                                    <i class="bi bi-pencil-square"></i> تعديل
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-muted py-4">لا توجد سجلات مطابقة للبحث.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-3 text-muted small fw-bold">
+                إجمالي أولياء الأمور: <strong>{{ parents|length }}</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تعديل بيانات ولي الأمر الموحدة (خارج الجدول لتفادي الوميض والتعليق) -->
+<div class="modal fade" id="unifiedParentModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold text-dark">
+                    <i class="bi bi-pencil-square text-warning me-1"></i> تعديل بيانات ولي الأمر: <span id="modalParentName" class="text-primary"></span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form method="POST" id="editParentForm" action="">
+                {% csrf_token %}
+                <div class="modal-body p-4 text-start">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">الاسم الكامل لولي الأمر:</label>
+                        <input type="text" name="first_name" id="modalInputName" class="form-control fw-bold" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">رقم الهاتف (واتساب):</label>
+                        <input type="text" name="phone" id="modalInputPhone" class="form-control font-monospace fw-bold">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">عنوان السكن والمنطقة:</label>
+                        <input type="text" name="address" id="modalInputAddress" class="form-control fw-bold">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">حفظ التعديلات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let parentModalObj = null;
+
+function openEditParentModal(parentId, name, phone, address) {
+    document.getElementById('modalParentName').innerText = name;
+    document.getElementById('modalInputName').value = name;
+    document.getElementById('modalInputPhone').value = phone;
+    document.getElementById('modalInputAddress').value = address;
+    
+    // توجيه مسار الحفظ لرقم المعرف الخاص بولي الأمر
+    document.getElementById('editParentForm').action = '/portal/parents/' + parentId + '/edit/';
+
+    const modalEl = document.getElementById('unifiedParentModal');
+    if (!parentModalObj) {
+        parentModalObj = new bootstrap.Modal(modalEl);
+    }
+    parentModalObj.show();
+}
+</script>
+{% endblock %}
+

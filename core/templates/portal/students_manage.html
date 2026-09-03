@@ -1,0 +1,319 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}إدارة وقبول الطلبة والتوزيع التناسبي{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4" dir="rtl">
+    <!-- نموذج تسجيل طالب جديد يدوي + نافذة الاستيراد -->
+    <div class="col-12 col-lg-5">
+        <div class="card card-custom p-4 border-start border-primary border-4 shadow-sm h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-primary mb-0">
+                    <i class="bi bi-person-plus-fill me-2"></i>تسجيل وقبول طالب جديد
+                </h5>
+                <!-- زر فتح نافذة استيراد الإكسل -->
+                <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm"
+                    data-bs-toggle="modal" data-bs-target="#excelImportModal">
+                    <i class="bi bi-file-earmark-excel-fill me-1"></i> استيراد إكسل
+                </button>
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="add_student">
+                
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">الاسم الأول والثاني:</label>
+                        <input type="text" name="first_name" class="form-control" placeholder="مثال: علي محمد" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">الجد واللقب:</label>
+                        <input type="text" name="last_name" class="form-control" placeholder="مثال: حسن الشمري">
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">رقم القيد العام:</label>
+                        <input type="text" name="registration_number" class="form-control" placeholder="مثال: 2026/105">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">الرقم الوطني / الهوية:</label>
+                        <input type="text" name="national_id" class="form-control font-monospace" placeholder="الرقم التعريفي">
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">المرحلة والصف:</label>
+                        <select name="class_id" class="form-select" required>
+                            <option value="">-- اختر الصف --</option>
+                            {% for cls in classes %}
+                            <option value="{{ cls.id }}">{{ cls.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">الشعبة:</label>
+                        <select name="section_id" class="form-select">
+                            <option value="">-- اختر الشعبة --</option>
+                            {% for sec in sections %}
+                            <option value="{{ sec.id }}">{{ sec.school_class.name }} - شعبة {{ sec.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="border-top pt-3 mt-3">
+                    <h6 class="fw-bold text-dark small mb-2"><i class="bi bi-person-badge me-1"></i>بيانات ولي الأمر (اختياري)</h6>
+                    <div class="mb-2">
+                        <label class="form-label small">اسم ولي الأمر الرباعي:</label>
+                        <input type="text" name="parent_name" class="form-control" placeholder="مثال: محمد حسن الشمري">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">رقم الهاتف (واتساب):</label>
+                        <input type="text" name="parent_phone" class="form-control font-monospace" placeholder="مثال: 077XXXXXXXX">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold py-2 mt-2">
+                    <i class="bi bi-check-circle me-1"></i> حفظ وتثبيت القيد
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول عرض وتعديل ونقل الطلبة المسجلين -->
+    <div class="col-12 col-lg-7">
+        <div class="card card-custom p-4 shadow-sm h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-people-fill text-primary me-2"></i>قائمة الطلبة المسجلين
+                    </h5>
+                    <span class="text-muted small">المسجلين حالياً: <strong>{{ students|length }}</strong> طالب</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'portal_dashboard' %}" class="btn btn-dark btn-sm rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-house-door-fill me-1"></i> الرئيسية
+                    </a>
+                </div>
+            </div>
+
+            <!-- شريط تصفية سريع -->
+            <form method="GET" class="row g-2 align-items-center mb-3">
+                <div class="col-md-5">
+                    <select name="class_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">-- كافة المراحل الدراسية --</option>
+                        {% for c in classes %}
+                        <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"i" %}selected{% endif %}>{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <select name="section_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">-- كافة الشعب --</option>
+                        {% for s in sections %}
+                        <option value="{{ s.id }}" {% if selected_section_id == s.id|stringformat:"i" %}selected{% endif %}>{{ s.school_class.name }} - شعبة {{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 text-end">
+                    <button type="submit" class="btn btn-secondary btn-sm rounded-pill w-100">تصفية</button>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 5%;">ت</th>
+                            <th style="width: 14%;">رقم القيد</th>
+                            <th style="width: 32%;">اسم الطالب</th>
+                            <th style="width: 25%;">الصف والشعبة</th>
+                            <th style="width: 24%;">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for st in students %}
+                        <tr>
+                            <td class="fw-bold">{{ forloop.counter }}</td>
+                            <td class="font-monospace text-primary fw-bold">{{ st.registration_number|default:"---" }}</td>
+                            <td class="text-start fw-bold pe-2">
+                                <i class="bi bi-person text-secondary me-1"></i> {{ st.user.get_full_name|default:st.user.username }}
+                            </td>
+                            <td>
+                                {{ st.current_class.name|default:"بدون صف" }}
+                                {% if st.section %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">شعبة {{ st.section.name }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <!-- زر التعديل السريع -->
+                                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2 py-1"
+                                        data-bs-toggle="modal" data-bs-target="#editStudentModal{{ st.id }}" title="تعديل بيانات الطالب">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+
+                                    <!-- زر الحذف اللطيف / النقل للأرشيف الدائم -->
+                                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-1"
+                                        onclick="confirmTransferStudent({{ st.id }}, '{{ st.user.get_full_name }}')" title="نقل الطالب وأرشفة قيده للشهادات">
+                                        <i class="bi bi-person-dash-fill"></i> نقل للأرشيف
+                                    </button>
+                                </div>
+
+                                <!-- نافذة التعديل السريع للطالب -->
+                                <div class="modal fade text-start" id="editStudentModal{{ st.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content rounded-4 border-0 shadow">
+                                            <div class="modal-header bg-light">
+                                                <h6 class="modal-title fw-bold text-dark">
+                                                    <i class="bi bi-pencil-square text-warning me-1"></i> تعديل بيانات الطالب: {{ st.user.get_full_name }}
+                                                </h6>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form method="POST" action="{% url 'portal_student_edit' st.id %}">
+                                                {% csrf_token %}
+                                                <div class="modal-body">
+                                                    <div class="row g-2 mb-3">
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">الاسم الأول والثاني:</label>
+                                                            <input type="text" name="first_name" class="form-control" value="{{ st.user.first_name }}" required>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">الجد واللقب:</label>
+                                                            <input type="text" name="last_name" class="form-control" value="{{ st.user.last_name }}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="row g-2 mb-3">
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">رقم القيد العام:</label>
+                                                            <input type="text" name="registration_number" class="form-control" value="{{ st.registration_number|default:'' }}">
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">الرقم الوطني / الهوية:</label>
+                                                            <input type="text" name="national_id" class="form-control" value="{{ st.national_id|default:'' }}">
+                                                        </div>
+                                                    </div>
+                                                    <div class="row g-2 mb-3">
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">الصف الدراسي:</label>
+                                                            <select name="class_id" class="form-select">
+                                                                <option value="">-- بدون صف --</option>
+                                                                {% for cls in classes %}
+                                                                <option value="{{ cls.id }}" {% if st.current_class_id == cls.id %}selected{% endif %}>{{ cls.name }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <label class="form-label small fw-bold">الشعبة:</label>
+                                                            <select name="section_id" class="form-select">
+                                                                <option value="">-- بدون شعبة --</option>
+                                                                {% for sec in sections %}
+                                                                <option value="{{ sec.id }}" {% if st.section_id == sec.id %}selected{% endif %}>{{ sec.school_class.name }} - شعبة {{ sec.name }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label small fw-bold">الحالة الأكاديمية للطالب:</label>
+                                                        <select name="student_status" class="form-select">
+                                                            <option value="active" {% if st.student_status == 'active' %}selected{% endif %}>مستمر بالدوام</option>
+                                                            <option value="graduated" {% if st.student_status == 'graduated' %}selected{% endif %}>متخرج</option>
+                                                            <option value="transferred" {% if st.student_status == 'transferred' %}selected{% endif %}>منقول</option>
+                                                            <option value="suspended" {% if st.student_status == 'suspended' %}selected{% endif %}>مفصول / تارك</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer bg-light">
+                                                    <button type="button" class="btn btn-secondary btn-sm rounded-pill" data-bs-dismiss="modal">إلغاء</button>
+                                                    <button type="submit" class="btn btn-warning btn-sm rounded-pill px-4 fw-bold">حفظ التعديلات</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-muted py-4">لم يتم تسجيل أي طلبة حتى الآن. يمكنك تسجيل طالب يدوياً أو استيراد دفعة كاملة من ملف إكسل.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== نافذة استيراد الإكسل الذكية مع التوزيع التناسبي ==================== -->
+<div class="modal fade" id="excelImportModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header bg-success text-white">
+                <h6 class="modal-title fw-bold"><i class="bi bi-file-earmark-excel-fill me-2"></i>استيراد طلبة وتوزيع تناسبي ذكي</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="import_excel">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        <strong>تنسيق شيت الإكسل (xlsx) المعتاد للإدارة:</strong><br>
+                        • <strong>العمود A:</strong> اسم الطالب الرباعي (مرتباً <strong>أبجدياً</strong> كالمعتاد).<br>
+                        • <strong>العمود B:</strong> معدل الطالب (مهما كان ترتيبه).<br>
+                        • <strong>العمود C:</strong> رقم القيد العام (اختياري).<br>
+                        • <strong>العمود D:</strong> هاتف ولي الأمر (اختياري).
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold mb-1">اختر ملف الإكسل (Excel):</label>
+                        <input type="file" name="excel_file" class="form-control" accept=".xlsx, .xls" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold mb-1">الصف والمرحلة المستهدفة للطلبة:</label>
+                        <select name="target_class_id" class="form-select fw-bold" required>
+                            <option value="">-- اختر الصف المستهدف --</option>
+                            {% for c in classes %}
+                            <option value="{{ c.id }}">{{ c.name }} (الشعب المعتمدة: {{ c.sections.count }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="alert alert-warning py-2 small mb-0">
+                        <i class="bi bi-stars me-1"></i>
+                        <strong>محرك التوزيع المتعرج التناسبي (Snake Drafting):</strong><br>
+                        سيتولى النظام أوتوماتيكياً فرز معدلات الطلبة الأبجدية وتوزيعها بعدالة تامة على الشعب لمنع تكدس المتفوقين في شعبة واحدة وتحقيق التكافؤ العلمي.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">بدء الفرز والتوزيع على الشُعب</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- نموذج حذف وأرشفة الطالب الخفي -->
+<form id="transferStudentForm" method="POST" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="action_type" value="soft_delete_student">
+    <input type="hidden" name="student_id" id="transfer_student_id" value="">
+</form>
+
+<script>
+function confirmTransferStudent(studentId, studentName) {
+    if (confirm(`هل أنت متأكد من نقل الطالب (${studentName}) وإخفائه من الشاشات الحالية؟\n\nملاحظة: سيبقى سجله وقيده محفوظاً في الأرشيف الدائم لإصدار وثائق التخرج وتأييدات الاستمرار في أي وقت.`)) {
+        document.getElementById('transfer_student_id').value = studentId;
+        document.getElementById('transferStudentForm').submit();
+    }
+}
+</script>
+{% endblock %}
+

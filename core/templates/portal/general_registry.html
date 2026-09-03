@@ -1,0 +1,433 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}سجل القيد العام للطلبة{% endblock %}
+
+{% block content %}
+    <div class="row g-4 mb-4" dir="rtl">
+      <div class="col-12">
+        <div class="card card-custom p-4 shadow-sm">
+          <div
+            class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2"
+          >
+            <h5 class="fw-bold text-primary mb-0">
+              <i class="bi bi-journal-bookmark-fill me-2"></i>
+              سجل القيد العام المدرسي
+            </h5>
+            <a
+              href="{% url 'portal_dashboard' %}"
+              class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
+            >
+              <i class="bi bi-house-door-fill me-1"></i>
+              القائمة الرئيسية
+            </a>
+          </div>
+
+          <!-- أدوات الفرز والبحث -->
+          <form method="GET" class="row g-2 mb-4 align-items-center">
+            <div class="col-12 col-md-5">
+              <div class="input-group">
+                <span class="input-group-text bg-light">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input
+                  type="text"
+                  name="q"
+                  value="{{ query }}"
+                  class="form-control"
+                  placeholder="ابحث بالاسم، رقم القيد، أو الهوية الوطنية..."
+                />
+              </div>
+            </div>
+
+            <div class="col-6 col-md-3">
+              <select name="school_class" class="form-select">
+                <option value="">-- جميع المراحل والصفوف --</option>
+                {% for cls in classes %}
+                  <option value="{{ cls.id }}" {% if selected_class == cls.id|stringformat:"s" %}selected{% endif %}>
+                    0
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-6 col-md-2">
+              <select name="status" class="form-select">
+                <option value="">-- كل الحالات --</option>
+                <option value="active" selected>
+                  مستمر بالدوام
+                </option>
+                <option value="graduated" 4selected5>
+                  متخرج
+                </option>
+                <option value="transferred" 6selected7>
+                  منقول
+                </option>
+                <option value="suspended" 8selected9>
+                  مفصول / تارك
+                </option>
+              </select>
+            </div>
+
+            <div class="col-12 col-md-2 d-flex gap-2">
+              <button
+                type="submit"
+                class="btn btn-primary rounded-pill w-100 fw-bold"
+              >
+                تصفية
+              </button>
+              {% if query or selected_class or selected_status %}
+                <a
+                  href="{% url 'portal_general_registry' %}"
+                  class="btn btn-outline-secondary rounded-pill"
+                >
+                  إلغاء
+                </a>
+              {% endif %}
+            </div>
+          </form>
+
+          <!-- جدول القيد العام -->
+          <div class="table-responsive">
+            <table
+              class="table table-bordered table-hover align-middle mb-0 text-center"
+            >
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 5%">ت</th>
+                  <th style="width: 12%">رقم القيد</th>
+                  <th style="width: 23%">اسم الطالب الرباعي واللقب</th>
+                  <th style="width: 15%">الصف والشعبة</th>
+                  <th style="width: 17%">ولي الأمر والهاتف</th>
+                  <th style="width: 10%">الحالة</th>
+                  <th style="width: 18%">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for st in students %}
+                  <tr>
+                    <td class="fw-bold">{{ forloop.counter }}</td>
+                    <td class="font-monospace text-primary fw-bold">
+                      {{ st.student_id_number|default:st.id }}</td><td class="text-start fw-bold pe-3"><i class="bi bi-person me-1"></i>{{ st.full_name }}
+                    </td>
+                    <td>
+                      {{ st.current_class.name|default:"---" }}
+                      {% if st.section %}
+                        <span class="badge bg-light text-dark border">
+                          شعبة 
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td class="text-start small">
+                      {% if st.parent %}
+                        <div class="fw-bold">{{ st.parent.user.first_name }}</div>
+                        <div class="text-muted font-monospace">
+                          <i class="bi bi-telephone"></i>
+                          {{ st.parent.phone|default:"---" }}
+                        </div>
+                      {% else %}
+                        <span class="text-muted">غير محدد</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if st.student_status == 'active' %}
+                        <span class="badge bg-success">مستمر</span>
+                      {% elif st.student_status == 'graduated' %}
+                        <span class="badge bg-primary">متخرج</span>
+                      {% elif st.student_status == 'transferred' %}
+                        <span class="badge bg-warning text-dark">منقول</span>
+                      {% else %}
+                        <span class="badge bg-secondary">{% url 'portal_dashboard' %}0</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="d-flex justify-content-center gap-1">
+                        <!-- زر التعديل السلس بدون تكرار المودال -->
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-warning rounded-pill px-2"
+                          onclick="
+                            openSingleEditModal(
+                              '{% url 'portal_dashboard' %}2',
+                              '{% url 'portal_dashboard' %}3',
+                              '{% url 'portal_dashboard' %}4',
+                              '{% url 'portal_dashboard' %}5',
+                              '{% url 'portal_dashboard' %}6',
+                              '{% url 'portal_dashboard' %}7',
+                              '{% url 'portal_dashboard' %}8',
+                            )
+                          "
+                          title="تعديل بيانات الطالب"
+                        >
+                          <i class="bi bi-pencil-square"></i>
+                          تعديل
+                        </button>
+
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-info rounded-pill px-2"
+                          onclick="
+                            openTranscriptModal('{% url 'portal_dashboard' %}9', '{{ query }}0')
+                          "
+                          title="استخراج وطباعة الوثيقة"
+                        >
+                          <i class="bi bi-printer"></i>
+                          الوثيقة
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="7" class="text-muted py-4">
+                      لا يوجد طلاب مطابقون لمعايير البحث الحالية.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3 text-muted small">
+            إجمالي النتائج:
+            <strong>{{ query }}3</strong>
+            طالب
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة التعديل السريع الموحدة خارج الجدول نهائياً لحل الوميض -->
+    <div
+      class="modal fade text-start"
+      id="singleEditStudentModal"
+      tabindex="-1"
+      aria-hidden="true"
+      dir="rtl"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+          <div class="modal-header bg-light">
+            <h6 class="modal-title fw-bold text-dark">
+              <i class="bi bi-pencil-square text-warning me-1"></i>
+              تعديل بيانات الطالب:
+              <span id="lblStudentName" class="text-primary"></span>
+            </h6>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+            ></button>
+          </div>
+          <form method="POST" id="editStudentFormElement" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label small fw-bold">
+                    الاسم الأول والثاني:
+                  </label>
+                  <input
+                    type="text"
+                    name="first_name"
+                    id="inp_first_name"
+                    class="form-control"
+                    required
+                  />
+                </div>
+                <div class="col-6">
+                  <label class="form-label small fw-bold">الجد واللقب:</label>
+                  <input
+                    type="text"
+                    name="last_name"
+                    id="inp_last_name"
+                    class="form-control"
+                  />
+                </div>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label small fw-bold">رقم القيد العام:</label>
+                  <input
+                    type="text"
+                    name="registration_number"
+                    id="inp_reg_num"
+                    class="form-control"
+                  />
+                </div>
+                <div class="col-6">
+                  <label class="form-label small fw-bold">
+                    الرقم الوطني / الهوية:
+                  </label>
+                  <input
+                    type="text"
+                    name="national_id"
+                    id="inp_nat_id"
+                    class="form-control"
+                  />
+                </div>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label small fw-bold">الصف الحالي:</label>
+                  <select name="class_id" id="inp_class_id" class="form-select">
+                    <option value="">-- بدون صف --</option>
+                    {% for cls in classes %}
+                      <option value="{{ query }}6">{{ query }}7</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small fw-bold">الحالة الأكاديمية:</label>
+                  <select name="student_status" id="inp_status" class="form-select">
+                    <option value="active">مستمر</option>
+                    <option value="graduated">متخرج</option>
+                    <option value="transferred">منقول</option>
+                    <option value="suspended">مفصول / تارك</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer bg-light">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm rounded-pill"
+                data-bs-dismiss="modal"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                class="btn btn-warning btn-sm rounded-pill px-4 fw-bold"
+              >
+                حفظ التعديلات
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- النافذة المنبثقة لمعاينة وطباعة الوثيقة -->
+    <div
+      class="modal fade"
+      id="transcriptModal"
+      tabindex="-1"
+      aria-hidden="true"
+      dir="rtl"
+    >
+      <div
+        class="modal-dialog modal-xl modal-dialog-centered"
+        style="max-width: 900px"
+      >
+        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+          <div class="modal-header bg-light border-bottom py-2 px-3">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-file-earmark-text-fill text-primary fs-5"></i>
+              <h6 class="modal-title fw-bold text-dark mb-0">
+                معاينة وثيقة الطالب:
+                <span id="modalStudentTitle" class="text-primary"></span>
+              </h6>
+            </div>
+            <div class="d-flex gap-2">
+              <button
+                type="button"
+                class="btn btn-sm btn-success rounded-pill px-3 fw-bold"
+                onclick="printTranscriptFrame()"
+              >
+                <i class="bi bi-printer-fill me-1"></i>
+                طباعة الوثيقة
+              </button>
+              <button
+                type="button"
+                class="btn-close ms-0"
+                data-bs-dismiss="modal"
+                aria-label="إغلاق"
+              ></button>
+            </div>
+          </div>
+          <div
+            class="modal-body p-0 position-relative"
+            style="background-color: #525659; min-height: 580px"
+          >
+            <div
+              id="transcriptLoader"
+              class="position-absolute top-50 start-50 translate-middle text-white text-center"
+            >
+              <div class="spinner-border text-light mb-2" role="status"></div>
+              <div class="small fw-bold">جاري إعداد وثيقة الطالب...</div>
+            </div>
+            <iframe
+              id="transcriptIframe"
+              style="width: 100%; height: 75vh; border: none; display: block"
+              onload="hideTranscriptLoader()"
+            ></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let editModalInstance = null;
+
+      function openSingleEditModal(
+        studentId,
+        firstName,
+        lastName,
+        regNum,
+        natId,
+        classId,
+        status,
+      ) {
+        document.getElementById("editStudentFormElement").action =
+          "/portal/students/" + studentId + "/edit/";
+        document.getElementById("lblStudentName").innerText =
+          firstName + " " + lastName;
+        document.getElementById("inp_first_name").value = firstName;
+        document.getElementById("inp_last_name").value = lastName;
+        document.getElementById("inp_reg_num").value = regNum;
+        document.getElementById("inp_nat_id").value = natId;
+        document.getElementById("inp_class_id").value = classId;
+        document.getElementById("inp_status").value = status;
+
+        if (!editModalInstance) {
+          editModalInstance = new bootstrap.Modal(
+            document.getElementById("singleEditStudentModal"),
+          );
+        }
+        editModalInstance.show();
+      }
+
+      let transcriptModalInstance = null;
+
+      function openTranscriptModal(url, studentName) {
+        document.getElementById("modalStudentTitle").innerText = studentName;
+        const loader = document.getElementById("transcriptLoader");
+        const iframe = document.getElementById("transcriptIframe");
+
+        if (loader) loader.style.display = "block";
+        if (iframe) iframe.src = url;
+
+        if (!transcriptModalInstance) {
+          transcriptModalInstance = new bootstrap.Modal(
+            document.getElementById("transcriptModal"),
+          );
+        }
+        transcriptModalInstance.show();
+      }
+
+      function hideTranscriptLoader() {
+        const loader = document.getElementById("transcriptLoader");
+        if (loader) loader.style.display = "none";
+      }
+
+      function printTranscriptFrame() {
+        const iframe = document.getElementById("transcriptIframe");
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }
+      }
+    </script>
+  {% endblock %}
+
+

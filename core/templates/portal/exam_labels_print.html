@@ -1,0 +1,114 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+شيت تفقد حضور القاعة الامتحانية - {{ session.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        @page {
+            size: A4 portrait;
+            margin: 12mm;
+        }
+
+        body {
+            background: #ffffff !important;
+            font-size: 12px;
+        }
+    }
+
+    .table-sheet th,
+    .table-sheet td {
+        border: 1px solid #000 !important;
+        vertical-align: middle;
+        text-align: center;
+        padding: 6px;
+    }
+
+    .table-sheet thead th {
+        background-color: #f2f2f2 !important;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <div>
+        <h5 class="fw-bold mb-0">شيت تفقد حضور الطلاب في القاعات الامتحانية</h5>
+        <span class="text-muted small">الدورة: {{ session.title }} | السنة: {{ session.academic_year.name }}</span>
+    </div>
+    <div class="d-flex gap-2">
+        <button onclick="window.print()" class="btn btn-primary fw-bold">
+            <i class="bi bi-printer me-1"></i> طباعة شيت الحضور (A4)
+        </button>
+        <a href="{% url 'portal_exam_halls' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-right me-1"></i> عودة
+        </a>
+    </div>
+</div>
+
+<div class="p-3 bg-white border">
+    <!-- الترويسة الرسمية العراقية -->
+    <div class="row align-items-center mb-3 pb-2 border-bottom text-center">
+        <div class="col-4 text-start">
+            <div class="fw-bold">جمهورية العراق</div>
+            <div class="fw-bold">وزارة التربية</div>
+            <div class="small text-muted">اللجنة الامتحانية المدرسية</div>
+        </div>
+        <div class="col-4">
+            <h5 class="fw-bold mb-1">استمارة تفقد حضور وغياب القاعة</h5>
+            <div class="badge bg-dark fs-6">{{ session.title }}</div>
+        </div>
+        <div class="col-4 text-end">
+            <div>التاريخ: {{ today_date }}</div>
+            <div>المادة: ......................</div>
+        </div>
+    </div>
+
+    <!-- جدول حضور الطلاب -->
+    <table class="table table-sheet w-100 mb-4">
+        <thead>
+            <tr>
+                <th style="width: 8%;">رقم المقعد</th>
+                <th style="width: 14%;">القاعة</th>
+                <th style="width: 30%;">اسم الطالب الرباعي واللقب</th>
+                <th style="width: 16%;">المرحلة والشعبة</th>
+                <th style="width: 14%;">الموقف (حاضر/غائب)</th>
+                <th style="width: 18%;">توقيع الطالب</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for seat in seats %}
+            <tr>
+                <td class="fw-bold fs-6">{{ seat.seat_number }}</td>
+                <td>{{ seat.exam_hall.name }}</td>
+                <td class="text-start fw-bold pe-2">{{ seat.student.full_name }}</td>
+                <td>{{ seat.student.current_class.name }} - {{ seat.student.section.name|default:"أ" }}</td>
+                <td>[ &nbsp; ] حاضر &nbsp;&nbsp; [ &nbsp; ] غائب</td>
+                <td></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="py-4 text-muted">لا يوجد طلاب مسجلون على مقاعد هذه القاعة.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- تواقيع اللجنة الامتحانية -->
+    <div class="row mt-4 pt-3 text-center">
+        <div class="col-4">
+            <div class="fw-bold">مراقب القاعة الأول</div>
+            <div class="mt-4">التوقيع: .....................</div>
+        </div>
+        <div class="col-4">
+            <div class="fw-bold">مراقب القاعة الثاني</div>
+            <div class="mt-4">التوقيع: .....................</div>
+        </div>
+        <div class="col-4">
+            <div class="fw-bold">مدير المركز / رئيس اللجنة الامتحانية</div>
+            <div class="mt-4">الختم والتوقيع: .....................</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

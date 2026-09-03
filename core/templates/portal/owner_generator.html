@@ -1,0 +1,88 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}مولد تراخيص المنظومة - خاص بالمالك{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card card-custom p-4 p-md-5 shadow-sm border-top border-warning border-4">
+
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="bi bi-key-fill text-warning me-2"></i>بوابة المالك لتوليد التراخيص
+                </h5>
+                <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+                    <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
+                </a>
+            </div>
+
+            {% if not is_authenticated %}
+            <!-- شاشة تسجيل الدخول السري للمالك -->
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="login">
+                <div class="mb-3 text-start">
+                    <label class="form-label small fw-bold">كلمة المرور الرئيسية للمالك:</label>
+                    <input type="password" name="password" class="form-control" placeholder="أدخل الرمز السري للمالك..."
+                        required>
+                </div>
+                <button type="submit" class="btn btn-warning rounded-pill w-100 fw-bold">
+                    <i class="bi bi-unlock-fill me-1"></i> تسجيل الدخول
+                </button>
+            </form>
+            {% else %}
+            <!-- نموذج توليد مفاتيح الترخيص -->
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="generate">
+
+                <div class="mb-3 text-start">
+                    <label class="form-label small fw-bold">بصمة جهاز المدرسة (Machine ID):</label>
+                    <input type="text" name="machine_id" class="form-control font-monospace text-uppercase"
+                        value="{{ target_machine }}" placeholder="مثال: A1B2C3D4E5F6" required>
+                </div>
+
+                <div class="mb-4 text-start">
+                    <label class="form-label small fw-bold">مدة خطة الاشتراك المطلوبة:</label>
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <input type="radio" class="btn-check" name="plan" id="plan_month" value="MONTH">
+                            <label class="btn btn-outline-info w-100 py-2 fw-bold" for="plan_month">
+                                <i class="bi bi-calendar-event d-block fs-5 mb-1"></i> شهر (30 يوم)
+                            </label>
+                        </div>
+                        <div class="col-4">
+                            <input type="radio" class="btn-check" name="plan" id="plan_year" value="YEAR" checked>
+                            <label class="btn btn-outline-success w-100 py-2 fw-bold" for="plan_year">
+                                <i class="bi bi-calendar-check d-block fs-5 mb-1"></i> سنة كاملة
+                            </label>
+                        </div>
+                        <div class="col-4">
+                            <input type="radio" class="btn-check" name="plan" id="plan_life" value="LIFETIME">
+                            <label class="btn btn-outline-primary w-100 py-2 fw-bold" for="plan_life">
+                                <i class="bi bi-infinity d-block fs-5 mb-1"></i> ترخيص دائم
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-warning btn-lg rounded-pill w-100 fw-bold shadow-sm">
+                    <i class="bi bi-gear-wide-connected me-1"></i> توليد كود التفعيل
+                </button>
+            </form>
+
+            {% if generated_key %}
+            <div class="mt-4 p-3 bg-light rounded-4 border text-start">
+                <label class="form-label small fw-bold text-success">مفتاح التفعيل المولّد بنجاح (قم بنسخه وتزويده
+                    للمدرسة):</label>
+                <textarea class="form-control font-monospace text-center fw-bold" rows="3"
+                    readonly>{{ generated_key }}</textarea>
+            </div>
+            {% endif %}
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+

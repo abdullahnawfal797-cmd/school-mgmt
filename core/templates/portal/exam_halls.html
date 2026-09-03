@@ -1,0 +1,239 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}إدارة القاعات الامتحانية وتوزيع المقاعد الذكية{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 d-print-none" dir="rtl">
+    <div>
+        <h5 class="fw-bold text-primary mb-0">
+            <i class="bi bi-mortarboard-fill me-2"></i>منظومة إدارة اللجان والامتحانات المدرسية
+        </h5>
+        <span class="text-muted small">العام الدراسي الفعّال: <strong>{{ current_year.name|default:"غير محدد" }}</strong></span>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-success rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#newSessionModal">
+            <i class="bi bi-plus-circle me-1"></i> إضافة دورة امتحانية
+        </button>
+        <button type="button" class="btn btn-outline-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#newHallModal">
+            <i class="bi bi-door-open me-1"></i> إضافة قاعة امتحانية
+        </button>
+        <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
+            <i class="bi bi-house-door-fill me-1"></i> الرئيسية
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4" dir="rtl">
+    <!-- تشغيل خوارزمية توزيع المقاعد ومكافحة الغش -->
+    <div class="col-12 col-lg-7">
+        <div class="card p-4 shadow-sm border-start border-primary border-4 h-100">
+            <h5 class="fw-bold text-primary mb-2">
+                <i class="bi bi-cpu-fill me-1"></i> خوارزمية توزيع المقاعد الذكية (مكافحة الغش)
+            </h5>
+            <p class="text-muted small mb-3">
+                تقوم هذه الخوارزمية بمناوبة وخلط طلاب المراحل والشعب المختلفة داخل القاعة الواحدة، لمنع جلوس طلاب من نفس المرحلة بجوار بعضهم مع تحديد أرقام الجلوس والصفوف تلقائياً.
+            </p>
+
+            <form method="POST" action="{% url 'portal_exam_halls' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="distribute_seats">
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">1. اختر الدورة الامتحانية المعتمدة:</label>
+                    <select name="session_id" class="form-select fw-bold" required>
+                        <option value="">-- اختر الدورة الامتحانية --</option>
+                        {% for session in sessions %}
+                        <option value="{{ session.id }}">{{ session.title }} ({{ session.academic_year.name|default:"عام غير محدد" }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">2. اختر الصفوف الدراسية المشاركة في هذه الوجبة الامتحانية:</label>
+                    <div class="row g-2">
+                        {% for cls in classes %}
+                        <div class="col-6 col-md-4">
+                            <div class="form-check border p-2 rounded bg-light">
+                                <input class="form-check-input ms-2" type="checkbox" name="classes" value="{{ cls.id }}" id="cls_{{ cls.id }}" checked>
+                                <label class="form-check-label fw-bold small" for="cls_{{ cls.id }}">{{ cls.name }}</label>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12 text-muted small">لا توجد صفوف معرفة مسبقاً.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button type="submit" name="distribute_seats" class="btn btn-primary w-100 py-2 fw-bold mt-2 shadow-sm rounded-pill">
+                    <i class="bi bi-shuffle me-1"></i> بدء التوزيع الذكي للمقاعد وتوليد القوائم
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- طباعة الملصقات والشيتات المعتمدة للدورات -->
+    <div class="col-12 col-lg-5">
+        <div class="card p-4 shadow-sm border-start border-success border-4 h-100">
+            <h5 class="fw-bold text-success mb-2">
+                <i class="bi bi-printer-fill me-1"></i> طباعة وثائق القاعات الامتحانية
+            </h5>
+            <p class="text-muted small mb-3">
+                طباعة ملصقات المقاعد (Desk Stickers) وقوائم تفقد الحضور والغياب اليومية للجان الامتحانية.
+            </p>
+
+            <div class="list-group">
+                {% for session in sessions %}
+                <div class="list-group-item p-3 mb-2 border rounded">
+                    <h6 class="fw-bold mb-1 text-dark">{{ session.title }}</h6>
+                    <div class="small text-muted mb-2">
+                        السنة: {{ session.academic_year.name|default:"---" }} | القاعات المخصصة: {{ session.halls.count }}
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{% url 'print_exam_labels' session.id %}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                            <i class="bi bi-tags me-1"></i> ملصقات المقاعد
+                        </a>
+                        <a href="{% url 'print_exam_attendance' session.id %}" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                            <i class="bi bi-card-checklist me-1"></i> شيت الحضور
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-4 border rounded bg-light">
+                    <i class="bi bi-calendar-x fs-2 d-block mb-1 opacity-50"></i>
+                    لم يتم تسجيل دورات امتحانية حتى الآن.<br>
+                    <button class="btn btn-sm btn-success rounded-pill mt-2 px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#newSessionModal">
+                        <i class="bi bi-plus-circle me-1"></i> إنشاء دورة امتحانية الآن
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- جدول القاعات الامتحانية المسجلة وسعاتها -->
+<div class="row" dir="rtl">
+    <div class="col-12">
+        <div class="card p-4 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h6 class="fw-bold text-secondary mb-0">
+                    <i class="bi bi-building-fill-check me-1"></i> بيانات وسعات القاعات الامتحانية بالمدرسة
+                </h6>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#newHallModal">
+                    <i class="bi bi-plus-circle me-1"></i> إضافة قاعة جديدة
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13px;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>اسم / رقم القاعة</th>
+                            <th>الموقع / الجناح</th>
+                            <th>السعة الكلية للمقاعد</th>
+                            <th>مصفوفة المقاعد (صفوف × أعمدة)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hall in halls %}
+                        <tr>
+                            <td class="fw-bold text-primary">{{ hall.name }}</td>
+                            <td>{{ hall.location|default:"المبنى الرئيسي" }}</td>
+                            <td><span class="badge bg-success fs-6">{{ hall.capacity }} طالب</span></td>
+                            <td>{{ hall.rows_count }} صفوف × {{ hall.cols_count }} أعمدة</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-muted py-4">
+                                لا توجد قاعات مسجلة بالمدرسة بعد. اضغط على زر "إضافة قاعة جديدة" بالأعلى لتسجيل القاعات وسعاتها.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة دورة امتحانية جديدة (Modal) -->
+<div class="modal fade" id="newSessionModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h6 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>إضافة دورة امتحانية جديدة</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'portal_exam_halls' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="create_session">
+                <div class="modal-body p-4 text-start">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">اسم الدورة الامتحانية:</label>
+                        <input type="text" name="title" class="form-control" placeholder="مثال: امتحانات نصف السنة 2026-2027" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold mb-2">القاعات المعتمدة لهذه الدورة:</label>
+                        {% for h in halls %}
+                        <div class="form-check mb-1">
+                            <input class="form-check-input ms-2" type="checkbox" name="halls" value="{{ h.id }}" id="sh_{{ h.id }}" checked>
+                            <label class="form-check-label small" for="sh_{{ h.id }}">{{ h.name }} (سعة: {{ h.capacity }} مقعد)</label>
+                        </div>
+                        {% empty %}
+                        <div class="alert alert-warning small py-2 mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i> يرجى إضافة قاعات أولاً لتحديدها ضمن هذه الدورة الامتحانية.
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">حفظ الدورة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة قاعة امتحانية جديدة (Modal) -->
+<div class="modal fade" id="newHallModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h6 class="modal-title fw-bold"><i class="bi bi-door-open me-2"></i>إضافة قاعة امتحانية</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'portal_exam_halls' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="create_hall">
+                <div class="modal-body p-4 text-start">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">اسم أو رقم القاعة:</label>
+                        <input type="text" name="name" class="form-control" placeholder="مثال: القاعة رقم 1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">الموقع / الجناح (اختياري):</label>
+                        <input type="text" name="location" class="form-control" placeholder="مثال: الطابق الثاني - الجناح الأيمن">
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">عدد الصفوف (Rows):</label>
+                            <input type="number" name="rows_count" class="form-control" value="6" min="1" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">عدد الأعمدة (Columns):</label>
+                            <input type="number" name="cols_count" class="form-control" value="4" min="1" required>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-1">يتم احتساب السعة الكلية تلقائياً (الصفوف × الأعمدة).</small>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">حفظ القاعة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

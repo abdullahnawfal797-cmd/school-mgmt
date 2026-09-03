@@ -1,0 +1,676 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}منشئ المخاطبات والكتب الرسمية المدرسية{% endblock %}
+
+{% block content %}
+<!-- شريط الأدوات العلوي -->
+<div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+    <h5 class="fw-bold text-primary mb-0">
+        <i class="bi bi-file-earmark-text-fill me-2"></i>منظومة المخاطبات والكتب المدرسية الرسمية الشاملة
+    </h5>
+    <div class="d-flex gap-2">
+        <button type="button" onclick="window.print()" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+            <i class="bi bi-printer-fill me-1"></i> طباعة الوثيقة
+        </button>
+        <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
+            <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- الجانب الأيمن: لوحة التحكم والمدخلات -->
+    <div class="col-12 col-xl-5 d-print-none">
+        <div class="card card-custom p-4 shadow-sm border-0">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                <i class="bi bi-sliders text-primary me-2"></i>خيارات وتخصيص النموذج
+            </h6>
+
+            <form id="letterControlForm">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">اختر نوع النموذج الأصولي:</label>
+                    <select class="form-select fw-bold" id="templateSelect" onchange="renderTemplateFields()">
+                        <optgroup label="1. نماذج شؤون الطلبة والتأييدات (مستمرون ومتخرجون)">
+                            <option value="student_active" selected>تأييد استمرار طالب بالدوام الرسمي</option>
+                            <option value="student_graduated">تأييد تخرج طالب (متخرج سابقاً)</option>
+                            <option value="student_grades_active">تأييد استمرار مع كشف بالدرجات (جدول المواد)</option>
+                            <option value="student_grades_graduated">تأييد تخرج مع كشف الدرجات والمعدل</option>
+                            <option value="student_conduct">شهادة حسن سيرة وسلوك</option>
+                        </optgroup>
+                        <optgroup label="2. نماذج النقل والإجراءات الانضباطية">
+                            <option value="student_no_objection">عدم ممانعة نقل وقبول طالب (مع قائمة المرفقات)</option>
+                            <option value="student_punish_transfer">نقل طالب كعقوبة (نظام المدارس الثانوية 1977)
+                            </option>
+                            <option value="student_fail_absence">رسوب بسبب الغياب (المادة 45 مع جدول مجلس المدرسين)
+                            </option>
+                            <option value="validity_check">تأييد صحة صدور وثيقة مدرسية</option>
+                        </optgroup>
+                        <optgroup label="3. نماذج الكادر والوظيفة">
+                            <option value="teacher_service">تأييد خدمة واستمرار بالعمل لكادر تدريسي</option>
+                            <option value="teacher_commence">مباشرة كادر تدريسي / وظيفي</option>
+                            <option value="teacher_detach">انفكاك كادر تدريسي / وظيفي</option>
+                            <option value="teacher_clearance">براءة ذمة وظيفية</option>
+                        </optgroup>
+                        <optgroup label="4. النماذج الحرة">
+                            <option value="custom_blank">⭐ كتاب رسمي عام (فورمة فارغة لكتابة أي نص مخصص)</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <!-- ضبط صيغة الخطاب: ذكر / أنثى -->
+                <div class="mb-3 p-2 bg-light rounded-3 border">
+                    <label class="form-label small fw-bold d-block mb-1">صيغة المخاطبة الأصولية:</label>
+                    <div class="d-flex gap-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="genderChoice" id="g_male" value="male"
+                                checked onchange="updateLiveDoc()">
+                            <label class="form-check-label small fw-bold" for="g_male">مذكر (طالب / السيد /
+                                باشر)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="genderChoice" id="g_female"
+                                value="female" onchange="updateLiveDoc()">
+                            <label class="form-check-label small fw-bold" for="g_female">مؤنث (طالبة / السيدة /
+                                باشرت)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">العدد:</label>
+                        <input type="text" id="in_doc_num" class="form-control" value="م.ت / 45"
+                            oninput="updateLiveDoc()">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">التاريخ:</label>
+                        <input type="text" id="in_date" class="form-control font-monospace" value="{{ today_date }}"
+                            oninput="updateLiveDoc()">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">الجهة المعنون إليها الكتاب (إلى /):</label>
+                    <input type="text" id="in_dest" class="form-control" value="إلى من يهمه الأمر"
+                        oninput="updateLiveDoc()">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">الموضوع (م /):</label>
+                    <input type="text" id="in_subject" class="form-control" value="تأييد استمرار بالدوام"
+                        oninput="updateLiveDoc()">
+                </div>
+
+                <!-- مدخلات الحقول الديناميكية -->
+                <div id="dynamicInputsContainer"></div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- الجانب الأيسر: الورقة الرسمية الصادرة (الطباعة A4) -->
+    <div class="col-12 col-xl-7">
+        <div class="card card-custom p-5 shadow bg-white border print-sheet" id="printableArea" dir="rtl">
+
+            <!-- الترويسة الأصولية المنضبطة بدقة -->
+            <div class="row align-items-center mb-4 pb-3 border-bottom border-2 border-dark" dir="rtl">
+                <!-- اليمين: معلومات الوزارة والمؤسسة -->
+                <div class="col-4 text-start small">
+                    <div class="fw-bold">جمهورية العراق</div>
+                    <div class="fw-bold">وزارة التربية</div>
+                    <div>{{ school.directorate|default:"المديرية العامة للتربية" }}</div>
+                    <div class="fw-bold text-primary">{{ school.school_name|default:"إدارة المدرسة" }}</div>
+                </div>
+
+                <!-- الوسط: الشعار الرسمي -->
+                <div class="col-4 text-center">
+                    {% if school.logo %}
+                    <img src="{{ school.logo.url }}" alt="شعار المدرسة"
+                        style="max-height: 80px; max-width: 90px; object-fit: contain;">
+                    {% else %}
+                    <div class="d-inline-block text-center">
+                        <svg width="75" height="75" viewBox="0 0 100 100" fill="none"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="50" cy="50" r="46" stroke="#1d4ed8" stroke-width="4" fill="#f8fafc" />
+                            <path d="M50 20 L80 35 L50 50 L20 35 Z" fill="#1e3a8a" />
+                            <path d="M30 42 V58 C30 65 50 75 50 75 C50 75 70 65 70 58 V42" stroke="#1e3a8a"
+                                stroke-width="3.5" fill="none" />
+                            <path d="M76 38 V65" stroke="#b45309" stroke-width="3" />
+                            <circle cx="76" cy="67" r="3" fill="#b45309" />
+                        </svg>
+                        <div class="text-muted fw-bold" style="font-size: 8px; margin-top: 2px;">وزارة التربية العراقية
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- اليسار: جدول العدد والتاريخ منضبط الاتجاه بالكامل -->
+                <div class="col-4 text-end" dir="rtl">
+                    <table class="float-start text-end small" style="border-collapse: collapse;">
+                        <tr>
+                            <td class="fw-bold pe-2" style="white-space: nowrap;">العدد :</td>
+                            <td class="font-monospace text-dark fw-bold" id="out_doc_num">م.ت / 45</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold pe-2 pt-1" style="white-space: nowrap;">التاريخ :</td>
+                            <td class="font-monospace text-dark fw-bold pt-1" id="out_date">{{ today_date }} م</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- عنوان وموضوع الكتاب -->
+            <div class="text-center my-3">
+                <h5 class="fw-bold text-dark text-decoration-underline mb-2" id="out_dest">إلى / إلى من يهمه الأمر</h5>
+                <h6 class="fw-bold text-primary" id="out_subject">م / تأييد استمرار بالدوام</h6>
+            </div>
+
+            <div class="fw-bold mb-3">تحية طيبة ..</div>
+
+            <!-- جسم المخاطبة الديناميكي -->
+            <div class="fs-6 lh-lg my-3 text-justify" style="text-align: justify; line-height: 2.2;"
+                id="mainLetterBody"></div>
+
+            <!-- جداول متخصصة (رسوب بالغياب / كشف درجات) -->
+            <div id="specialTablesSection" class="d-none my-3"></div>
+
+            <!-- عبارة الختام الرسمية -->
+            <div class="fw-bold my-4 text-center" id="out_closing_phrase">
+                للتفضل بالاطلاع واتخاذ ما يلزم ...
+            </div>
+
+            <!-- ذيل الصفحة: الختم وتوقيع المدير التلقائي -->
+            <div class="row mt-5 pt-4 text-center align-items-end">
+                <div class="col-6">
+                    <div class="text-muted small mb-4">الختم الرسمي للمدرسة</div>
+                    <div style="height: 60px;"></div>
+                </div>
+                <div class="col-6">
+                    <div class="fw-bold mb-1">مدير المدرسة</div>
+                    <div class="text-muted font-monospace small mb-3">التوقيع: .....................</div>
+                    <div class="fw-bold text-dark border-top border-dark d-inline-block pt-1 px-4">
+                        {{ school.director_name|default:"إدارة المدرسة" }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- هامش: نسخة منه إلى -->
+            <div id="out_cc_container" class="mt-4 pt-3 border-top small text-start d-none">
+                <div class="fw-bold text-decoration-underline mb-1">نسخة منه إلى:</div>
+                <div id="out_cc_list" class="text-muted"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    function renderTemplateFields() {
+        const t = document.getElementById('templateSelect').value;
+        const container = document.getElementById('dynamicInputsContainer');
+        const inSub = document.getElementById('in_subject');
+        const inDest = document.getElementById('in_dest');
+        let html = '';
+
+        if (t === 'custom_blank') {
+            inSub.value = "أمر إداري / إشعار رسمي";
+            inDest.value = "إلى / الجهة المعنية";
+            html = `
+            <div class="mb-3">
+                <label class="form-label small fw-bold text-primary">النص المخصص للكتاب:</label>
+                <textarea id="in_custom_text" class="form-control" rows="8" placeholder="اكتب هنا متن الكتاب المطلوب..." oninput="updateLiveDoc()">بناءً على مقتضيات المصلحة العامة ولحسن سير العملية التربوية، تقرر ما يلي:\n1- \n2- </textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">عبارة الختام:</label>
+                <input type="text" id="in_closing" class="form-control" value="للتفضل بالاطلاع واتخاذ ما يلزم ..." oninput="updateLiveDoc()">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">نسخة منه إلى (اختياري - سطر لكل جهة):</label>
+                <textarea id="in_cc" class="form-control font-monospace small" rows="2" placeholder="جهة 1&#10;جهة 2" oninput="updateLiveDoc()"></textarea>
+            </div>
+        `;
+        } else if (t.includes('grades')) {
+            inSub.value = t === 'student_grades_graduated' ? "تأييد تخرج مع كشف بالدرجات" : "تأييد استمرار مع كشف بالدرجات";
+            inDest.value = "إلى / إلى من يهمه الأمر";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">الصف:</label><input type="text" id="in_class" class="form-control" placeholder="مثال: الرابع العلمي" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">رقم القيد:</label><input type="text" id="in_reg" class="form-control" placeholder="مثال: 1025" oninput="updateLiveDoc()"></div>
+            </div>
+            ${t === 'student_grades_graduated' ? `
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">العام الدراسي للتخرج:</label><input type="text" id="in_grad_year" class="form-control font-monospace" value="2025-2026" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">الدور:</label><input type="text" id="in_grad_round" class="form-control" value="الدور الأول" oninput="updateLiveDoc()"></div>
+            </div>` : ''}
+            <div class="p-3 bg-light rounded-3 mb-2 border">
+                <h6 class="fw-bold text-primary small mb-2"><i class="bi bi-table me-1"></i>رصد درجات المواد</h6>
+                <div class="row g-2 small">
+                    <div class="col-4"><label>الإسلامية:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="التربية الإسلامية" value="95" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><label>العربية:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="اللغة العربية" value="88" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><label>الإنجليزية:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="اللغة الإنجليزية" value="90" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><label>الرياضيات:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="الرياضيات" value="85" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><label>الأحياء/العلوم:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="الأحياء" value="92" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><label>الكيمياء/الفيزياء:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="الكيمياء" value="89" oninput="updateLiveDoc()"></div>
+                </div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">الغرض:</label><input type="text" id="in_purpose" class="form-control" value="لتقديمه إلى الدائرة المعنية لترويج المعاملة" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'student_graduated') {
+            inSub.value = "تأييد تخرج طالب";
+            inDest.value = "إلى / إلى من يهمه الأمر";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">الصف المتخرج منه:</label><input type="text" id="in_class" class="form-control" placeholder="مثال: الثالث المتوسط" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">رقم القيد:</label><input type="text" id="in_reg" class="form-control" placeholder="مثال: 1025" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">عام التخرج:</label><input type="text" id="in_grad_year" class="form-control font-monospace" value="2025-2026" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">الدور:</label><input type="text" id="in_grad_round" class="form-control" value="الدور الأول" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">الغرض:</label><input type="text" id="in_purpose" class="form-control" value="لتقديمه إلى الدائرة المعنية لترويج المعاملة" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'student_punish_transfer') {
+            inSub.value = "نقل طالب";
+            inDest.value = "إلى / إدارة ثانوية ...";
+            html = `
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">رقم المادة القانونية:</label><input type="text" id="in_law_art" class="form-control" value="(    )" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">رقم الأمر المدرسي:</label><input type="text" id="in_order_num" class="form-control" value="(    )" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">الصف الدراسي:</label><input type="text" id="in_class" class="form-control" placeholder="الصف" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">المدرسة المنقول إليها:</label><input type="text" id="in_target_school" class="form-control" placeholder="اسم الثانوية" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">السبب الأصولي:</label><input type="text" id="in_reason" class="form-control" value="تجاوزه على إدارة المدرسة وأعضاء الهيئة التدريسية" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">مركز الفحص:</label><input type="text" id="in_exam_center" class="form-control" value="المتوسطة" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">الفرع:</label><input type="text" id="in_branch" class="form-control" value="العام" oninput="updateLiveDoc()"></div>
+            </div>
+        `;
+        } else if (t === 'student_no_objection') {
+            inSub.value = "عدم ممانعة";
+            inDest.value = "إلى / إدارة ثانوية ...";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">الصف الدراسي:</label><input type="text" id="in_class" class="form-control" placeholder="الصف" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">العام الدراسي:</label><input type="text" id="in_year" class="form-control font-monospace" value="2026-2027" oninput="updateLiveDoc()"></div>
+            </div>
+        `;
+        } else if (t === 'student_fail_absence') {
+            inSub.value = "رسوب بسبب الغياب";
+            inDest.value = "إلى / المديرية العامة للتربية - قسم التعليم العام";
+            html = `
+            <div class="row g-2 mb-2">
+                <div class="col-4"><label class="small fw-bold">المادة القانونية:</label><input type="text" id="in_law_num" class="form-control" value="45" oninput="updateLiveDoc()"></div>
+                <div class="col-4"><label class="small fw-bold">حد الغياب (يوم):</label><input type="text" id="in_limit_days" class="form-control" value="25" oninput="updateLiveDoc()"></div>
+                <div class="col-4"><label class="small fw-bold">تاريخ الاجتماع:</label><input type="text" id="in_meeting_date" class="form-control" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="p-2 bg-light rounded border mb-2">
+                <input type="text" id="in_fail_student_name" class="form-control form-control-sm mb-1" placeholder="اسم الطالب الرباعي" value="أحمد حسن علي" oninput="updateLiveDoc()">
+                <div class="row g-1">
+                    <div class="col-4"><input type="text" id="in_fail_class" class="form-control form-control-sm" placeholder="الصف" value="الثالث المتوسط" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><input type="text" id="in_fail_sec" class="form-control form-control-sm" placeholder="الشعبة" value="أ" oninput="updateLiveDoc()"></div>
+                    <div class="col-4"><input type="text" id="in_fail_reg" class="form-control form-control-sm" placeholder="رقم القيد" value="412" oninput="updateLiveDoc()"></div>
+                </div>
+            </div>
+        `;
+        } else if (t === 'validity_check') {
+            inSub.value = "تأييد صحة صدور";
+            inDest.value = "إلى / الجهة الطالبة لصحة الصدور";
+            html = `
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">كتابكم ذي العدد:</label><input type="text" id="in_ref_num" class="form-control" placeholder="رقم كتابهم" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">تاريخ كتابهم:</label><input type="text" id="in_ref_date" class="form-control" placeholder="تاريخ كتابهم" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">رقم الوثيقة الصادرة:</label><input type="text" id="in_doc_issued_num" class="form-control" placeholder="رقم الوثيقة" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">تاريخ صدورها:</label><input type="text" id="in_doc_issued_date" class="form-control" placeholder="تاريخ الوثيقة" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'teacher_commence') {
+            inSub.value = "مباشرة";
+            inDest.value = "إلى / المديرية العامة للتربية - شعبة الملاكات";
+            html = `
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">رقم الأمر الإداري:</label><input type="text" id="in_admin_order" class="form-control" placeholder="رقم الأمر" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">تاريخ الأمر الإداري:</label><input type="text" id="in_admin_date" class="form-control" placeholder="تاريخ الأمر" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">اسم المباشر / المباشرة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">العنوان الوظيفي:</label><input type="text" id="in_job_title" class="form-control" placeholder="مدرس / معلم جامعي" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">يوم المباشرة:</label><input type="text" id="in_commence_day" class="form-control" placeholder="مثال: الأحد" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">تاريخ المباشرة:</label><input type="text" id="in_commence_date" class="form-control font-monospace" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'teacher_detach') {
+            inSub.value = "انفكاك";
+            inDest.value = "إلى / المديرية العامة للتربية - شعبة الملاكات";
+            html = `
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">رقم الأمر الإداري:</label><input type="text" id="in_admin_order" class="form-control" placeholder="رقم الأمر" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">تاريخ الأمر الإداري:</label><input type="text" id="in_admin_date" class="form-control" placeholder="تاريخ الأمر" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">اسم المنفك / المنفكة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="mb-2"><label class="small fw-bold">تاريخ الانفكاك:</label><input type="text" id="in_detach_date" class="form-control font-monospace" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'teacher_service') {
+            inSub.value = "تأييد خدمة واستمرار بالعمل";
+            inDest.value = "إلى / إلى من يهمه الأمر";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم المدرس / الموظف:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">العنوان الوظيفي:</label><input type="text" id="in_job_title" class="form-control" placeholder="مثال: مدرس أول" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">الرقم الإحصائي:</label><input type="text" id="in_reg" class="form-control" placeholder="الرقم الإحصائي" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">الغرض:</label><input type="text" id="in_purpose" class="form-control" value="لتقديمه إلى الدائرة المعنية لترويج المعاملة" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'teacher_clearance') {
+            inSub.value = "براءة ذمة وظيفية";
+            inDest.value = "إلى / المديرية العامة للتربية";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم الموظف / المعلم:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="mb-2"><label class="small fw-bold">العنوان الوظيفي:</label><input type="text" id="in_job_title" class="form-control" placeholder="العنوان الوظيفي" oninput="updateLiveDoc()"></div>
+            <div class="mb-2"><label class="small fw-bold">الغرض:</label><input type="text" id="in_purpose" class="form-control" value="لأغراض النقل / الانفكاك الأصولي" oninput="updateLiveDoc()"></div>
+        `;
+        } else if (t === 'student_conduct') {
+            inSub.value = "شهادة حسن سيرة وسلوك";
+            inDest.value = "إلى / إلى من يهمه الأمر";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">الصف الدراسي:</label><input type="text" id="in_class" class="form-control" placeholder="الصف" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">رقم القيد:</label><input type="text" id="in_reg" class="form-control" placeholder="رقم القيد" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">الغرض:</label><input type="text" id="in_purpose" class="form-control" value="لتقديمه إلى الجهة الطالبة" oninput="updateLiveDoc()"></div>
+        `;
+        } else {
+            inSub.value = "تأييد استمرار بالدوام";
+            inDest.value = "إلى / إلى من يهمه الأمر";
+            html = `
+            <div class="mb-2"><label class="small fw-bold">اسم الطالب / الطالبة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><label class="small fw-bold">الصف والشعبة:</label><input type="text" id="in_class" class="form-control" placeholder="الصف" oninput="updateLiveDoc()"></div>
+                <div class="col-6"><label class="small fw-bold">رقم القيد:</label><input type="text" id="in_reg" class="form-control" placeholder="القيد" oninput="updateLiveDoc()"></div>
+            </div>
+            <div class="mb-2"><label class="small fw-bold">الغرض:</label><input type="text" id="in_purpose" class="form-control" value="لتقديمه إلى الدائرة المعنية لترويج المعاملة" oninput="updateLiveDoc()"></div>
+        `;
+        }
+
+        container.innerHTML = html;
+        updateLiveDoc();
+    }
+
+    function updateLiveDoc() {
+        const t = document.getElementById('templateSelect').value;
+        const isFemale = document.getElementById('g_female').checked;
+
+        // تحديث العدد والتاريخ
+        document.getElementById('out_doc_num').innerText = document.getElementById('in_doc_num').value || '---';
+        document.getElementById('out_date').innerText = (document.getElementById('in_date').value || '---') + " م";
+        document.getElementById('out_dest').innerText = "إلى / " + (document.getElementById('in_dest').value || '...');
+        document.getElementById('out_subject').innerText = "م / " + (document.getElementById('in_subject').value || '');
+
+        const body = document.getElementById('mainLetterBody');
+        const tblSec = document.getElementById('specialTablesSection');
+        const ccContainer = document.getElementById('out_cc_container');
+        const ccList = document.getElementById('out_cc_list');
+        const closing = document.getElementById('out_closing_phrase');
+
+        tblSec.classList.add('d-none');
+        tblSec.innerHTML = '';
+        ccContainer.classList.add('d-none');
+        closing.innerText = "للتفضل بالاطلاع واتخاذ ما يلزم ...";
+
+        const studentWord = isFemale ? "الطالبة" : "الطالب";
+        const mrWord = isFemale ? "السيدة" : "السيد";
+        const commenceWord = isFemale ? "باشرت" : "باشر";
+        const detachWord = isFemale ? "انفكت" : "انفك";
+        const hisHerWord = isFemale ? "تجاوزها" : "تجاوزه";
+        const transferredWord = isFemale ? "المنقولة" : "المنقول";
+
+        if (t === 'custom_blank') {
+            const txt = document.getElementById('in_custom_text') ? document.getElementById('in_custom_text').value : '';
+            body.innerHTML = txt.replace(/\n/g, '<br>');
+            closing.innerText = document.getElementById('in_closing') ? document.getElementById('in_closing').value : "للتفضل بالاطلاع واتخاذ ما يلزم ...";
+            const ccVal = document.getElementById('in_cc') ? document.getElementById('in_cc').value : '';
+            if (ccVal.trim()) {
+                ccContainer.classList.remove('d-none');
+                ccList.innerHTML = ccVal.split('\n').map(item => `<div>- ${item}</div>`).join('');
+            }
+        } else if (t.includes('grades')) {
+            const name = document.getElementById('in_name').value || '................................';
+            const cls = document.getElementById('in_class').value || '................';
+            const reg = document.getElementById('in_reg').value || '........';
+            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة المعنية';
+            const gradYear = document.getElementById('in_grad_year') ? document.getElementById('in_grad_year').value : '';
+            const gradRound = document.getElementById('in_grad_round') ? document.getElementById('in_grad_round').value : '';
+
+            if (t === 'student_grades_graduated') {
+                body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا برقم قيد (<strong>${reg}</strong>) كان أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، وقد <strong>تخرج بنجاح</strong> للعام الدراسي (<strong>${gradYear}</strong>) - (<strong>${gradRound}</strong>) وكانت درجاته كما مبين في الجدول أدناه، وزوّد بهذا التأييد بناءً على طلبه لغرض (<span>${purp}</span>).`;
+            } else {
+                body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا برقم قيد (<strong>${reg}</strong>) هو أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، ومستمر بالدوام الرسمي للعام الدراسي الحالي، وكانت درجات السعي والامتحانات المعتمدة له كما مبين أدناه، وزوّد بهذا التأييد لغرض (<span>${purp}</span>).`;
+            }
+
+            const inputs = document.querySelectorAll('.grade-input');
+            let ths = '';
+            let tds = '';
+            let total = 0;
+            let count = 0;
+
+            inputs.forEach(input => {
+                const val = parseFloat(input.value) || 0;
+                ths += `<th style="font-size: 11px;">${input.getAttribute('data-sub')}</th>`;
+                tds += `<td class="fw-bold font-monospace">${val}</td>`;
+                total += val;
+                count++;
+            });
+
+            tblSec.classList.remove('d-none');
+            tblSec.innerHTML = `
+            <div class="fw-bold small mb-2 text-center">جدول درجات السعي والامتحانات المعتمدة:</div>
+            <table class="table table-bordered table-sm text-center align-middle mb-2">
+                <thead class="table-light"><tr>${ths}</tr></thead>
+                <tbody><tr>${tds}</tr></tbody>
+            </table>
+            <div class="d-flex justify-content-between px-3 fw-bold small">
+                <span>المجموع الكلي: <span class="font-monospace">${total}</span></span>
+                <span>المعدل العام: <span class="font-monospace">${count > 0 ? (total / count).toFixed(1) : 0}</span>%</span>
+                <span>النتيجة: <span class="badge bg-success">ناجح</span></span>
+            </div>
+        `;
+        } else if (t === 'student_graduated') {
+            const name = document.getElementById('in_name').value || '(                    )';
+            const cls = document.getElementById('in_class').value || '(          )';
+            const reg = document.getElementById('in_reg').value || '(        )';
+            const gradYear = document.getElementById('in_grad_year').value || '2025-2026';
+            const gradRound = document.getElementById('in_grad_round').value || 'الدور الأول';
+            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة المعنية';
+
+            body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا بالسجل العام برقم قيد (<strong>${reg}</strong>) كان أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، وقد <strong>تخرج وأكمل متطلبات الدراسة بنجاح</strong> خلال العام الدراسي (<strong>${gradYear}</strong>) - (<strong>${gradRound}</strong>)، وزُوّد بهذا التأييد بناءً على طلبه لغرض (<span>${purp}</span>) دون أن تتحمل المدرسة أي تبعة مالية أو قانونية.`;
+        } else if (t === 'student_punish_transfer') {
+            const art = document.getElementById('in_law_art').value || '(    )';
+            const ord = document.getElementById('in_order_num').value || '(    )';
+            const name = document.getElementById('in_name').value || '(                    )';
+            const cls = document.getElementById('in_class').value || '(          )';
+            const target = document.getElementById('in_target_school').value || '(                    )';
+            const reason = document.getElementById('in_reason').value || 'لتجاوزه على إدارة المدرسة وأعضاء الهيئة التدريسية';
+            const center = document.getElementById('in_exam_center').value || 'المتوسطة';
+            const branch = document.getElementById('in_branch').value || 'العام';
+
+            body.innerHTML = `استناداً إلى أحكام المادة <u>${art}</u> من نظام المدارس الثانوية لسنة 1977 <u>المعدل</u>، قرر مجلس المدرسين لمدرسة (<u>${document.querySelector('.text-primary.fw-bold') ? document.querySelector('.text-primary.fw-bold').innerText : 'مدرستنا'}</u>) بالأمر المدرسي <u>${ord}</u> نقل ${studentWord} (<u>${name}</u>) ${isFemale ? 'المقيدة' : 'المقيد'} في الصف <u>${cls}</u> إلى ثانوية <u>${target}</u> وذلك ${hisHerWord} على إدارة المدرسة وأعضاء الهيئة التدريسية.`;
+
+            ccContainer.classList.remove('d-none');
+            ccList.innerHTML = `
+            <div>- إدارة المدرسة المنقول إليها ${studentWord} للعلم مع الاطلاع...</div>
+            <div>- مركز فحص الدراسة ( <u>${center}</u> ) - الفرع ( <u>${branch}</u> ) لاتخاذ ما يلزم مع التقدير...</div>
+        `;
+        } else if (t === 'student_no_objection') {
+            const name = document.getElementById('in_name').value || '(                     )';
+            const cls = document.getElementById('in_class').value || '(           )';
+            const yr = document.getElementById('in_year').value || '( 2026-2027 )';
+
+            body.innerHTML = `
+            <div>لا مانع من قبول ${studentWord} ( <u>${name}</u> ) في الصف ( <u>${cls}</u> ) للعام الدراسي ( <u>${yr}</u> ) مع إرسال:</div>
+            <div class="pe-4 my-2 fw-bold">
+                1- وثيقة ${isFemale ? 'نقلها' : 'نقله'}.<br>
+                2- بطاقتها/بطاقته المدرسية.<br>
+                3- الكتب المدرسية كاملة.<br>
+                4- تأييد بالدرجات.
+            </div>
+        `;
+            closing.innerText = "مع جزيل الشكر والتقدير...";
+        } else if (t === 'student_fail_absence') {
+            const art = document.getElementById('in_law_num').value || '45';
+            const days = document.getElementById('in_limit_days').value || '25';
+            const mDate = document.getElementById('in_meeting_date').value || '---';
+            const stName = document.getElementById('in_fail_student_name').value || '---';
+            const stClass = document.getElementById('in_fail_class').value || '---';
+            const stSec = document.getElementById('in_fail_sec').value || '---';
+            const stReg = document.getElementById('in_fail_reg').value || '---';
+
+            body.innerHTML = `استناداً إلى الفقرة (2) من المادة ( <u>${art}</u> ) من نظام المدارس الثانوية رقم (2) لسنة 1977 المعدل، وبالنظر لتجاوز غياب الطلبة المدرجة أسماؤهم أدناه الحد المقرر والبالغ ( <u>${days}</u> ) يوماً ودرس، فقد قرر مجلس المدرسين المنعقد بتاريخ أعلاه ( <u>${mDate}</u> ) اعتبارهم راسبين في صفوفهم للعام الدراسي، بسبب الغياب <u>المتواصل</u>.`;
+
+            tblSec.classList.remove('d-none');
+            tblSec.innerHTML = `
+            <table class="table table-bordered table-sm text-center align-middle mb-3">
+                <thead class="table-light">
+                    <tr>
+                        <th rowspan="2" style="width: 5%;">ت</th>
+                        <th rowspan="2" style="width: 30%;">اسم الطالب</th>
+                        <th rowspan="2" style="width: 15%;">الصف</th>
+                        <th rowspan="2" style="width: 10%;">الشعبة</th>
+                        <th colspan="2" style="width: 15%;">رقم القبول</th>
+                        <th rowspan="2" style="width: 15%;">المواليد</th>
+                        <th rowspan="2" style="width: 10%;">النتيجة</th>
+                    </tr>
+                    <tr>
+                        <th>قيد</th>
+                        <th>صفحة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td class="fw-bold">${stName}</td>
+                        <td>${stClass}</td>
+                        <td>${stSec}</td>
+                        <td class="font-monospace">${stReg}</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td class="text-danger fw-bold">راسب</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="fw-bold small mb-1"><u>مجلس المدرسين:</u></div>
+            <table class="table table-bordered table-sm text-center align-middle mb-2">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 8%;">ت</th>
+                        <th style="width: 40%;">اسم المدرس</th>
+                        <th style="width: 30%;">العنوان الوظيفي</th>
+                        <th style="width: 22%;">التوقيع</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>........................</td><td>مدرس</td><td>................</td></tr>
+                    <tr><td>2</td><td>........................</td><td>مدرس</td><td>................</td></tr>
+                    <tr><td>3</td><td>........................</td><td>مدرس</td><td>................</td></tr>
+                </tbody>
+            </table>
+        `;
+            closing.innerText = "للعمل بموجبه مع التقدير...";
+        } else if (t === 'validity_check') {
+            const refNum = document.getElementById('in_ref_num').value || '(          )';
+            const refDate = document.getElementById('in_ref_date').value || '(          )';
+            const docIssuedNum = document.getElementById('in_doc_issued_num').value || '(          )';
+            const docIssuedDate = document.getElementById('in_doc_issued_date').value || '(          )';
+            const name = document.getElementById('in_name').value || '(                      )';
+
+            body.innerHTML = `كتابكم ذي العدد ( <u>${refNum}</u> ) في ( <u>${refDate}</u> )، نؤيد لكم صحة صدور الوثيقة ذات العدد ( <u>${docIssuedNum}</u> ) والمرقمة بالرقم ( <u>${docIssuedNum}</u> ) في ( <u>${docIssuedDate}</u> ) ${studentWord ? 'للطالب/ة' : 'للطالب'} ( <u>${name}</u> ) ${transferredWord} من مدرستنا إلى مدرستكم.`;
+            closing.innerText = "للتفضل بالاطلاع مع فائق الشكر والتقدير.";
+        } else if (t === 'teacher_commence') {
+            const ord = document.getElementById('in_admin_order').value || '(          )';
+            const ordDate = document.getElementById('in_admin_date').value || '(          )';
+            const name = document.getElementById('in_name').value || '(                      )';
+            const job = document.getElementById('in_job_title').value || '(                )';
+            const day = document.getElementById('in_commence_day').value || '(          )';
+            const cDate = document.getElementById('in_commence_date').value || '(          )';
+
+            body.innerHTML = `استناداً إلى الأمر الإداري المرقم ( <u>${ord}</u> ) في ( <u>${ordDate}</u> )، والمتضمن (أمر إداري)، ${commenceWord} ${mrWord} ( <u>${name}</u> ) العنوان الوظيفي ( <u>${job}</u> )، في مدرستنا يوم ( <u>${day}</u> ) الموافق ( <u>${cDate}</u> ).`;
+        } else if (t === 'teacher_detach') {
+            const ord = document.getElementById('in_admin_order').value || '(          )';
+            const ordDate = document.getElementById('in_admin_date').value || '(          )';
+            const name = document.getElementById('in_name').value || '(                      )';
+            const dDate = document.getElementById('in_detach_date').value || '(          )';
+
+            body.innerHTML = `استناداً إلى الأمر الإداري المرقم ( <u>${ord}</u> ) في ( <u>${ordDate}</u> ) ${detachWord} ${mrWord} ( <u>${name}</u> ) في مدرستنا بتاريخ ( <u>${dDate}</u> ).`;
+        } else if (t === 'teacher_service') {
+            const name = document.getElementById('in_name').value || '................................';
+            const job = document.getElementById('in_job_title').value || '................';
+            const reg = document.getElementById('in_reg').value || '........';
+            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الدائرة المعنية';
+
+            body.innerHTML = `نؤيد لكم بأن ${mrWord} (<strong>${name}</strong>) بعنوان وظيفي (<strong>${job}</strong>) والرقم الإحصائي (<strong>${reg}</strong>) هو أحد كوادر مدرستنا ومستمر بالخدمة الفعلية والدوام الرسمي لغاية تاريخ تحرير هذا الكتاب، وقد أعطي هذا التأييد بناءً على طلبه لغرض (<span>${purp}</span>).`;
+        } else if (t === 'teacher_clearance') {
+            const name = document.getElementById('in_name').value || '................................';
+            const job = document.getElementById('in_job_title').value || '................';
+            const purp = document.getElementById('in_purpose').value || 'لأغراض النقل والانفكاك';
+
+            body.innerHTML = `تشهد إدارة المدرسة ببراءة ذمة ${mrWord} (<strong>${name}</strong>) بعنوان وظيفي (<strong>${job}</strong>) من أي عهدة أو مستحقات مالية أو سجلات مدرسية أو مقتنيات عائدة للمدرسة حتى تاريخ انفكاكه الأصولي، وزوّد ببراءة الذمة هذه لغرض (<span>${purp}</span>).`;
+        } else if (t === 'student_conduct') {
+            const name = document.getElementById('in_name').value || '................................';
+            const cls = document.getElementById('in_class').value || '................';
+            const reg = document.getElementById('in_reg').value || '........';
+            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة الطالبة';
+
+            body.innerHTML = `تشهد إدارة المدرسة بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا برقم قيد (<strong>${reg}</strong>) في الصف (<strong>${cls}</strong>) كان طيلة فترة دراسته حسن السيرة والسلوك وملتزماً بالأنظمة والتعليمات التربوية ولم يصدر بحقه أي عقوبة انضباطية، وبناءً على طلبه زوّد بهذه الشهادة لغرض (<span>${purp}</span>).`;
+        } else {
+            const name = document.getElementById('in_name').value || '................................';
+            const cls = document.getElementById('in_class').value || '................';
+            const reg = document.getElementById('in_reg').value || '........';
+            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة المعنية';
+
+            body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) ${isFemale ? 'المقيدة' : 'المقيد'} لدينا برقم قيد (<strong>${reg}</strong>) هي/هو أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، ومستمر/ة بالدوام الرسمي للعام الدراسي الحالي حتى تاريخ تحرير هذا الكتاب، وقد زُوّد/ت بهذا التأييد بناءً على طلبها/طلبه لغرض (<span>${purp}</span>) دون أن تتحمل المدرسة أي تبعة مالية أو قانونية.`;
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        renderTemplateFields();
+    });
+</script>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printableArea,
+        #printableArea * {
+            visibility: visible;
+        }
+
+        #printableArea {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 30px !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .d-print-none {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+

@@ -1,0 +1,143 @@
+﻿{% extends 'portal/base_portal.html' %}
+
+{% block title %}إدارة ورصد الحضور والغياب اليومي{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card card-custom p-4 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                <h5 class="fw-bold text-primary mb-0">
+                    <i class="bi bi-calendar-check-fill me-2"></i>سجل ورصد الحضور والغياب اليومي
+                </h5>
+                <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+                    <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
+                </a>
+            </div>
+
+            <!-- محدد الصف والشعبة والتاريخ -->
+            <form method="GET" class="row g-2 mb-4 align-items-end">
+                <div class="col-12 col-md-4">
+                    <label class="form-label small fw-bold">الصف الدراسي:</label>
+                    <select name="school_class" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- اختر المرحلة / الصف --</option>
+                        {% for cls in classes %}
+                        <option value="{{ cls.id }}">{{ cls.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <label class="form-label small fw-bold">الشعبة:</label>
+                    <select name="section" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- جميع الشعب --</option>
+                        {% for sec in sections %}
+                        <option value="{{ sec.id }}">شعبة {{ sec.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-3">
+                    <label class="form-label small fw-bold">تاريخ الرصد:</label>
+                    <input type="date" name="date" class="form-control font-monospace" value="{{ selected_date }}"
+                        onchange="this.form.submit()">
+                </div>
+
+                <div class="col-12 col-md-1">
+                    <button type="submit" class="btn btn-outline-primary rounded-pill w-100 fw-bold">عرض</button>
+                </div>
+            </form>
+
+            <!-- جدول رصد الحضور والغياب للطلبة -->
+            {% if selected_class_id %}
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="attendance_date" value="{{ selected_date }}">
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle mb-0 text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 6%;">ت</th>
+                                <th style="width: 35%;">اسم الطالب الرباعي</th>
+                                <th style="width: 15%;">الشعبة</th>
+                                <th style="width: 44%;">حالة الحضور والتثبيت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for st in students %}
+                            <tr>
+                                <td class="fw-bold">{{ forloop.counter }}</td>
+                                <td class="text-start fw-bold pe-3">
+                                    <i class="bi bi-person text-primary me-1"></i>
+                                    {{ st.user.get_full_name|default:st.user.username }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">شعبة {{ st.section.name|default:"عامة"
+                                        }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex justify-content-center gap-3">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="status_{{ st.id }}"
+                                                id="present_{{ st.id }}" value="present" checked>
+                                            <label class="form-check-label text-success fw-bold"
+                                                for="present_{{ st.id }}">
+                                                <i class="bi bi-check-circle-fill"></i> حاضر
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="status_{{ st.id }}"
+                                                id="absent_{{ st.id }}" value="absent">
+                                            <label class="form-check-label text-danger fw-bold"
+                                                for="absent_{{ st.id }}">
+                                                <i class="bi bi-x-circle-fill"></i> غائب
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="status_{{ st.id }}"
+                                                id="excused_{{ st.id }}" value="excused">
+                                            <label class="form-check-label text-warning fw-bold"
+                                                for="excused_{{ st.id }}">
+                                                <i class="bi bi-clock-history"></i> مجاز
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="status_{{ st.id }}"
+                                                id="late_{{ st.id }}" value="late">
+                                            <label class="form-check-label text-secondary fw-bold"
+                                                for="late_{{ st.id }}">
+                                                <i class="bi bi-hourglass-split"></i> متأخر
+                                            </label>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-muted py-4">لا يوجد طلاب مسجلون في هذا الصف أو الشعبة.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if students %}
+                <div class="mt-4 text-center">
+                    <button type="submit" class="btn btn-success btn-lg rounded-pill px-5 fw-bold shadow-sm">
+                        <i class="bi bi-save-fill me-2"></i> حفظ وتثبيت سجل الغياب
+                    </button>
+                </div>
+                {% endif %}
+            </form>
+            {% else %}
+            <div class="alert alert-info rounded-4 text-center py-4 mb-0">
+                <i class="bi bi-info-circle-fill fs-3 d-block mb-2"></i>
+                يرجى اختيار <strong>الصف الدراسي</strong> من القائمة أعلاه لعرض قائمة الطلاب ورصد حضورهم وغيابهم.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
