@@ -1214,9 +1214,9 @@
     <!-- Bootstrap JS (محلي 100% للعمل أوفلاين وأونلاين) -->
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
 
+    {% if show_first_run_wizard %}
     <script>
         // معالج التهيئة الأولية التلقائي عند أول تشغيل للمنظومة
-        {% if show_first_run_wizard %}
         document.addEventListener("DOMContentLoaded", function () {
             const wizardEl = document.getElementById('firstRunWizardModal');
             if (wizardEl && typeof bootstrap !== 'undefined') {
@@ -1224,8 +1224,10 @@
                 wizardModal.show();
             }
         });
-        {% endif %}
+    </script>
+    {% endif %}
 
+    <script>
         // System Diagnostics & Security Dispatcher
         let clickCount = 0;
         let clickTimer = null;
