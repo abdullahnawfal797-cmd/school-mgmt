@@ -1,14 +1,19 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}رصد الدرجات (أرقام صحيحة بدون كسور){% endblock %}
 
 {% block content %}
 <div class="card card-custom p-4 mb-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold text-primary mb-0"><i class="bi bi-award-fill me-2"></i>رصد درجات طالب (تقريب تلقائي لأقرب
-            عدد صحيح)</h5>
-        <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary rounded-pill"><i
-                class="bi bi-arrow-right"></i> رجوع</a>
+        <h5 class="fw-bold text-primary mb-0"><i class="bi bi-award-fill me-2"></i>رصد درجات طالب (تقريب تلقائي لأقرب عدد صحيح)</h5>
+        <div class="d-flex gap-2">
+            <a href="{% url 'portal_student_result_cards' %}" class="btn btn-sm btn-primary rounded-pill fw-bold shadow-sm">
+                <i class="bi bi-printer-fill me-1"></i> طباعة كارتات نتائج الطلبة (كارت النتيجة)
+            </a>
+            <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary rounded-pill">
+                <i class="bi bi-arrow-right"></i> رجوع
+            </a>
+        </div>
     </div>
     <form method="POST" class="row g-2">
         {% csrf_token %}
@@ -37,7 +42,7 @@
     <h6 class="fw-bold text-secondary mb-3">سجل الدرجات المرصودة (أعداد صحيحة معتمدة)</h6>
     <div class="table-responsive">
         <table class="table table-hover align-middle text-center mb-0">
-            <thead class="table-light">
+            <thead>
                 <tr>
                     <th>الطالب</th>
                     <th>المادة</th>
@@ -66,4 +71,3 @@
     </div>
 </div>
 {% endblock %}
-

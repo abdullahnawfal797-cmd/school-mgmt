@@ -1,6 +1,7 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}إدارة المواد والكتب المنهجية{% endblock %}
+
 
 {% block content %}
 <div class="row g-4 mb-4">
@@ -43,7 +44,7 @@
 
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle mb-0 text-center">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
                             <th style="width: 10%;">ت</th>
                             <th style="width: 45%;">اسم المادة</th>
@@ -56,10 +57,10 @@
                         <tr>
                             <td class="fw-bold">{{ forloop.counter }}</td>
                             <td class="text-start fw-bold pe-3">
-                                <i class="bi bi-journal-text text-primary me-1"></i> {{ sub.name }}
+                                <i class="bi bi-journal-text text-warning me-1"></i> {{ sub.name }}
                             </td>
                             <td>
-                                <span class="badge bg-light text-dark border font-monospace fs-6">{{ sub.code }}</span>
+                                <span class="badge font-monospace fs-6" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">{{ sub.code }}</span>
                             </td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3"
@@ -72,8 +73,8 @@
                                     aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content rounded-4 border-0 shadow">
-                                            <div class="modal-header bg-light">
-                                                <h6 class="modal-title fw-bold text-dark">
+                                            <div class="modal-header border-bottom" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                                                <h6 class="modal-title fw-bold text-white">
                                                     <i class="bi bi-pencil-square text-warning me-1"></i> تعديل المادة:
                                                     {{ sub.name }}
                                                 </h6>
@@ -96,11 +97,11 @@
                                                             required>
                                                     </div>
                                                 </div>
-                                                <div class="modal-footer bg-light">
+                                                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                                                     <button type="button" class="btn btn-secondary btn-sm rounded-pill"
                                                         data-bs-dismiss="modal">إلغاء</button>
                                                     <button type="submit"
-                                                        class="btn btn-warning btn-sm rounded-pill px-4 fw-bold">حفظ
+                                                        class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm">حفظ
                                                         التعديل</button>
                                                 </div>
                                             </form>
@@ -125,4 +126,3 @@
     </div>
 </div>
 {% endblock %}
-

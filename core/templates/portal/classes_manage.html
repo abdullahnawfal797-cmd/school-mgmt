@@ -1,20 +1,24 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}إدارة الصفوف والشُعب والدمج الذكي{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 d-print-none" dir="rtl">
+<div class="d-flex justify-content-between align-items-center mb-4 d-print-none flex-wrap gap-2" dir="rtl">
     <div>
         <h5 class="fw-bold text-primary mb-0">
-            <i class="bi bi-diagram-3-fill me-2"></i>منظومة إدارة المراحل والشُعب المدرسية
+            <i class="bi bi-diagram-3-fill me-2"></i>هيكلية المراحل والصفوف والشُعب المدرسية
         </h5>
-        <span class="text-muted small">إجمالي المراحل المعتمدة: <strong>{{ classes.count }} صفوف</strong></span>
+        <span class="text-muted small">المرحلة المعتمدة للمدرسة: <strong>{{ school.get_school_level_display|default:"ثانوية" }}</strong> | إجمالي الصفوف: <strong>{{ classes.count }}</strong></span>
     </div>
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-warning rounded-pill px-3 fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#mergeSectionsModal">
-            <i class="bi bi-arrows-collapse me-1"></i> دمج وإعادة توزيع الشُعب
-        </button>
-        <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
+    <div class="d-flex gap-2 flex-wrap">
+        <form method="POST" action="{% url 'portal_classes_manage' %}" class="d-inline" onsubmit="return confirm('هل تريد تهيئة وتثبيت كافة المراحل الرسمية لوزارة التربية العراقية تلقائياً بحسب مرحلة المدرسة؟');">
+            {% csrf_token %}
+            <input type="hidden" name="action_type" value="init_iraqi_classes">
+            <button type="submit" class="btn btn-outline-primary rounded-pill px-3 shadow-sm fw-bold">
+                <i class="bi bi-stars me-1"></i> تهيئة الصفوف الرسمية آلياً
+            </button>
+        </form>
+        <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold">
             <i class="bi bi-house-door-fill me-1"></i> الرئيسية
         </a>
     </div>
@@ -30,29 +34,47 @@
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="add_class">
                 <div class="mb-3">
-                    <label class="small fw-bold">اسم الصف:</label>
-                    <input type="text" name="name" class="form-control" placeholder="مثال: الأول المتوسط" required>
+                    <label class="small fw-bold mb-1">المرحلة / الصف الدراسي (وزارة التربية العراقية):</label>
+                    <select name="name" class="form-select fw-bold" id="stageSelect" onchange="checkCustomStage(this)" required>
+                        <option value="">-- اختر الصف من القائمة الرسمية --</option>
+                        <optgroup label="المرحلة الابتدائية">
+                            <option value="الاول الابتدائي">الأول الابتدائي</option>
+                            <option value="الثاني الابتدائي">الثاني الابتدائي</option>
+                            <option value="الثالث الابتدائي">الثالث الابتدائي</option>
+                            <option value="الرابع الابتدائي">الرابع الابتدائي</option>
+                            <option value="الخامس الابتدائي">الخامس الابتدائي</option>
+                            <option value="السادس الابتدائي">السادس الابتدائي (تخرج ابتدائي)</option>
+                        </optgroup>
+                        <optgroup label="المرحلة المتوسطة">
+                            <option value="الاول المتوسط">الأول المتوسط</option>
+                            <option value="الثاني المتوسط">الثاني المتوسط</option>
+                            <option value="الثالث المتوسط">الثالث المتوسط (تخرج متوسط/أساسي)</option>
+                        </optgroup>
+                        <optgroup label="المرحلة الإعدادية والثانوية">
+                            <option value="الرابع العلمي">الرابع العلمي</option>
+                            <option value="الرابع الادبي">الرابع الأدبي</option>
+                            <option value="الخامس العلمي">الخامس العلمي</option>
+                            <option value="الخامس الادبي">الخامس الأدبي</option>
+                            <option value="السادس العلمي">السادس العلمي (تخرج إعدادي)</option>
+                            <option value="السادس الادبي">السادس الأدبي (تخرج إعدادي)</option>
+                        </optgroup>
+                    </select>
                 </div>
                 <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="small fw-bold">الترتيب بالمدرسة:</label>
+                    <div class="col-12">
+                        <label class="small fw-bold mb-1">الترتيب والتسلسل بالمدرسة:</label>
                         <input type="number" name="level_order" class="form-control" value="{{ classes.count|add:1 }}" min="1" required>
-                    </div>
-                    <div class="col-6">
-                        <label class="small fw-bold">الصف اللاحق للترفيع:</label>
-                        <select name="next_class_id" class="form-select">
-                            <option value="">-- بدون صف لاحق --</option>
-                            {% for c in classes %}
-                            <option value="{{ c.id }}">{{ c.name }}</option>
-                            {% endfor %}
-                        </select>
                     </div>
                 </div>
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" name="is_final_stage" id="is_final_stage">
-                    <label class="form-check-label small fw-bold" for="is_final_stage">مرحلة منتهية (تخرج نهائي كالـ الثالث أو السادس)</label>
+                    <label class="form-check-label small fw-bold" for="is_final_stage">
+                        مرحلة تخرج نهائية (كـ السادس الابتدائي أو الثالث المتوسط أو السادس الإعدادي)
+                    </label>
                 </div>
-                <button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold py-2 shadow-sm">حفظ الصف</button>
+                <button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold py-2 shadow-sm">
+                    <i class="bi bi-check2-circle me-1"></i> حفظ وإنشاء الصف (مع شعبة أ)
+                </button>
             </form>
         </div>
 
@@ -80,7 +102,9 @@
                         <input type="number" name="capacity" class="form-control" value="40" min="10">
                     </div>
                 </div>
-                <button type="submit" class="btn btn-success rounded-pill w-100 fw-bold py-2 shadow-sm">إضافة الشعبة</button>
+                <button type="submit" class="btn btn-success rounded-pill w-100 fw-bold py-2 shadow-sm">
+                    <i class="bi bi-plus-lg me-1"></i> إضافة الشعبة للصف
+                </button>
             </form>
         </div>
     </div>
@@ -88,25 +112,24 @@
     <!-- عمود استعراض الصفوف والشُعب وإدارتها وحذفها -->
     <div class="col-12 col-lg-7">
         <div class="card card-custom p-4 shadow-sm h-100">
-            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                <i class="bi bi-buildings me-2 text-primary"></i>هيكلية الصفوف والشُعب المعتمدة
+            <h6 class="fw-bold text-white border-bottom pb-2 mb-3">
+                <i class="bi bi-buildings me-2 text-warning"></i>هيكلية الصفوف والشُعب المعتمدة
             </h6>
 
             <div class="accordion" id="classesAccordion">
                 {% for cls in classes %}
-                <div class="accordion-item mb-3 border rounded shadow-sm overflow-hidden">
+                <div class="accordion-item mb-3 border rounded-4 shadow-sm overflow-hidden">
                     <h2 class="accordion-header" id="heading{{ cls.id }}">
-                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} bg-light fw-bold text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ cls.id }}">
+                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fw-bold text-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ cls.id }}">
                             <div class="d-flex justify-content-between w-100 align-items-center pe-3 flex-wrap gap-2">
                                 <div>
-                                    <i class="bi bi-folder2-open text-primary me-2"></i>
-                                    <span>{{ cls.name }}</span>
+                                    <span class="badge bg-warning text-dark me-2">#{{ cls.level_order }}</span>
+                                    <i class="bi bi-folder2-open text-warning me-1"></i>
+                                    <span class="text-white">{{ cls.name }}</span>
                                     {% if cls.is_final_stage %}
-                                    <span class="badge bg-danger ms-2" style="font-size: 11px;">مرحلة منتهية</span>
-                                    {% elif cls.next_class %}
-                                    <span class="badge bg-light text-muted border ms-2" style="font-size: 11px;">يرفع إلى: {{ cls.next_class.name }}</span>
-                                    {% else %}
-                                    <span class="badge bg-warning text-dark ms-2" style="font-size: 11px;">بدون صف لاحق</span>
+                                    <span class="badge bg-danger ms-2" style="font-size: 11px;">
+                                        <i class="bi bi-mortarboard-fill me-1"></i>مرحلة تخرج نهائية
+                                    </span>
                                     {% endif %}
                                 </div>
                                 <div class="d-flex gap-2 align-items-center">
@@ -118,20 +141,25 @@
                     </h2>
                     <div id="collapse{{ cls.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#classesAccordion">
                         <div class="accordion-body p-3">
-                            <!-- شريط عمليات الصف: تعديل وحذف وإعادة موازنة -->
+                            <!-- شريط عمليات الصف: تعديل، حذف طلاب، وحذف الصف -->
                             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
-                                <div class="d-flex gap-1 align-items-center">
+                                <div class="d-flex gap-2 align-items-center flex-wrap">
                                     <!-- زر تعديل الصف -->
-                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1" data-bs-toggle="modal" data-bs-target="#editClassModal{{ cls.id }}">
+                                    <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 py-1 fw-bold" data-bs-toggle="modal" data-bs-target="#editClassModal{{ cls.id }}">
                                         <i class="bi bi-pencil me-1"></i> تعديل الصف
                                     </button>
 
+                                    <!-- زر حذف طلاب الصف بالكامل (مطلوب) -->
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-bold" data-bs-toggle="modal" data-bs-target="#deleteStudentsModal{{ cls.id }}" title="حذف كافة طلاب هذا الصف دفعة واحدة">
+                                        <i class="bi bi-person-x-fill me-1"></i> حذف طلاب الصف بالكامل ({{ cls.student_set.count }})
+                                    </button>
+
                                     <!-- زر حذف الصف بالكامل -->
-                                    <form method="POST" action="{% url 'portal_classes_manage' %}" class="d-inline" onsubmit="return confirm('تحذير شديد: هل أنت متأكد من رغبتك في حذف صف ({{ cls.name }}) بالكامل؟ سيتم تفريغ ارتباط الطلاب وشطب حصص جدوله الدراسي نهائياً!');">
+                                    <form method="POST" action="{% url 'portal_classes_manage' %}" class="d-inline" onsubmit="return confirm('تحذير شديد: هل أنت متأكد من رغبتك في حذف صف ({{ cls.name }}) بالكامل؟');">
                                         {% csrf_token %}
                                         <input type="hidden" name="action_type" value="delete_class">
                                         <input type="hidden" name="class_id" value="{{ cls.id }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1" title="حذف الصف بالكامل">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1" title="حذف الصف وشُعبه">
                                             <i class="bi bi-trash me-1"></i> حذف الصف
                                         </button>
                                     </form>
@@ -143,14 +171,10 @@
                                         {% csrf_token %}
                                         <input type="hidden" name="action_type" value="rebalance_all_sections">
                                         <input type="hidden" name="class_id" value="{{ cls.id }}">
-                                        <button type="submit" class="btn btn-xs btn-outline-info rounded-pill px-2 py-1 small fw-bold">
-                                            <i class="bi bi-shuffle me-1"></i> إعادة موازنة الشعب
+                                        <button type="submit" class="btn btn-sm btn-outline-info rounded-pill px-2 py-1 small fw-bold">
+                                            <i class="bi bi-shuffle me-1"></i> موازنة الشعب
                                         </button>
                                     </form>
-
-                                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2 py-1 small fw-bold text-dark" onclick="openMergeModalForClass({{ cls.id }})">
-                                        <i class="bi bi-arrows-collapse me-1"></i> دمج شُعب هذا الصف
-                                    </button>
                                 </div>
                                 {% endif %}
                             </div>
@@ -158,7 +182,7 @@
                             <!-- جدول الشُعب التابعة للصف -->
                             <div class="table-responsive">
                                 <table class="table table-bordered table-sm text-center align-middle mb-0" style="font-size: 13px;">
-                                    <thead class="table-light">
+                                    <thead>
                                         <tr>
                                             <th>الشعبة</th>
                                             <th>الاستيعاب</th>
@@ -180,16 +204,18 @@
                                                     {% csrf_token %}
                                                     <input type="hidden" name="action_type" value="delete_empty_section">
                                                     <input type="hidden" name="section_id" value="{{ sec.id }}">
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2 rounded-pill">حذف الشعبة</button>
+                                                    <button type="submit" class="btn btn-xs btn-outline-danger border-0" title="حذف الشعبة">
+                                                        <i class="bi bi-trash-fill text-danger"></i> حذف
+                                                    </button>
                                                 </form>
                                                 {% else %}
-                                                <span class="badge bg-light text-muted border">مشغولة بطلبة</span>
+                                                <span class="text-muted small">شعبة مأهولة</span>
                                                 {% endif %}
                                             </td>
                                         </tr>
                                         {% empty %}
                                         <tr>
-                                            <td colspan="4" class="text-muted py-2">لا توجد أي شعب مضافة لهذا الصف بعد.</td>
+                                            <td colspan="4" class="text-muted py-2">لا توجد شعب منشأة لهذا الصف.</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -199,46 +225,64 @@
                     </div>
                 </div>
 
+                <!-- نافذة تأكيد حذف جميع طلاب الصف بالكامل -->
+                <div class="modal fade" id="deleteStudentsModal{{ cls.id }}" tabindex="-1" aria-hidden="true" dir="rtl">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 border-0 shadow">
+                            <div class="modal-header bg-danger text-white rounded-top-4">
+                                <h6 class="modal-title fw-bold">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>تأكيد حذف طلاب الصف بالكامل
+                                </h6>
+                                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form method="POST" action="{% url 'portal_classes_manage' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="action_type" value="delete_all_class_students">
+                                <input type="hidden" name="class_id" value="{{ cls.id }}">
+                                <div class="modal-body p-4 text-center">
+                                    <i class="bi bi-person-x text-danger display-4 d-block mb-3"></i>
+                                    <h5 class="fw-bold text-dark mb-2">هل أنت متأكد من حذف كافة طلاب صف ({{ cls.name }})؟</h5>
+                                    <div class="alert alert-warning py-2 rounded-3 small text-end">
+                                        سيتم شطب وحذف جميع الطلاب المسجلين في هذا الصف وعددهم <strong>{{ cls.student_set.count }}</strong> طالب، مع تفريغ ارتباطاتهم وسجلات القيد والمقاعد الامتحانية.
+                                    </div>
+                                    <p class="text-muted small mb-0">يرجى التأكد من رغبتك لأن هذه العملية ستحذف بيانات طلاب الصف بالكامل.</p>
+                                </div>
+                                <div class="modal-footer border-0 pt-0 justify-content-center">
+                                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">نعم، حذف طلاب الصف الآن</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- نافذة تعديل الصف المنبثقة لكل صف -->
                 <div class="modal fade" id="editClassModal{{ cls.id }}" tabindex="-1" aria-hidden="true" dir="rtl">
                     <div class="modal-dialog modal-dialog-centered">
                         <div class="modal-content border-0 shadow rounded-4">
-                            <div class="modal-header bg-secondary text-white">
+                            <div class="modal-header bg-secondary text-white rounded-top-4">
                                 <h6 class="modal-title fw-bold"><i class="bi bi-pencil me-2"></i>تعديل صف ({{ cls.name }})</h6>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
                             </div>
                             <form method="POST" action="{% url 'portal_class_edit' cls.id %}">
                                 {% csrf_token %}
-                                <div class="modal-body p-4 text-start">
+                                <div class="modal-body p-4 text-start" dir="rtl">
                                     <div class="mb-3">
-                                        <label class="small fw-bold">اسم الصف:</label>
+                                        <label class="small fw-bold mb-1">اسم الصف:</label>
                                         <input type="text" name="name" class="form-control fw-bold" value="{{ cls.name }}" required>
                                     </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-6">
-                                            <label class="small fw-bold">الترتيب:</label>
-                                            <input type="number" name="level_order" class="form-control" value="{{ cls.level_order }}" required>
-                                        </div>
-                                        <div class="col-6">
-                                            <label class="small fw-bold">الصف اللاحق للترفيع:</label>
-                                            <select name="next_class_id" class="form-select">
-                                                <option value="">-- بدون صف لاحق --</option>
-                                                {% for oc in classes %}
-                                                    {% if oc.id != cls.id %}
-                                                    <option value="{{ oc.id }}" {% if cls.next_class_id == oc.id %}selected{% endif %}>{{ oc.name }}</option>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </select>
-                                        </div>
+                                    <div class="mb-3">
+                                        <label class="small fw-bold mb-1">الترتيب والتسلسل بالمدرسة:</label>
+                                        <input type="number" name="level_order" class="form-control" value="{{ cls.level_order }}" required>
                                     </div>
                                     <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" name="is_final_stage" id="edit_is_final_{{ cls.id }}" {% if cls.is_final_stage %}checked{% endif %}>
-                                        <label class="form-check-label small fw-bold" for="edit_is_final_{{ cls.id }}">مرحلة منتهية (تخرج نهائي)</label>
+                                        <label class="form-check-label small fw-bold" for="edit_is_final_{{ cls.id }}">مرحلة تخرج نهائية (تخرج الطلاب للأرشيف)</label>
                                     </div>
                                 </div>
-                                <div class="modal-footer bg-light">
-                                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
-                                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">حفظ التعديلات</button>
+                                <div class="modal-footer border-0 justify-content-center">
+                                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">حفظ التعديلات</button>
                                 </div>
                             </form>
                         </div>
@@ -247,115 +291,11 @@
                 {% empty %}
                 <div class="text-center text-muted py-5">
                     <i class="bi bi-inbox fs-1 opacity-50"></i>
-                    <p class="mt-2">لم تقم بإضافة صفوف دراسية بعد.</p>
+                    <p class="mt-2">لا توجد صفوف دراسية مضافة حتى الآن.<br>يمكنك الضغط على <strong>"تهيئة الصفوف الرسمية آلياً"</strong> بالأعلى لإنشاء صفوف مدرستك بضغطة زر واحدة.</p>
                 </div>
                 {% endfor %}
             </div>
         </div>
     </div>
 </div>
-
-<!-- نافذة دمج الشُعب المنبثقة -->
-<div class="modal fade" id="mergeSectionsModal" tabindex="-1" aria-hidden="true" dir="rtl">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow rounded-4">
-            <div class="modal-header bg-warning text-dark">
-                <h6 class="modal-title fw-bold"><i class="bi bi-arrows-collapse me-2"></i>دمج وتقليص شُعب الصف</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="action_type" value="merge_and_rebalance_sections">
-                <div class="modal-body p-4 text-start">
-                    <div class="alert alert-info py-2 small mb-3">
-                        <i class="bi bi-info-circle-fill me-1"></i>
-                        تقليص عدد الشعب مع إعادة توزيع الطلبة بالتساوي.
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold">اختر الصف المطلوب:</label>
-                        <select name="class_id" id="modal_merge_class" class="form-select fw-bold" onchange="updateSourceSectionsList()" required>
-                            <option value="">-- اختر الصف --</option>
-                            {% for c in classes %}
-                                {% if c.sections.count > 1 %}
-                                <option value="{{ c.id }}">{{ c.name }}</option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold text-danger">الشعبة المراد إلغاؤها وحذفها:</label>
-                        <select name="source_section_id" id="modal_merge_source_sec" class="form-select fw-bold text-danger" required>
-                            <option value="">-- اختر الشعبة المراد إزالتها --</option>
-                            {% for c in classes %}
-                                {% for s in c.sections.all %}
-                                <option value="{{ s.id }}" data-class-id="{{ c.id }}">شعبة {{ s.name }} (صف {{ c.name }})</option>
-                                {% endfor %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="small fw-bold">طريقة معالجة وتوزيع الطلبة:</label>
-                        <div class="form-check mb-2">
-                            <input class="form-check-input" type="radio" name="rebalance_mode" id="mode1" value="distribute_all" checked onchange="toggleTargetSecVisibility()">
-                            <label class="form-check-label small fw-bold text-dark" for="mode1">إعادة توزيع تناسبي شامل</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="rebalance_mode" id="mode2" value="move_to_one" onchange="toggleTargetSecVisibility()">
-                            <label class="form-check-label small fw-bold text-dark" for="mode2">ترحيل إلى شعبة محددة</label>
-                        </div>
-                    </div>
-                    <div class="mb-3" id="single_target_sec_wrapper" style="display: none;">
-                        <label class="small fw-bold text-success">ترحيلهم للشعبة المستهدفة:</label>
-                        <select name="target_single_section_id" id="modal_merge_target_sec" class="form-select fw-bold text-success">
-                            <option value="">-- اختر الشعبة البديلة --</option>
-                            {% for c in classes %}
-                                {% for s in c.sections.all %}
-                                <option value="{{ s.id }}" data-class-id="{{ c.id }}">شعبة {{ s.name }} (صف {{ c.name }})</option>
-                                {% endfor %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">تأكيد الدمج</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-function openMergeModalForClass(classId) {
-    const clsSelect = document.getElementById('modal_merge_class');
-    if (clsSelect) {
-        clsSelect.value = classId;
-        updateSourceSectionsList();
-    }
-    const myModal = new bootstrap.Modal(document.getElementById('mergeSectionsModal'));
-    myModal.show();
-}
-
-function updateSourceSectionsList() {
-    const clsId = document.getElementById('modal_merge_class').value;
-    const srcOptions = document.querySelectorAll('#modal_merge_source_sec option[data-class-id]');
-    const trgOptions = document.querySelectorAll('#modal_merge_target_sec option[data-class-id]');
-
-    srcOptions.forEach(opt => {
-        opt.style.display = (opt.getAttribute('data-class-id') === clsId) ? 'block' : 'none';
-    });
-    trgOptions.forEach(opt => {
-        opt.style.display = (opt.getAttribute('data-class-id') === clsId) ? 'block' : 'none';
-    });
-
-    document.getElementById('modal_merge_source_sec').value = '';
-    document.getElementById('modal_merge_target_sec').value = '';
-}
-
-function toggleTargetSecVisibility() {
-    const isSingle = document.getElementById('mode2').checked;
-    document.getElementById('single_target_sec_wrapper').style.display = isSingle ? 'block' : 'none';
-}
-</script>
 {% endblock %}
-

@@ -1,6 +1,7 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}إدارة ورصد الحضور والغياب اليومي{% endblock %}
+
 
 {% block content %}
 <div class="row g-4 mb-4">
@@ -56,7 +57,7 @@
 
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover align-middle mb-0 text-center">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
                                 <th style="width: 6%;">ت</th>
                                 <th style="width: 35%;">اسم الطالب الرباعي</th>
@@ -69,12 +70,11 @@
                             <tr>
                                 <td class="fw-bold">{{ forloop.counter }}</td>
                                 <td class="text-start fw-bold pe-3">
-                                    <i class="bi bi-person text-primary me-1"></i>
+                                    <i class="bi bi-person text-warning me-1"></i>
                                     {{ st.user.get_full_name|default:st.user.username }}
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-dark border">شعبة {{ st.section.name|default:"عامة"
-                                        }}</span>
+                                    <span class="badge" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">شعبة {{ st.section.name|default:"عامة" }}</span>
                                 </td>
                                 <td>
                                     <div class="d-flex justify-content-center gap-3">
@@ -140,4 +140,3 @@
     </div>
 </div>
 {% endblock %}
-

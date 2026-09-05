@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}وثيقة رسمية{% endblock %}</title>
+    <style>
+        :root {
+            --primary-color: #1a365d;
+            --secondary-color: #2b6cb0;
+            --accent-gold: #c69214;
+            --text-dark: #1a202c;
+            --bg-light: #f7fafc;
+            --border-color: #2d3748;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', 'Amiri', Tahoma, sans-serif;
+            background-color: #e2e8f0;
+            color: var(--text-dark);
+            direction: rtl;
+            padding: 20px;
+        }
+
+        .no-print-toolbar {
+            max-width: 900px;
+            margin: 0 auto 20px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .btn-print {
+            background-color: #2b6cb0;
+            color: #ffffff;
+            border: none;
+            padding: 8px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            font-family: 'Cairo', sans-serif;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-print:hover {
+            background-color: #1a365d;
+            transform: translateY(-1px);
+        }
+
+        .page-container {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20mm 18mm;
+            border: 2px solid #2d3748;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            position: relative;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .official-frame {
+            border: 3px double var(--primary-color);
+            padding: 15px;
+            height: 100%;
+            position: relative;
+        }
+
+        /* Header Styling */
+        .doc-header {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            align-items: center;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .header-right {
+            text-align: right;
+            font-size: 13px;
+            line-height: 1.6;
+            font-weight: 600;
+        }
+
+        .header-center {
+            text-align: center;
+        }
+
+        .header-center .emblem {
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .header-center .school-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2c5282;
+        }
+
+        .header-left {
+            text-align: left;
+            font-size: 13px;
+            line-height: 1.6;
+            font-weight: 600;
+        }
+
+        /* Title */
+        .doc-title-container {
+            text-align: center;
+            margin: 20px 0 25px 0;
+        }
+
+        .doc-title {
+            display: inline-block;
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--primary-color);
+            padding: 6px 30px;
+            border-bottom: 2px solid var(--accent-gold);
+            background: #edf2f7;
+            border-radius: 4px;
+        }
+
+        /* Body Content */
+        .doc-body {
+            font-size: 15px;
+            line-height: 2;
+            color: #2d3748;
+            margin-bottom: 30px;
+            text-align: justify;
+        }
+
+        /* Tables */
+        .official-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 13px;
+        }
+
+        .official-table th, .official-table td {
+            border: 1px solid #4a5568;
+            padding: 8px 6px;
+            text-align: center;
+        }
+
+        .official-table th {
+            background-color: #edf2f7;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        /* Signatures */
+        .signatures-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        .sig-box {
+            padding: 10px;
+        }
+
+        .sig-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 40px;
+        }
+
+        .sig-name {
+            font-size: 14px;
+            font-weight: 600;
+            border-top: 1px dotted #718096;
+            padding-top: 5px;
+        }
+
+        .stamp-placeholder {
+            width: 90px;
+            height: 90px;
+            border: 2px dashed #a0aec0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            color: #a0aec0;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        /* Footer */
+        .doc-footer {
+            margin-top: 30px;
+            border-top: 1px solid #cbd5e0;
+            padding-top: 10px;
+            font-size: 11px;
+            color: #718096;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 10mm 8mm 10mm 8mm;
+            }
+            body {
+                background: none !important;
+                padding: 0 !important;
+                color: #000000 !important;
+                font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+                font-weight: bold !important;
+            }
+            .no-print-toolbar {
+                display: none !important;
+            }
+            .page-container {
+                width: 100% !important;
+                min-height: auto !important;
+                margin: 0 !important;
+                padding: 4mm 6mm !important;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+            thead {
+                display: table-header-group !important;
+            }
+            tfoot {
+                display: table-footer-group !important;
+            }
+            tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+        }
+
+        .page-container,
+        .page-container * {
+            font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+            font-weight: bold !important;
+            color: #000000 !important;
+        }
+
+        .page-container {
+            font-size: 16pt !important;
+        }
+        .page-container p,
+        .page-container div,
+        .page-container span,
+        .page-container td,
+        .page-container th {
+            font-size: 16pt !important;
+            font-weight: bold !important;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+    <div class="no-print-toolbar">
+        <div>
+            <strong>نظام إدارة المدرسة - النظام التعليمي العراقي</strong>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn-print" onclick="window.print()">
+                🖨️ طباعة الوثيقة / تصدير PDF
+            </button>
+            <a href="javascript:history.back()" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#4a5568; color:#fff; padding:8px 18px; border-radius:6px; font-weight:bold; font-size:14px;">
+                ↩️ رجوع
+            </a>
+        </div>
+    </div>
+
+    <div class="page-container">
+        <div class="official-frame">
+            <!-- الهيدر الرسمي لوزارة التربية العراقية -->
+            <header class="doc-header">
+                <div class="header-right">
+                    <div>جمهورية العراق</div>
+                    <div>وزارة التربية</div>
+                    <div>المديرية العامة للتربية</div>
+                    <div>قسم الشؤون التعليمية</div>
+                </div>
+                <div class="header-center">
+                    <div class="emblem">🇮🇶</div>
+                    <div class="school-name">مدرسة النور الابتدائية / الثانوية</div>
+                    <div style="font-size: 12px; color: #4a5568;">العام الدراسي {{ academic_year|default:"2025 - 2026" }}</div>
+                </div>
+                <div class="header-left">
+                    <div>العدد: <strong>{{ doc_number|default:"---" }}</strong></div>
+                    <div>التاريخ: <strong>{{ doc_date|default:today_date }}</strong></div>
+                    <div>المرفقات: <strong>{{ attachments|default:"لا يوجد" }}</strong></div>
+                </div>
+            </header>
+
+            {% block content %}{% endblock %}
+
+            <footer class="doc-footer">
+                <div>العنوان: جمهورية العراق - المحافظة - الإدارة المدرسية</div>
+                <div>حرر بواسطة المنظومة الإلكترونية لإدارة المدرسة</div>
+            </footer>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,6 +1,7 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}إدارة وقبول الطلبة والتوزيع التناسبي{% endblock %}
+
 
 {% block content %}
 <div class="row g-4 mb-4" dir="rtl">
@@ -11,11 +12,17 @@
                 <h5 class="fw-bold text-primary mb-0">
                     <i class="bi bi-person-plus-fill me-2"></i>تسجيل وقبول طالب جديد
                 </h5>
-                <!-- زر فتح نافذة استيراد الإكسل -->
-                <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm"
-                    data-bs-toggle="modal" data-bs-target="#excelImportModal">
-                    <i class="bi bi-file-earmark-excel-fill me-1"></i> استيراد إكسل
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold shadow-sm"
+                        data-bs-toggle="modal" data-bs-target="#exportStudentsExcelModal">
+                        <i class="bi bi-file-earmark-excel-fill me-1"></i> تصدير القوائم (Excel)
+                    </button>
+                    <!-- زر فتح نافذة استيراد الإكسل -->
+                    <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm"
+                        data-bs-toggle="modal" data-bs-target="#excelImportModal">
+                        <i class="bi bi-file-earmark-excel-fill me-1"></i> استيراد إكسل
+                    </button>
+                </div>
             </div>
 
             <form method="POST">
@@ -49,9 +56,27 @@
                         <label class="form-label small fw-bold">المرحلة والصف:</label>
                         <select name="class_id" class="form-select" required>
                             <option value="">-- اختر الصف --</option>
-                            {% for cls in classes %}
-                            <option value="{{ cls.id }}">{{ cls.name }}</option>
-                            {% endfor %}
+                            <optgroup label="المرحلة الابتدائية (1 - 6)">
+                                {% for cls in classes %}
+                                {% if cls.level_order <= 6 %}
+                                <option value="{{ cls.id }}">{{ cls.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="المرحلة المتوسطة (الأول - الثالث متوسط)">
+                                {% for cls in classes %}
+                                {% if cls.level_order >= 7 and cls.level_order <= 9 %}
+                                <option value="{{ cls.id }}">{{ cls.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="المرحلة الإعدادية (الرابع - السادس العلمي والأدبي)">
+                                {% for cls in classes %}
+                                {% if cls.level_order >= 10 %}
+                                <option value="{{ cls.id }}">{{ cls.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
                         </select>
                     </div>
                     <div class="col-6">
@@ -95,6 +120,10 @@
                     <span class="text-muted small">المسجلين حالياً: <strong>{{ students|length }}</strong> طالب</span>
                 </div>
                 <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm rounded-pill px-3 fw-bold shadow-sm"
+                        data-bs-toggle="modal" data-bs-target="#exportStudentsExcelModal">
+                        <i class="bi bi-file-earmark-excel-fill me-1"></i> تصدير القوائم (Excel)
+                    </button>
                     <a href="{% url 'portal_dashboard' %}" class="btn btn-dark btn-sm rounded-pill px-3 shadow-sm">
                         <i class="bi bi-house-door-fill me-1"></i> الرئيسية
                     </a>
@@ -106,9 +135,27 @@
                 <div class="col-md-5">
                     <select name="class_id" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">-- كافة المراحل الدراسية --</option>
-                        {% for c in classes %}
-                        <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"i" %}selected{% endif %}>{{ c.name }}</option>
-                        {% endfor %}
+                        <optgroup label="المرحلة الابتدائية">
+                            {% for c in classes %}
+                            {% if c.level_order <= 6 %}
+                            <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"i" %}selected{% endif %}>{{ c.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="المرحلة المتوسطة">
+                            {% for c in classes %}
+                            {% if c.level_order >= 7 and c.level_order <= 9 %}
+                            <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"i" %}selected{% endif %}>{{ c.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="المرحلة الإعدادية">
+                            {% for c in classes %}
+                            {% if c.level_order >= 10 %}
+                            <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"i" %}selected{% endif %}>{{ c.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </optgroup>
                     </select>
                 </div>
                 <div class="col-md-5">
@@ -126,7 +173,7 @@
 
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13px;">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
                             <th style="width: 5%;">ت</th>
                             <th style="width: 14%;">رقم القيد</th>
@@ -141,7 +188,15 @@
                             <td class="fw-bold">{{ forloop.counter }}</td>
                             <td class="font-monospace text-primary fw-bold">{{ st.registration_number|default:"---" }}</td>
                             <td class="text-start fw-bold pe-2">
-                                <i class="bi bi-person text-secondary me-1"></i> {{ st.user.get_full_name|default:st.user.username }}
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span><i class="bi bi-person text-secondary me-1"></i> {{ st.user.get_full_name|default:st.user.username }}</span>
+                                    {% if st.parent and st.parent.phone %}
+                                    <a href="https://wa.me/{% if st.parent.phone|slice:':1' == '0' %}964{{ st.parent.phone|slice:'1:' }}{% else %}964{{ st.parent.phone }}{% endif %}?text=السلام%20عليكم%20ورحمة%20الله%20وبركاته%20من%20إدارة%20مدرسة%20{{ school.school_name|urlencode }}%20بخصوص%20الطالب%20{{ st.user.get_full_name|urlencode }}" 
+                                       target="_blank" class="btn btn-xs btn-outline-success rounded-circle p-0 d-inline-flex align-items-center justify-content-center ms-2" style="width: 22px; height: 22px;" title="مراسلة ولي الأمر عبر واتساب ({{ st.parent.phone }})">
+                                        <i class="bi bi-whatsapp" style="font-size: 11px;"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
                                 {{ st.current_class.name|default:"بدون صف" }}
@@ -168,8 +223,8 @@
                                 <div class="modal fade text-start" id="editStudentModal{{ st.id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content rounded-4 border-0 shadow">
-                                            <div class="modal-header bg-light">
-                                                <h6 class="modal-title fw-bold text-dark">
+                                            <div class="modal-header border-bottom" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                                                <h6 class="modal-title fw-bold text-white">
                                                     <i class="bi bi-pencil-square text-warning me-1"></i> تعديل بيانات الطالب: {{ st.user.get_full_name }}
                                                 </h6>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -227,9 +282,9 @@
                                                         </select>
                                                     </div>
                                                 </div>
-                                                <div class="modal-footer bg-light">
+                                                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                                                     <button type="button" class="btn btn-secondary btn-sm rounded-pill" data-bs-dismiss="modal">إلغاء</button>
-                                                    <button type="submit" class="btn btn-warning btn-sm rounded-pill px-4 fw-bold">حفظ التعديلات</button>
+                                                    <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm">حفظ التعديلات</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -278,10 +333,28 @@
                     <div class="mb-3">
                         <label class="small fw-bold mb-1">الصف والمرحلة المستهدفة للطلبة:</label>
                         <select name="target_class_id" class="form-select fw-bold" required>
-                            <option value="">-- اختر الصف المستهدف --</option>
-                            {% for c in classes %}
-                            <option value="{{ c.id }}">{{ c.name }} (الشعب المعتمدة: {{ c.sections.count }})</option>
-                            {% endfor %}
+                            <option value="">-- اختر الصف والمرحلة المستهدفة --</option>
+                            <optgroup label="المرحلة الابتدائية (الصفوف 1 - 6)">
+                                {% for c in classes %}
+                                {% if c.level_order <= 6 %}
+                                <option value="{{ c.id }}">{{ c.name }} (الشعب المعتمدة: {{ c.sections.count }})</option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="المرحلة المتوسطة (الأول - الثالث متوسط)">
+                                {% for c in classes %}
+                                {% if c.level_order >= 7 and c.level_order <= 9 %}
+                                <option value="{{ c.id }}">{{ c.name }} (الشعب المعتمدة: {{ c.sections.count }})</option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="المرحلة الإعدادية (الرابع - السادس العلمي والأدبي)">
+                                {% for c in classes %}
+                                {% if c.level_order >= 10 %}
+                                <option value="{{ c.id }}">{{ c.name }} (الشعب المعتمدة: {{ c.sections.count }})</option>
+                                {% endif %}
+                                {% endfor %}
+                            </optgroup>
                         </select>
                     </div>
 
@@ -291,9 +364,100 @@
                         سيتولى النظام أوتوماتيكياً فرز معدلات الطلبة الأبجدية وتوزيعها بعدالة تامة على الشعب لمنع تكدس المتفوقين في شعبة واحدة وتحقيق التكافؤ العلمي.
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                     <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
                     <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">بدء الفرز والتوزيع على الشُعب</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== نافذة تصدير بيانات الطلبة إلى ملف Excel ==================== -->
+<div class="modal fade" id="exportStudentsExcelModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-4">
+            <div class="modal-header bg-success text-white">
+                <h6 class="modal-title fw-bold">
+                    <i class="bi bi-file-earmark-excel-fill me-2"></i>تصدير قوائم الطلبة إلى ملف Excel
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="GET" action="{% url 'portal_students_export_excel' %}">
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">
+                        حدد نطاق التصدير المطلوب لتوليد ملف Excel رسمي يحتوي على: (ت، رقم القيد، الاسم الرباعي واللقب، الصف والشعبة، الرقم الوطني/الهوية، هاتف ولي الأمر، والحالة الأكاديمية)، مع اتجاه ورقة العمل من اليمين إلى اليسار (RTL).
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold mb-2">اختر نطاق التصدير:</label>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="form-check p-3 rounded-3 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                                <input class="form-check-input" type="radio" name="export_scope" id="scope_all_std" value="all" checked onchange="toggleExportFieldsStd()">
+                                <label class="form-check-label fw-bold text-white ms-2" for="scope_all_std">
+                                    <i class="bi bi-people-fill text-warning me-1"></i> تصدير كافة طلبة المدرسة (شامل)
+                                </label>
+                                <small class="text-muted d-block ms-4 mt-1">تصدير جميع الطلاب المسجلين بالمدرسة في كافة الصفوف والمراحل.</small>
+                            </div>
+
+                            <div class="form-check p-3 rounded-3 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                                <input class="form-check-input" type="radio" name="export_scope" id="scope_specific_std" value="specific" onchange="toggleExportFieldsStd()">
+                                <label class="form-check-label fw-bold text-white ms-2" for="scope_specific_std">
+                                    <i class="bi bi-filter-circle-fill text-info me-1"></i> تصدير طلبة صف وشعبة محددة
+                                </label>
+                                <small class="text-muted d-block ms-4 mt-1">تخصيص مرحلة وصف دراسي معين مع خيار تحديد الشعبة.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- حقول اختيار الصف والشعبة -->
+                    <div id="exportClassSectionFieldsStd" class="p-3 rounded-3 border mb-3 d-none" style="background: rgba(0, 0, 0, 0.2); border-color: rgba(255, 255, 255, 0.1) !important;">
+                        <div class="mb-3">
+                            <label class="small fw-bold mb-1">الصف الدراسي المستهدف:</label>
+                            <select name="class_id" id="export_class_select_std" class="form-select form-select-sm fw-bold">
+                                <option value="">-- اختر الصف الدراسي --</option>
+                                <optgroup label="المرحلة الابتدائية">
+                                    {% for c in classes %}
+                                    {% if c.level_order <= 6 %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="المرحلة المتوسطة">
+                                    {% for c in classes %}
+                                    {% if c.level_order >= 7 and c.level_order <= 9 %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </optgroup>
+                                <optgroup label="المرحلة الإعدادية">
+                                    {% for c in classes %}
+                                    {% if c.level_order >= 10 %}
+                                    <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="small fw-bold mb-1">الشعبة (اختياري):</label>
+                            <select name="section_id" id="export_section_select_std" class="form-select form-select-sm">
+                                <option value="">-- كافة شُعب الصف المحدد --</option>
+                                {% for s in sections %}
+                                <option value="{{ s.id }}">{{ s.school_class.name }} - شعبة {{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="export_all" id="inp_export_all_std" value="1">
+                </div>
+                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="bi bi-download me-1"></i> تحميل ملف Excel الآن
+                    </button>
                 </div>
             </form>
         </div>
@@ -314,6 +478,18 @@ function confirmTransferStudent(studentId, studentName) {
         document.getElementById('transferStudentForm').submit();
     }
 }
+
+function toggleExportFieldsStd() {
+    const isSpecific = document.getElementById('scope_specific_std') && document.getElementById('scope_specific_std').checked;
+    const fieldsDiv = document.getElementById('exportClassSectionFieldsStd');
+    const inpAll = document.getElementById('inp_export_all_std');
+    if (isSpecific) {
+        if (fieldsDiv) fieldsDiv.classList.remove('d-none');
+        if (inpAll) inpAll.value = '0';
+    } else {
+        if (fieldsDiv) fieldsDiv.classList.add('d-none');
+        if (inpAll) inpAll.value = '1';
+    }
+}
 </script>
 {% endblock %}
-

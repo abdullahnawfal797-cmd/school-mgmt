@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شيت الدرجات العام وسجل الدرجات المعتمد - {{ school_class.name }}</title>
+    <style>
+        :root {
+            --primary: #111827;
+            --border-dark: #000000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Simplified Arabic', 'Traditional Arabic', 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            background-color: #f1f5f9;
+            color: #000000;
+            direction: rtl;
+            padding: 15px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* شريط التحكم والطباعة العلوي */
+        .no-print-toolbar {
+            max-width: 1200px;
+            margin: 0 auto 15px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-print {
+            background-color: #1e3a8a;
+            color: #ffffff;
+            border: none;
+            padding: 8px 24px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3);
+        }
+
+        .btn-print:hover {
+            background-color: #0f172a;
+            transform: translateY(-1px);
+        }
+
+        .btn-back {
+            background-color: #f8fafc;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            padding: 8px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Cairo', sans-serif;
+            border-radius: 30px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* حاوية صفحة A4 Landscape */
+        .master-page-block {
+            width: 297mm;
+            min-height: 209mm;
+            max-height: 209mm;
+            margin: 0 auto 25px auto;
+            background: #ffffff;
+            padding: 6mm 8mm 5mm 8mm;
+            border: 2px solid var(--border-dark);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-after: always;
+            break-after: page;
+            box-sizing: border-box;
+            background-color: #ffffff !important;
+        }
+
+        .master-page-block:last-child {
+            page-break-after: auto;
+            break-after: auto;
+            margin-bottom: 0;
+        }
+
+        /* الترويسة الوزارية الأصولية */
+        .doc-header-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.6fr 1fr;
+            align-items: center;
+            border-bottom: 2px solid var(--border-dark);
+            padding-bottom: 4px;
+            margin-bottom: 5px;
+        }
+
+        .header-right {
+            text-align: right;
+            font-size: 11px;
+            line-height: 1.35;
+            font-weight: 700;
+        }
+
+        .header-center {
+            text-align: center;
+        }
+
+        .header-center .emblem {
+            font-size: 14px;
+            font-weight: 900;
+            color: #000;
+            margin-bottom: 1px;
+        }
+
+        .header-center .doc-main-title {
+            font-size: 15px;
+            font-weight: 900;
+            color: #000;
+            letter-spacing: -0.2px;
+        }
+
+        .header-center .doc-sub-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .header-left {
+            text-align: left;
+            font-size: 11px;
+            line-height: 1.35;
+            font-weight: 700;
+        }
+
+        /* جدول الدرجات المعتمد */
+        .table-master-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .master-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            table-layout: fixed;
+            border: 1.5px solid var(--border-dark);
+            background: #ffffff;
+        }
+
+        .master-table thead {
+            display: table-header-group;
+        }
+
+        .master-table th, .master-table td {
+            border: 1px solid var(--border-dark);
+            padding: 2px 1px;
+            text-align: center;
+            vertical-align: middle;
+            color: #000000;
+            word-wrap: break-word;
+            overflow: hidden;
+        }
+
+        .master-table thead th {
+            background-color: #f1f5f9 !important;
+            font-weight: 800;
+            color: #000000;
+            height: 18px;
+        }
+
+        .sub-header-row th {
+            background-color: #f8fafc !important;
+            font-size: 9.5px;
+            font-weight: 700;
+            height: 15px;
+        }
+
+        .student-row {
+            height: 5.1mm;
+            max-height: 5.1mm;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .student-row td {
+            font-size: 10px;
+            line-height: 1.15;
+        }
+
+        .student-name-cell {
+            text-align: right !important;
+            padding-right: 5px !important;
+            font-weight: 700;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .seq-cell {
+            font-weight: 800;
+            background-color: #f8fafc;
+        }
+
+        .total-cell, .avg-cell {
+            font-weight: 800;
+            background-color: #f8fafc;
+        }
+
+        .result-cell {
+            font-weight: 800;
+            font-size: 9.5px;
+        }
+
+        /* تذييل التوقيعات */
+        .doc-signatures-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            text-align: center;
+            border-top: 1.5px solid var(--border-dark);
+            padding-top: 5px;
+            margin-top: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .sig-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+        }
+
+        .sig-title {
+            color: #000000;
+            font-weight: 800;
+        }
+
+        .sig-dots {
+            font-weight: normal;
+            color: #64748b;
+        }
+
+        /* قواعد الطباعة الصارمة */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 4mm 6mm;
+            }
+
+            body {
+                background: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .no-print-toolbar {
+                display: none !important;
+            }
+
+            .master-page-block {
+                width: 100% !important;
+                height: 198mm !important;
+                max-height: 198mm !important;
+                min-height: 198mm !important;
+                margin: 0 !important;
+                padding: 4mm 5mm 3mm 5mm !important;
+                border: 2px solid #000000 !important;
+                box-shadow: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+
+            .master-page-block:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+
+            .master-table thead th {
+                background-color: #e2e8f0 !important;
+            }
+
+            .sub-header-row th {
+                background-color: #f1f5f9 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- شريط التحكم خارج الطباعة -->
+    <div class="no-print-toolbar">
+        <div class="d-flex align-items-center gap-2">
+            <a href="javascript:history.back()" class="btn-back">↩ العودة</a>
+            <span style="font-weight: 700; color: #1e293b;">سجل الدرجات العام للإدارة - {{ school_class.name }} (إجمالي الطلبة: {{ total_students }} طالب - {{ total_pages }} صفحة)</span>
+        </div>
+        <div>
+            <button class="btn-print" onclick="window.print()">
+                🖨️ طباعة السجل بالكامل (A4 بالعرض Landscape)
+            </button>
+        </div>
+    </div>
+
+    <!-- تكرار الصفحات المقسمة برمجياً بحد أقصى 27 طالباً في كل صفحة -->
+    {% for page in pages_data %}
+    <div class="master-page-block">
+        
+        <!-- الترويسة المعتمدة أعلى كل صفحة -->
+        <header class="doc-header-grid">
+            <div class="header-right">
+                <div>جمهورية العراق</div>
+                <div>وزارة التربية</div>
+                <div>{{ school.directorate|default:"المديرية العامة للتربية" }}</div>
+                <div>{{ school.sub_directorate|default:"قسم التربية" }}</div>
+            </div>
+
+            <div class="header-center">
+                <div class="emblem">وزارة التربية العراقية</div>
+                <div class="doc-main-title">شيت الدرجات العام وسجل الدرجات المعتمد</div>
+                <div class="doc-sub-title">الصف: <strong>{{ school_class.name }}</strong> | العام الدراسي: <strong>{{ academic_year.name|default:academic_year|default:"2026-2027" }}</strong></div>
+            </div>
+
+            <div class="header-left">
+                <div>إدارة: <strong>{{ school.school_name }}</strong></div>
+                <div>تاريخ الطباعة: <strong>{{ today_date }}</strong></div>
+                <div>الصفحة: <strong>( {{ page.page_number }} من {{ total_pages }} )</strong></div>
+            </div>
+        </header>
+
+        <!-- جدول الدرجات لـ 27 طالباً -->
+        <div class="table-master-container">
+            <table class="master-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="width: 26px;">ت</th>
+                        <th rowspan="2" style="width: 170px;">اسم الطالب الرباعي واللقب</th>
+                        <th rowspan="2" style="width: 40px;">الشعبة</th>
+                        {% for sub in subjects %}
+                        <th colspan="2">{{ sub.name }}</th>
+                        {% endfor %}
+                        <th rowspan="2" style="width: 44px;">المجموع</th>
+                        <th rowspan="2" style="width: 44px;">المعدل</th>
+                        <th rowspan="2" style="width: 40px;">القرار</th>
+                        <th rowspan="2" style="width: 72px;">النتيجة</th>
+                    </tr>
+                    <tr class="sub-header-row">
+                        {% for sub in subjects %}
+                        <th style="width: 28px;">سعي</th>
+                        <th style="width: 28px;">نهائي</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page.students %}
+                    <tr class="student-row">
+                        <td class="seq-cell">{{ forloop.counter|add:page.start_idx }}</td>
+                        <td class="student-name-cell">{{ item.student.user.get_full_name|default:item.student.full_name }}</td>
+                        <td>{{ item.student.section.name|default:"أ" }}</td>
+                        {% for sub_res in item.subjects_grades %}
+                            {% if sub_res %}
+                                <td>{{ sub_res.annual_effort|default:"-" }}</td>
+                                <td style="font-weight: 700;">
+                                    {% if sub_res.final_grade_after_decision %}
+                                        {{ sub_res.final_grade_after_decision }}
+                                    {% elif sub_res.final_grade %}
+                                        {{ sub_res.final_grade }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            {% else %}
+                                <td>-</td>
+                                <td>-</td>
+                            {% endif %}
+                        {% endfor %}
+                        <td class="total-cell">{{ item.total_sum|default:"-" }}</td>
+                        <td class="avg-cell">{{ item.avg|default:"-" }}</td>
+                        <td>{{ item.total_decision|default:"0" }}</td>
+                        <td class="result-cell">
+                            {% if item.result == 'ناجح' or item.result == 'ناجح بالقرار' %}
+                                <span style="color: #15803d;">{{ item.result }}</span>
+                            {% elif item.result == 'مكمل' %}
+                                <span style="color: #b45309;">{{ item.result }}</span>
+                            {% else %}
+                                <span style="color: #b91c1c;">{{ item.result }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ subjects|length|add:subjects|length|add:7 }}" style="padding: 20px; text-align: center;">
+                            لا يوجد طلاب مسجلين في هذا الصف.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- تذييل التوقيعات الرسمي المكرر أسفل كل صفحة -->
+        <footer class="doc-signatures-grid">
+            <div class="sig-box">
+                <span class="sig-title">أعضاء اللجنة الامتحانية</span>
+                <span class="sig-dots">التوقيع: .......................................</span>
+            </div>
+            <div class="sig-box">
+                <span class="sig-title">مدقق السجل / معاون شؤون الطلبة</span>
+                <span class="sig-dots">التوقيع: .......................................</span>
+            </div>
+            <div class="sig-box">
+                <span class="sig-title">مدير المدرسة / رئيس اللجنة (الختم الرسمي)</span>
+                <span class="sig-dots">التوقيع: {{ school.director_name|default:"......................................." }}</span>
+            </div>
+        </footer>
+
+    </div>
+    {% endfor %}
+
+</body>
+</html>

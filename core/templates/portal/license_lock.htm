@@ -20,40 +20,33 @@
             </p>
 
             <!-- بطاقة معرف الجهاز للتفعيل -->
-            <div class="alert alert-light border text-center p-3 mb-4 rounded-3">
-                <span class="text-muted small d-block mb-1">المُعرّف الرقمي الخاص بهذه الحاسبة (Machine ID):</span>
-                <span class="fs-4 fw-bold text-primary font-monospace tracking-wide">{{ machine_id }}</span>
-                <small class="text-muted d-block mt-1">زوّدنا بهذا الكود عند الاتصال لتوليد مفتاح التفعيل الفوري
-                    لمدرستكم.</small>
+            <div class="alert border text-center p-3 mb-4 rounded-4" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                <span class="text-white-50 small d-block mb-1">المُعرّف الرقمي الخاص بهذه الحاسبة (Machine ID):</span>
+                <span class="fs-4 fw-bold text-warning font-monospace tracking-wide">{{ machine_id }}</span>
+                <small class="text-white-50 d-block mt-1">زوّدنا بهذا الكود عند الاتصال لتوليد مفتاح التفعيل الفوري لمدرستكم.</small>
             </div>
 
             <!-- طرق التسديد المتاحة ورقم الاتصال -->
             <div class="row g-3 mb-4 text-start">
                 <div class="col-12 col-md-6">
-                    <div class="p-3 bg-light rounded-3 h-100 border">
-                        <h6 class="fw-bold text-dark"><i class="bi bi-cash-stack text-success me-2"></i>1. التسديد
-                            المباشر (كاش):</h6>
-                        <p class="small text-muted mb-0">يمكنكم الدفع المباشر عبر مندوبنا المعتمد أو المراجعة، وسيصلكم
-                            الكود فوراً.</p>
+                    <div class="p-3 rounded-4 h-100 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                        <h6 class="fw-bold text-white"><i class="bi bi-cash-stack text-success me-2"></i>1. التسديد المباشر (كاش):</h6>
+                        <p class="small text-white-50 mb-0">يمكنكم الدفع المباشر عبر مندوبنا المعتمد أو المراجعة، وسيصلكم الكود فوراً.</p>
                     </div>
                 </div>
                 <div class="col-12 col-md-6">
-                    <div class="p-3 bg-light rounded-3 h-100 border">
-                        <h6 class="fw-bold text-dark"><i class="bi bi-credit-card-2-front text-primary me-2"></i>2.
-                            التحويل عبر الماستر كارد:</h6>
-                        <p class="small text-muted mb-0">تحويل المبلغ إلى بطاقة الماستر كارد مباشرة واستلام كود التفعيل
-                            عبر الواتساب بدقائق.</p>
+                    <div class="p-3 rounded-4 h-100 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                        <h6 class="fw-bold text-white"><i class="bi bi-credit-card-2-front text-warning me-2"></i>2. التحويل عبر الماستر كارد:</h6>
+                        <p class="small text-white-50 mb-0">تحويل المبلغ إلى بطاقة الماستر كارد مباشرة واستلام كود التفعيل عبر الواتساب بدقائق.</p>
                     </div>
                 </div>
             </div>
 
             <!-- زر الاتصال المباشر -->
-            <div
-                class="alert alert-primary d-flex align-items-center justify-content-center gap-2 p-3 rounded-pill mb-4">
-                <i class="bi bi-telephone-outbound-fill fs-5"></i>
-                <span class="fw-bold">للتفعيل والاشتراك، اتصل بالإدارة مباشرة أو عبر الواتساب:</span>
-                <a href="tel:{{ phone_contact }}" class="fw-bold fs-5 text-decoration-none text-danger">{{ phone_contact
-                    }}</a>
+            <div class="d-flex align-items-center justify-content-center gap-2 p-3 rounded-pill mb-4 border" style="background: rgba(255, 107, 53, 0.15); border-color: rgba(255, 107, 53, 0.3) !important;">
+                <i class="bi bi-telephone-outbound-fill fs-5 text-warning"></i>
+                <span class="fw-bold text-white">للتفعيل والاشتراك، اتصل بالإدارة مباشرة أو عبر الواتساب:</span>
+                <a href="tel:{{ phone_contact }}" class="fw-bold fs-5 text-decoration-none text-warning">{{ phone_contact }}</a>
             </div>
 
             <!-- حقل إدخال كود التفعيل -->

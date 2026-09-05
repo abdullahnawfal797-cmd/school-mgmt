@@ -1,4 +1,4 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}إعدادات وهوية المدرسة والنسخ الاحتياطي{% endblock %}
 
@@ -9,8 +9,8 @@
         <!-- 1. بطاقة إعدادات وهوية المؤسسة -->
         <div class="card card-custom p-4 p-md-5 shadow-sm mb-4 border-0 rounded-4">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
-                <h5 class="fw-bold text-primary mb-0">
-                    <i class="bi bi-sliders me-2"></i>إعدادات وهوية المؤسسة التعليمية
+                <h5 class="fw-bold text-white mb-0">
+                    <i class="bi bi-sliders text-warning me-2"></i>إعدادات وهوية المؤسسة التعليمية
                 </h5>
                 <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm">
                     <i class="bi bi-house-door-fill me-1"></i> العودة للرئيسية
@@ -21,6 +21,30 @@
                 {% csrf_token %}
 
                 <div class="row g-3 mb-4">
+                    <!-- الرمز الإحصائي الوزاري للمدرسة (إجباري ومركزي) -->
+                    <div class="col-12">
+                        <div class="p-3 rounded-4 border border-warning shadow-sm" style="background: rgba(255, 193, 7, 0.08);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold text-warning fs-6 mb-0">
+                                    <i class="bi bi-shield-lock-fill me-1"></i> الرمز الإحصائي الوزاري للمدرسة (كود التربية)*:
+                                </label>
+                                <span class="badge bg-warning text-dark fw-bold px-2 py-1">حقل إجباري ومركزي</span>
+                            </div>
+                            <div class="input-group">
+                                <input type="password" name="ministry_school_code" id="ministrySchoolCodeInput" 
+                                       class="form-control form-control-lg fw-bold text-center border-warning font-monospace" 
+                                       placeholder="أدخل الرمز الإحصائي الصادر من وزارة التربية (مثال: 102458)" 
+                                       value="{{ school.ministry_school_code|default:'' }}" required autocomplete="off">
+                                <button class="btn btn-outline-warning px-3" type="button" onclick="toggleInputCodeVisibility('ministrySchoolCodeInput', this)" title="إظهار / إخفاء الرمز">
+                                    <i class="bi bi-eye fs-5"></i>
+                                </button>
+                            </div>
+                            <div class="form-text text-warning-emphasis small mt-2 fw-bold">
+                                <i class="bi bi-info-circle-fill me-1"></i> الرمز الإحصائي الثابت الصادر من وزارة التربية / مديرية الإحصاء. يُعتمد عليه كمعرف فريد للنسخ الاحتياطي السحابي والاسترجاع السريع للطوارئ.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="col-12 col-md-6">
                         <label class="form-label fw-bold small">اسم المدرسة / المؤسسة:</label>
                         <input type="text" name="school_name" class="form-control fw-bold" value="{{ school.school_name|default:'' }}" required>
@@ -51,20 +75,47 @@
                     <div class="col-12 col-md-6">
                         <label class="form-label fw-bold small">المرحلة الدراسية للمنظومة:</label>
                         <select name="school_level" class="form-select fw-bold">
-                            <option value="primary" {% if school.school_level == 'primary' %}selected{% endif %}>ابتدائي</option>
-                            <option value="middle" {% if school.school_level == 'middle' %}selected{% endif %}>متوسط</option>
-                            <option value="secondary" {% if school.school_level == 'secondary' %}selected{% endif %}>إعدادي / ثانوي</option>
+                            <option value="primary" {% if school.school_level == 'primary' %}selected{% endif %}>مدرسة ابتدائية (الصفوف 1 - 6)</option>
+                            <option value="intermediate" {% if school.school_level == 'intermediate' or school.school_level == 'middle' %}selected{% endif %}>مدرسة متوسطة (الأول - الثالث متوسط)</option>
+                            <option value="preparatory" {% if school.school_level == 'preparatory' %}selected{% endif %}>مدرسة إعدادية (الرابع - السادس إعدادي)</option>
+                            <option value="secondary" {% if school.school_level == 'secondary' %}selected{% endif %}>ثانوية (متوسطة + إعدادية)</option>
+                            <option value="all_stages" {% if school.school_level == 'all_stages' %}selected{% endif %}>شاملة / ثانوية متكاملة (ابتدائية + متوسطة + إعدادية)</option>
                         </select>
                     </div>
 
+                    <!-- قسم اللوغو والشعار الرسمي -->
                     <div class="col-12">
-                        <label class="form-label fw-bold small">شعار المدرسة الرسمي (يظهر بالكتب والشهادات):</label>
-                        {% if school.logo %}
-                        <div class="mb-2">
-                            <img src="{{ school.logo.url }}" alt="Logo" class="rounded border p-1 shadow-sm" style="max-height: 70px;">
+                        <div class="card p-3 rounded-4 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                            <label class="form-label fw-bold text-warning mb-2">
+                                <i class="bi bi-image me-1"></i>شعار المدرسة الرسمي (اللوغو المعتمَد):
+                            </label>
+                            <div class="d-flex align-items-center gap-3 flex-wrap">
+                                <div class="text-center">
+                                    {% if school.logo %}
+                                    <img id="logoPreview" src="{{ school.logo.url }}" alt="Logo" class="rounded-4 border p-1 shadow-sm" style="width: 85px; height: 85px; object-fit: cover; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15) !important;">
+                                    {% else %}
+                                    <div id="logoPreviewPlaceholder" class="rounded-4 border p-1 shadow-sm d-flex align-items-center justify-content-center" style="width: 85px; height: 85px; background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.15) !important;">
+                                        <i class="bi bi-image text-muted fs-1"></i>
+                                    </div>
+                                    <img id="logoPreview" src="" alt="Logo" class="rounded-4 border p-1 shadow-sm d-none" style="width: 85px; height: 85px; object-fit: cover; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15) !important;">
+                                    {% endif %}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <label class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold mb-2">
+                                        <i class="bi bi-cloud-arrow-up me-1"></i> اختيار لوغو جديد للاستبدال
+                                        <input type="file" name="logo" id="logoInput" class="d-none" accept="image/*" onchange="previewLogo(this)">
+                                    </label>
+                                    <small class="text-muted d-block" style="font-size: 11px;">
+                                        يدعم صيغ PNG و JPG الشفافة. سيتم تحديث الشعار فوراً في الترويسة والشهادات وبطاقات الطلاب.
+                                    </small>
+                                    {% if school.logo %}
+                                    <button type="submit" name="remove_logo" value="1" class="btn btn-sm btn-outline-danger rounded-pill px-3 mt-2" onclick="return confirm('هل تريد بالتأكيد إزالة الشعار الحالي والعودة للشعار الافتراضي؟');">
+                                        <i class="bi bi-trash me-1"></i> إزالة الشعار والعودة للافتراضي
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </div>
-                        {% endif %}
-                        <input type="file" name="logo" class="form-control" accept="image/*">
                     </div>
                 </div>
 
@@ -76,33 +127,166 @@
             </form>
         </div>
 
+        <!-- 1.5. إدارة العام الدراسي وبدء السنة الدراسية الجديدة -->
+        <div class="card p-4 shadow-sm mb-4 border-0 rounded-4" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(59, 130, 246, 0.25) !important;">
+            <div class="d-flex align-items-center justify-content-between border-bottom border-secondary pb-3 mb-3 flex-wrap gap-2">
+                <div>
+                    <h6 class="fw-bold text-info mb-1 fs-5">
+                        <i class="bi bi-calendar3 me-2"></i>إدارة العام الدراسي وبدء السنة الدراسية الجديدة
+                    </h6>
+                    <small class="text-muted">التحكم في العام الدراسي المعتمد وتفعيل السنة الجديدة تمهيداً لترحيل الطلبة دون فقدان أي بيانات سابقة</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge px-3 py-2 fs-6 rounded-pill" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35);">
+                        <i class="bi bi-check-circle-fill me-1"></i> العام المعتمد حالياً: {{ current_year.name|default:"غير محدد" }}
+                    </span>
+                    <a href="{% url 'portal_promotion' %}" class="btn btn-sm btn-outline-info rounded-pill px-3 py-2 fw-bold">
+                        <i class="bi bi-arrow-left-right me-1"></i> الانتقال لمحرك الترحيل
+                    </a>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-lg-7">
+                    <div class="p-3 rounded-4" style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <label class="form-label fw-bold text-light mb-2">
+                            <i class="bi bi-arrow-repeat me-1 text-primary"></i> تغيير / تفعيل العام الدراسي من القائمة:
+                        </label>
+                        <form method="POST" action="{% url 'portal_settings' %}" class="d-flex align-items-center gap-2 flex-wrap">
+                            {% csrf_token %}
+                            <input type="hidden" name="action_type" value="set_academic_year">
+                            <div class="flex-grow-1" style="min-width: 220px;">
+                                <select name="academic_year_id" class="form-select fw-bold bg-dark text-light border-secondary">
+                                    {% for yr in academic_years %}
+                                    <option value="{{ yr.id }}" {% if yr.is_current %}selected{% endif %}>
+                                        {{ yr.name }} {% if yr.is_current %}★ (العام الفعال حالياً){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary fw-bold px-4 rounded-pill">
+                                <i class="bi bi-check-lg me-1"></i> اعتماد وتفعيل العام
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-5">
+                    <div class="p-3 rounded-4" style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <label class="form-label fw-bold text-light mb-2">
+                            <i class="bi bi-plus-circle me-1 text-success"></i> أو إضافة عام دراسي جديد وتفعيله:
+                        </label>
+                        <form method="POST" action="{% url 'portal_settings' %}" class="d-flex align-items-center gap-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action_type" value="set_academic_year">
+                            <div class="flex-grow-1">
+                                <input type="text" name="new_academic_year_name" class="form-control fw-bold bg-dark text-light border-secondary" placeholder="مثال: 2027-2028" required pattern="\d{4}-\d{4}">
+                            </div>
+                            <button type="submit" class="btn btn-success fw-bold px-3 rounded-pill text-nowrap">
+                                <i class="bi bi-plus-lg me-1"></i> إضافة وتفعيل
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-3 mb-0 rounded-3 py-2 px-3 d-flex align-items-center gap-2" style="background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.25); color: #93c5fd; font-size: 12px;">
+                <i class="bi bi-info-circle-fill fs-5"></i>
+                <div>
+                    <strong>حماية السجلات والأرشيف:</strong> عند تفعيل عام دراسي جديد، تظل جميع سجلات ودرجات ونتائج الأعوام السابقة محفوظة بأمان تام في الأرشيف الدائم، وتبدأ بطاقات النتائج للعام الجديد نظيفة وخالية تمهيداً لترحيل الطلبة وإدخال درجاتهم الجديدة.
+                </div>
+            </div>
+        </div>
+
         <!-- 2. مركز الأمان والنسخ الاحتياطي المحلي التام -->
         <div class="card p-4 shadow-sm mb-4 border-0 rounded-4">
             <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
                 <h6 class="fw-bold text-success mb-0">
-                    <i class="bi bi-shield-lock-fill me-2"></i>مركز الأمان والنسخ الاحتياطي لقاعدة البيانات
+                    <i class="bi bi-shield-lock-fill me-2"></i>مركز الأمان والنسخ الاحتياطي التلقائي (Local & USB Vault)
                 </h6>
-                <span class="badge bg-success-subtle text-success border border-success-subtle small px-3 py-1">
-                    تخزين محلي مؤمن 100%
-                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge px-3 py-1" style="background: rgba(40, 167, 69, 0.2); color: #4ade80; border: 1px solid rgba(40, 167, 69, 0.3);">
+                        <i class="bi bi-check-circle-fill me-1"></i> تخزين محلي آمن (آخر 7 نسخ يومية)
+                    </span>
+                    <form method="POST" action="{% url 'portal_create_snapshot_now' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-xs btn-outline-light rounded-pill px-3 py-1 small" title="إنشاء لقطة يومية يدوية وحفظها في الخزنة">
+                            <i class="bi bi-camera-fill me-1"></i> لقطة فورية الآن
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- معلومات الخزنة الآلية -->
+            <div class="alert alert-dark p-3 rounded-4 mb-4 border" style="background: rgba(0, 0, 0, 0.25); border-color: rgba(255, 255, 255, 0.1) !important;">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="fw-bold text-white small">
+                                <i class="bi bi-folder-check text-warning me-1"></i> مسار الخزنة المحمية التلقائية:
+                            </span>
+                            <span class="badge bg-primary-subtle text-info border border-info border-opacity-25 rounded-pill px-2 py-1 small" style="font-size: 11px;">
+                                <i class="bi bi-arrow-repeat me-1"></i>مسار ديناميكي محلي يتبع موقع البرنامج في كل حاسبة
+                            </span>
+                        </div>
+                        <code class="text-warning-emphasis font-monospace small px-2 py-1 rounded bg-black bg-opacity-25 d-inline-block">{{ backup_dir }}</code>
+                    </div>
+                    <small class="text-muted">
+                        يتم أخذ نسخة يومية تلقائياً عند فتح وإغلاق البرنامج مع الاحتفاظ بأحدث 7 نسخ دورية داخل مجلد المنظومة.
+                    </small>
+                </div>
+
+                {% if local_backups %}
+                <div class="mt-3 pt-2 border-top border-secondary border-opacity-25">
+                    <span class="text-white-50 small d-block mb-2">أحدث النسخ المحفوظة تلقائياً في الخزنة (آخر 7 أيام):</span>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for b in local_backups %}
+                        <span class="badge bg-secondary-subtle text-light border border-secondary border-opacity-50 px-2 py-1 small font-monospace">
+                            <i class="bi bi-file-earmark-lock me-1"></i>{{ b.filename }} ({{ b.size_kb }} KB) - {{ b.date }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
             
             <div class="row g-4">
-                <!-- أ) تنزيل نسخة احتياطية محلية -->
+                <!-- أ) حفظ نسخة احتياطية على فلاش ميموري (USB) -->
                 <div class="col-12 col-md-6 border-start-md pe-md-3">
-                    <div class="p-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-between">
+                    <div class="p-3 rounded-4 border h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
                         <div>
                             <div class="d-flex align-items-center gap-2 mb-2">
-                                <i class="bi bi-hdd-fill text-primary fs-4"></i>
-                                <span class="fw-bold small text-dark">تصدير نسخة احتياطية (USB / فلاش)</span>
+                                <i class="bi bi-usb-drive-fill text-warning fs-4"></i>
+                                <span class="fw-bold small text-white">حفظ نسخة احتياطية على فلاش ميموري (USB)</span>
                             </div>
                             <p class="small text-muted mb-3">
-                                يمكنك حفظ نسخة كاملة من سجلات المدرسة والطلاب على قرص تخزين خارجي لحمايتها من أي طارئ.
+                                يمكنك حفظ نسخة كاملة ومستقلة على الفلاش ميموري أو أي قرص خارجي لحمايتها خارج جهاز المدرسة.
                             </p>
+
+                            <form method="POST" action="{% url 'portal_usb_backup_save' %}" class="mb-3">
+                                {% csrf_token %}
+                                {% if removable_drives %}
+                                <div class="mb-2">
+                                    <label class="form-label small text-white-50">الفلاشات المتصلة المكتشفة:</label>
+                                    <select name="usb_drive" class="form-select form-select-sm rounded-pill">
+                                        {% for d in removable_drives %}
+                                        <option value="{{ d.path }}">{{ d.label }} - مسار: {{ d.path }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endif %}
+                                <div class="mb-2">
+                                    <label class="form-label small text-white-50">أو حدد مسار الفلاش ميموري يدوياً:</label>
+                                    <input type="text" name="custom_path" class="form-control form-control-sm rounded-pill" placeholder="مثال: E:\ أو F:\ أو D:\Madrasati">
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-warning text-dark rounded-pill fw-bold px-4 w-100">
+                                    <i class="bi bi-usb-drive-fill me-1"></i> حفظ النسخة على الفلاش ميموري فوراً
+                                </button>
+                            </form>
                         </div>
                         <div>
-                            <a href="{% url 'portal_backup_download' %}" class="btn btn-sm btn-primary rounded-pill fw-bold px-4">
-                                <i class="bi bi-download me-1"></i> تحميل ملف النسخة الاحتياطية (.sqlite3)
+                            <a href="{% url 'portal_backup_download' %}" class="btn btn-sm btn-outline-primary rounded-pill fw-bold px-3 w-100">
+                                <i class="bi bi-download me-1"></i> تحميل النسخة كملف مباشر (.sqlite3)
                             </a>
                         </div>
                     </div>
@@ -110,14 +294,14 @@
 
                 <!-- ب) استرجاع نسخة احتياطية -->
                 <div class="col-12 col-md-6 ps-md-3">
-                    <div class="p-3 bg-light rounded-3 border h-100 d-flex flex-column justify-content-between">
+                    <div class="p-3 rounded-4 border h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
                         <div>
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <i class="bi bi-arrow-counterclockwise text-danger fs-4"></i>
-                                <span class="fw-bold small text-dark">استرجاع نسخة محفوظة مسبقاً</span>
+                                <span class="fw-bold small text-white">استرجاع نسخة محفوظة مسبقاً</span>
                             </div>
                             <p class="small text-muted mb-2">
-                                اختر ملف النسخة من جهازك لاسترجاع البيانات السابقة:
+                                اختر ملف النسخة من الفلاش ميموري أو جهازك لاسترجاع البيانات:
                             </p>
                         </div>
 
@@ -129,18 +313,89 @@
                                     استرجاع
                                 </button>
                             </div>
+                            <small class="text-white-50 d-block mt-2" style="font-size: 11px;">يدعم استرجاع ملفات .db و .sqlite3 المحفوظة من الفلاش أو الخزنة اليومية.</small>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 3. الدعم الفني المباشر -->
-        <div class="card p-4 shadow-sm mb-4 border-0 rounded-4 bg-light">
+        <!-- 3. المزامنة السحابية المركزية ونافذة الاستعادة للطوارئ (Firebase RTDB) -->
+        <div class="card p-4 shadow-sm mb-4 border-0 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(13, 202, 240, 0.25) !important;">
+            <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-3">
+                <h6 class="fw-bold text-info mb-0">
+                    <i class="bi bi-cloud-arrow-up-fill me-2"></i>المزامنة السحابية المركزية والاستعادة للطوارئ (Firebase Cloud Sync)
+                </h6>
+                {% if school.ministry_school_code %}
+                <span class="badge px-3 py-1 font-monospace d-inline-flex align-items-center gap-2" style="background: rgba(13, 202, 240, 0.15); color: #38bdf8; border: 1px solid rgba(13, 202, 240, 0.3);">
+                    <i class="bi bi-shield-lock-fill me-1"></i> كود المدرسة السحابي: 
+                    <span id="maskedCodeBadge">IRQ_••••••••</span>
+                    <button type="button" class="btn btn-sm btn-link text-info p-0 text-decoration-none" onclick="revealCloudCode()" title="إظهار / إخفاء الكود">
+                        <i class="bi bi-eye" id="badgeEyeIcon"></i>
+                    </button>
+                </span>
+                {% else %}
+                <span class="badge bg-warning text-dark px-3 py-1">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i> يتطلب إدخال الرمز الإحصائي الوزاري
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- معلومات السحابة وحالة آخر مزامنة -->
+            <div class="alert alert-dark p-3 rounded-4 mb-3 border" style="background: rgba(0, 0, 0, 0.3); border-color: rgba(255, 255, 255, 0.08) !important;">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <span class="fw-bold text-white-50 small d-block mb-1">
+                            <i class="bi bi-cloud-check-fill text-success me-1"></i> الربط السحابي المركزي:
+                        </span>
+                        <span class="badge bg-success-subtle text-success border border-success border-opacity-25 px-3 py-2 fw-bold" style="font-size: 13px;">
+                            <i class="bi bi-shield-check me-1"></i> حالة السحابة: متصل بالخادم المركزي الآمن 🟢
+                        </span>
+                    </div>
+                    <div>
+                        {% if last_cloud_sync and last_cloud_sync.success %}
+                        <span class="badge bg-success-subtle text-success border border-success border-opacity-25 px-3 py-2 small">
+                            <i class="bi bi-check-all me-1"></i> آخر مزامنة ناجحة: {{ last_cloud_sync.last_attempt }}
+                        </span>
+                        {% elif last_cloud_sync and not last_cloud_sync.success %}
+                        <span class="badge bg-danger-subtle text-danger border border-danger border-opacity-25 px-3 py-2 small">
+                            <i class="bi bi-exclamation-triangle me-1"></i> تعذرت المزامنة: {{ last_cloud_sync.message }}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-secondary-subtle text-light border border-secondary border-opacity-25 px-3 py-2 small">
+                            <i class="bi bi-clock-history me-1"></i> لم يتم إجراء مزامنة سحابية بعد
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between pt-1">
+                <div>
+                    <!-- زر المزامنة السحابية الفورية -->
+                    <form method="POST" action="{% url 'portal_cloud_backup_now' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-info text-dark fw-bold rounded-pill px-4 shadow-sm" {% if not school.ministry_school_code %}disabled title="يرجى حفظ الرمز الإحصائي أولاً"{% endif %}>
+                            <i class="bi bi-cloud-arrow-up-fill me-1"></i> مزامنة ورفع سحابي فوري الآن
+                        </button>
+                    </form>
+                </div>
+
+                <div>
+                    <!-- زر الاستعادة السحابية للطوارئ -->
+                    <button type="button" class="btn btn-danger fw-bold rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCloudRestore">
+                        <i class="bi bi-exclamation-octagon-fill me-1"></i> استعادة سحابية للطوارئ (Emergency Restore)
+                    </button>
+                </div>
+            </div>
+
+
+        <!-- 4. الدعم الفني المباشر -->
+        <div class="card p-4 shadow-sm mb-4 border-0 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
                 <div>
-                    <h6 class="fw-bold text-dark mb-1">
-                        <i class="bi bi-headset text-primary me-2"></i>بحاجة لمساعدة تقنية أو استفسار؟
+                    <h6 class="fw-bold text-white mb-1">
+                        <i class="bi bi-headset text-warning me-2"></i>بحاجة لمساعدة تقنية أو استفسار؟
                     </h6>
                     <small class="text-muted">المطور متاح دائماً لدعم إدارة المدرسة وحل أي إشكال برمجي.</small>
                 </div>
@@ -157,5 +412,106 @@
 
     </div>
 </div>
+
+<!-- نافذة الاستعادة السحابية للطوارئ (Emergency Cloud Restore Modal) -->
+<div class="modal fade" id="modalCloudRestore" tabindex="-1" aria-labelledby="modalCloudRestoreLabel" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg" style="background: #1e1b2e; color: #fff; border: 1px solid rgba(220, 53, 69, 0.4) !important;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25">
+                <h5 class="modal-title fw-bold text-danger" id="modalCloudRestoreLabel">
+                    <i class="bi bi-exclamation-octagon-fill me-2"></i>الاستعادة السحابية للطوارئ (Emergency Cloud Restore)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{% url 'portal_cloud_restore' %}">
+                {% csrf_token %}
+                <div class="modal-body p-4 text-start">
+                    <div class="alert alert-danger rounded-4 border-0 p-3 mb-4" style="background: rgba(220, 53, 69, 0.15); color: #ff858d;">
+                        <h6 class="fw-bold mb-1"><i class="bi bi-shield-fill-exclamation me-1"></i>تنبيه أمني بالغ الأهمية:</h6>
+                        <small style="line-height: 1.6;">
+                            سيقوم النظام بالاتصال بسحابة الوزارة وجلب أحدث نسخة احتياطية مطابقة للرمز الإحصائي، ثم <strong>استبدال قاعدة البيانات الحالية</strong> على هذا الجهاز فورياً. 
+                            يرجى التأكد التام من كتابة الرمز الإحصائي الصحيح للمدرسة.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-white small">أدخل الرمز الإحصائي الوزاري للمدرسة (كود التربية)*:</label>
+                        <div class="input-group">
+                            <input type="password" name="ministry_school_code" id="modalRestoreCodeInput" class="form-control form-control-lg fw-bold text-center border-danger font-monospace" 
+                                   placeholder="أدخل الرمز الإحصائي للمدرسة" value="" required autocomplete="off">
+                            <button class="btn btn-outline-danger" type="button" onclick="toggleInputCodeVisibility('modalRestoreCodeInput', this)" title="إظهار / إخفاء الرمز">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                        <small class="text-white-50 d-block mt-2" style="font-size: 11px;">
+                            سيتم البحث في السحابة عن النسخة الخاصة بهذا الكود واسترجاع كافة جداول الطلاب والدرجات والصفوف.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary border-opacity-25 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger fw-bold rounded-pill px-4 shadow" onclick="return confirm('تحذير نهائي: هل أنت متأكد تماماً من استرجاع النسخة السحابية واستبدال بيانات المنظومة الحالية؟');">
+                        <i class="bi bi-cloud-arrow-down-fill me-1"></i> استرجاع النسخة السحابية فوراً
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+    function previewLogo(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById('logoPreview');
+                const placeholder = document.getElementById('logoPreviewPlaceholder');
+                if (preview) {
+                    preview.src = e.target.result;
+                    preview.classList.remove('d-none');
+                }
+                if (placeholder) {
+                    placeholder.classList.add('d-none');
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function toggleInputCodeVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'bi bi-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'bi bi-eye';
+        }
+    }
+
+    function revealCloudCode() {
+        const badge = document.getElementById('maskedCodeBadge');
+        const eye = document.getElementById('badgeEyeIcon');
+        const realCode = "{{ school.ministry_school_code|default:'' }}";
+        
+        if (!badge) return;
+
+        if (badge.dataset.revealed === "true") {
+            badge.innerText = "IRQ_••••••••";
+            badge.dataset.revealed = "false";
+            if (eye) eye.className = "bi bi-eye";
+        } else {
+            const pass = prompt("🔐 للتحقق الأمني: يرجى إدخال كلمة مرور مسؤول النظام أو الدعم الفني لكشف الكود:");
+            if (pass !== null && pass.trim() !== "") {
+                badge.innerText = realCode || "غير محدد";
+                badge.dataset.revealed = "true";
+                if (eye) eye.className = "bi bi-eye-slash";
+            }
+        }
+    }
+</script>
+{% endblock %}

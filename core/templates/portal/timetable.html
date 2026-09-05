@@ -1,1083 +1,855 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
-{% block title %}الجدول المدرسي العام وإدارة الحصص{% endblock %}
+{% block title %}الجدول المدرسي العام وإدارة الحصص الأسبوعية{% endblock %}
 
 {% block content %}
     <!-- شريط الأدوات العلوي والأزرار -->
-    <div
-      class="d-flex justify-content-between align-items-center mb-3 d-print-none"
-      dir="rtl"
-    >
-      <div>
-        <h5 class="fw-bold text-primary mb-0">
-          <i class="bi bi-calendar3-week-fill me-2"></i>
-          منظومة الجدول العام وإدارة الحصص
-        </h5>
-        <span class="text-muted small">
-          العام الدراسي:
-          <strong>{{ current_year.name|default:"2026-2027" }}</strong>
-        </span>
-      </div>
-      <div class="d-flex gap-2">
-        <!-- زر التوليد الآلي الذكي للجدول -->
-        <form
-          method="POST"
-          class="d-inline"
-          onsubmit="
-            return confirm(
-              'هل تريد بالتأكيد توليد الجدول آلياً بنظام الذكاء التوزيعي؟ سيتم إسناد الحصص لجميع المواد والمعلمين دون أي تعارض زمني.',
-            );
-          "
-        >
-          {% csrf_token %}
-          <input type="hidden" name="action_type" value="auto_generate_schedule" />
-          <button
-            type="submit"
-            class="btn btn-success rounded-pill px-3 fw-bold shadow-sm"
-          >
-            <i class="bi bi-magic me-1"></i>
-            توليد الجدول آلياً
-          </button>
-        </form>
+    <div class="d-flex justify-content-between align-items-center mb-3 d-print-none flex-wrap gap-2" dir="rtl">
+        <div>
+            <h5 class="fw-bold text-white mb-0">
+                <i class="bi bi-calendar3-week-fill me-2" style="color: var(--accent-orange);"></i>
+                منظومة الجدول العام وإدارة الحصص
+            </h5>
+            <span class="text-white-50 small">
+                العام الدراسي: <strong>{{ current_year.name|default:"2026-2027" }}</strong>
+            </span>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <!-- زر التوليد الآلي الذكي للجدول الأسبوعي -->
+            <form method="POST" class="d-inline" onsubmit="return confirm('هل تريد بالتأكيد توليد الجدول آلياً بنظام الذكاء التوزيعي؟ سيقوم المحرك بتوزيع الحصص لكافة المواد والمعلمين على مدى أيام الأسبوع دون أي تضارب زمني.');">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="auto_generate_schedule" />
+                <button type="submit" class="btn btn-success rounded-pill px-3 fw-bold shadow-sm">
+                    <i class="bi bi-magic me-1"></i>
+                    توليد الجدول آلياً
+                </button>
+            </form>
 
-        <!-- زر ضبط توقيتات الحصص واليوم الدراسي -->
-        <button
-          type="button"
-          class="btn btn-outline-dark rounded-pill px-3 fw-bold shadow-sm"
-          data-bs-toggle="modal"
-          data-bs-target="#timingModal"
-        >
-          <i class="bi bi-clock me-1"></i>
-          ضبط التوقيتات
-        </button>
+            <!-- زر ضبط توقيتات الحصص -->
+            <button type="button" class="btn btn-outline-warning rounded-pill px-3 fw-bold shadow-sm text-white" data-bs-toggle="modal" data-bs-target="#timingModal">
+                <i class="bi bi-clock-history me-1 text-warning"></i>
+                ضبط التوقيتات
+            </button>
 
-        <button
-          type="button"
-          onclick="window.print()"
-          class="btn btn-primary rounded-pill px-3 fw-bold shadow-sm"
-        >
-          <i class="bi bi-printer-fill me-1"></i>
-          طباعة الجدول
-        </button>
-        <button
-          type="button"
-          class="btn btn-warning rounded-pill px-3 fw-bold text-dark shadow-sm"
-          data-bs-toggle="modal"
-          data-bs-target="#quotaModal"
-        >
-          <i class="bi bi-person-lines-fill me-1"></i>
-          نصاب المعلمين
-        </button>
-        <button
-          type="button"
-          class="btn btn-info rounded-pill px-3 fw-bold text-dark shadow-sm"
-          data-bs-toggle="modal"
-          data-bs-target="#substituteModal"
-        >
-          <i class="bi bi-arrow-left-right me-1"></i>
-          استبدال واحتياط
-        </button>
-        <a
-          href="{% url 'portal_dashboard' %}"
-          class="btn btn-outline-primary rounded-pill px-3 shadow-sm"
-        >
-          <i class="bi bi-house-door-fill me-1"></i>
-          الرئيسية
-        </a>
-      </div>
+            <!-- زر طباعة الجدول الرسمي A4 -->
+            <button type="button" onclick="window.print()" class="btn btn-primary rounded-pill px-3 fw-bold shadow-sm">
+                <i class="bi bi-printer-fill me-1"></i>
+                طباعة الجدول (A4)
+            </button>
+
+            <!-- زر نصاب المعلمين -->
+            <button type="button" class="btn btn-warning rounded-pill px-3 fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#quotaModal">
+                <i class="bi bi-person-lines-fill me-1"></i>
+                نصاب المعلمين
+            </button>
+
+            <!-- زر الاستبدال والاحتياط -->
+            <button type="button" class="btn btn-info rounded-pill px-3 fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#substituteModal">
+                <i class="bi bi-arrow-left-right me-1"></i>
+                استبدال واحتياط
+            </button>
+
+            <!-- العودة للرئيسية -->
+            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-light rounded-pill px-3 shadow-sm">
+                <i class="bi bi-house-door-fill me-1"></i>
+                الرئيسية
+            </a>
+        </div>
     </div>
 
-    <!-- بطاقات الإحصاء السريع -->
+    <!-- بطاقات الإحصاء السريع ذات التباين المريح -->
     <div class="row g-3 mb-4 d-print-none" dir="rtl">
-      <div class="col-6 col-md-3 col-lg-2">
-        <div
-          class="card card-custom p-3 text-center border-top border-primary border-4 shadow-sm"
-        >
-          <span class="text-muted small fw-bold">الصفوف</span>
-          <h4 class="fw-bold mb-0 text-primary">{{ total_classes }}</h4>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="card card-custom p-3 text-center border-top border-primary border-4 shadow-sm">
+                <span class="small fw-bold text-white-50">الصفوف الدراسية</span>
+                <h4 class="fw-bold mb-0 text-white mt-1">{{ total_classes }}</h4>
+            </div>
         </div>
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <div
-          class="card card-custom p-3 text-center border-top border-info border-4 shadow-sm"
-        >
-          <span class="text-muted small fw-bold">الشعب المدرسية</span>
-          <h4 class="fw-bold mb-0 text-info">{{ total_sections }}</h4>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="card card-custom p-3 text-center border-top border-info border-4 shadow-sm">
+                <span class="small fw-bold text-white-50">الشعب المدرسية</span>
+                <h4 class="fw-bold mb-0 text-info mt-1">{{ total_sections }}</h4>
+            </div>
         </div>
-      </div>
-      <div class="col-6 col-md-3 col-lg-2">
-        <div
-          class="card card-custom p-3 text-center border-top border-success border-4 shadow-sm"
-        >
-          <span class="text-muted small fw-bold">الكادر التدريسي</span>
-          <h4 class="fw-bold mb-0 text-success">{{ total_teachers }}</h4>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="card card-custom p-3 text-center border-top border-success border-4 shadow-sm">
+                <span class="small fw-bold text-white-50">الكادر التدريسي</span>
+                <h4 class="fw-bold mb-0 text-success mt-1">{{ total_teachers }}</h4>
+            </div>
         </div>
-      </div>
-      <div class="col-6 col-md-3 col-lg-3">
-        <div
-          class="card card-custom p-3 text-center border-top border-warning border-4 shadow-sm"
-        >
-          <span class="text-muted small fw-bold">إجمالي الحصص المجدولة</span>
-          <h4 class="fw-bold mb-0 text-dark">0 حصة</h4>
+        <div class="col-6 col-md-3 col-lg-3">
+            <div class="card card-custom p-3 text-center border-top border-warning border-4 shadow-sm">
+                <span class="small fw-bold text-white-50">إجمالي الحصص المجدولة</span>
+                <h4 class="fw-bold mb-0 text-warning mt-1">{{ total_scheduled_slots }} حصة</h4>
+            </div>
         </div>
-      </div>
-      <div class="col-12 col-md-12 col-lg-3">
-        <div
-          class="card card-custom p-3 text-center border-top border-danger border-4 shadow-sm"
-        >
-          <span class="text-muted small fw-bold">حالة التعارضات</span>
-          <h4 class="fw-bold mb-0 text-success">
-            <i class="bi bi-shield-check me-1"></i>
-            مؤمن بالكامل
-          </h4>
+        <div class="col-12 col-md-12 col-lg-3">
+            <div class="card card-custom p-3 text-center border-top border-danger border-4 shadow-sm">
+                <span class="small fw-bold text-white-50">حالة التعارض الزمني</span>
+                <h4 class="fw-bold mb-0 text-success mt-1">
+                    <i class="bi bi-shield-check me-1"></i>
+                    مؤمن بالكامل
+                </h4>
+            </div>
         </div>
-      </div>
     </div>
 
-    <!-- شريط التبديل بين الأوضاع والفلاتر -->
-    <div
-      class="card card-custom p-3 shadow-sm mb-4 border-0 d-print-none bg-light"
-      dir="rtl"
-    >
-      <form
-        method="GET"
-        class="row g-2 align-items-center"
-        id="timetableFilterForm"
-      >
-        <div class="col-md-4">
-          <div class="btn-group w-100" role="group">
-            <a
-              href="?view_mode=master&day=1&periods_count="
-              class="btn btn-sm btn-primary fw-bold4btn-outline-primary5"
-            >
-              <i class="bi bi-grid-3x3-gap-fill me-1"></i>
-              الجدول العام للمدرسة
-            </a>
-            <a
-              href="?view_mode=class&periods_count=6"
-              class="btn btn-sm btn-outline-primary"
-            >
-              <i class="bi bi-door-open me-1"></i>
-              جدول الصف
-            </a>
-            <a
-              href="?view_mode=teacher&periods_count=6"
-              class="btn btn-sm btn-outline-primary"
-            >
-              <i class="bi bi-person-video3 me-1"></i>
-              جدول المعلم
-            </a>
-          </div>
-          <input type="hidden" name="view_mode" value="" />
-        </div>
+    <!-- شريط التبديل بين الأنماط والفلاتر -->
+    <div class="card card-custom p-3 shadow-sm mb-4 border-0 d-print-none" dir="rtl">
+        <form method="GET" class="row g-2 align-items-center" id="timetableFilterForm">
+            <div class="col-md-5">
+                <div class="btn-group w-100 shadow-sm" role="group">
+                    <a href="?view_mode=weekly_master&periods_count={{ active_periods_count }}" class="btn btn-sm {% if view_mode == 'weekly_master' or view_mode == 'master' and not selected_day %}btn-primary fw-bold{% else %}btn-outline-light{% endif %}">
+                        <i class="bi bi-calendar3 me-1"></i> الجدول الأسبوعي الشامل
+                    </a>
+                    <a href="?view_mode=day_master&day={{ selected_day }}&periods_count={{ active_periods_count }}" class="btn btn-sm {% if view_mode == 'day_master' %}btn-primary fw-bold{% else %}btn-outline-light{% endif %}">
+                        <i class="bi bi-calendar-day me-1"></i> عرض يوم
+                    </a>
+                    <a href="?view_mode=class&periods_count={{ active_periods_count }}" class="btn btn-sm {% if view_mode == 'class' %}btn-primary fw-bold{% else %}btn-outline-light{% endif %}">
+                        <i class="bi bi-door-open me-1"></i> جدول الصف
+                    </a>
+                    <a href="?view_mode=teacher&periods_count={{ active_periods_count }}" class="btn btn-sm {% if view_mode == 'teacher' %}btn-primary fw-bold{% else %}btn-outline-light{% endif %}">
+                        <i class="bi bi-person-video3 me-1"></i> جدول المعلم
+                    </a>
+                </div>
+                <input type="hidden" name="view_mode" value="{{ view_mode }}" />
+            </div>
 
-        {% if view_mode == 'master' %}
-          <div class="col-md-5">
-            <select
-              name="day"
-              id="daySelectFilter"
-              class="form-select form-select-sm fw-bold border-primary text-primary"
-              onchange="this.form.submit()"
-            >
-              {% for d_val, d_label in days_choices %}
-                <option value="{{ d_val }}" {% if selected_day == d_val %}selected{% endif %}>
-                  عرض يوم: {{ d_label }} لكافة الشعب
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-        {% elif view_mode == 'class' %}
-          <div class="col-md-3">
-            <select
-              name="class_id"
-              id="classSelectFilter"
-              class="form-select form-select-sm fw-bold"
-              onchange="this.form.submit()"
-            >
-              {% for c in classes %}
-                <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"s" %}selected{% endif %}>
-                  {{ c.name }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <select
-              name="section_id"
-              id="sectionSelectFilter"
-              class="form-select form-select-sm"
-              onchange="this.form.submit()"
-            >
-              <option value="">-- جميع الشعب --</option>
-              {% for c in classes %}
-                {% for s in c.sections.all %}
-                  <option value="{{ current_year.name|default:"2026-2027" }}1" {{ current_year.name|default:"2026-2027" }}2selected{{ current_year.name|default:"2026-2027" }}3>
-                    {{ current_year.name|default:"2026-2027" }}4 - شعبة {{ current_year.name|default:"2026-2027" }}5
-                  </option>
-                {% endfor %}
-              {% endfor %}
-            </select>
-          </div>
+            {% if view_mode == 'day_master' %}
+                <div class="col-md-4">
+                    <select name="day" id="daySelectFilter" class="form-select form-select-sm fw-bold border-warning text-white" onchange="this.form.submit()">
+                        {% for d_val, d_label in days_choices %}
+                            <option value="{{ d_val }}" {% if selected_day == d_val %}selected{% endif %}>
+                                عرض يوم: {{ d_label }} لكافة الشعب
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% elif view_mode == 'class' %}
+                <div class="col-md-2">
+                    <select name="class_id" id="classSelectFilter" class="form-select form-select-sm fw-bold" onchange="this.form.submit()">
+                        {% for c in classes %}
+                            <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"s" %}selected{% endif %}>
+                                {{ c.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="section_id" id="sectionSelectFilter" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">-- جميع الشعب --</option>
+                        {% for c in classes %}
+                            {% for s in c.sections.all %}
+                                <option value="{{ s.id }}" {% if selected_section_id == s.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ c.name }} - شعبة {{ s.name }}
+                                </option>
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                </div>
+            {% elif view_mode == 'teacher' %}
+                <div class="col-md-4">
+                    <select name="teacher_id" id="teacherSelectFilter" class="form-select form-select-sm fw-bold" onchange="this.form.submit()">
+                        {% for t in teachers %}
+                            <option value="{{ t.id }}" {% if selected_teacher_id == t.id|stringformat:"s" %}selected{% endif %}>
+                                المدرس: {{ t.user.get_full_name }} ({{ t.job_title|default:"مدرس" }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% else %}
+                <div class="col-md-4 text-white-50 small">
+                    <i class="bi bi-info-circle text-warning me-1"></i>
+                    يعرض الجدول كافة أيام الأسبوع (الأحد - الخميس) مجمعة في صفحة واحدة.
+                </div>
+            {% endif %}
+
+            <!-- اختيار عدد الحصص (1 إلى 7 القياسي) -->
+            <div class="col-md-2">
+                <select name="periods_count" id="periodsCountSelect" class="form-select form-select-sm fw-bold border-warning text-white" onchange="this.form.submit()">
+                    <option value="5" {% if active_periods_count == 5 %}selected{% endif %}>نظام 5 حصص</option>
+                    <option value="6" {% if active_periods_count == 6 %}selected{% endif %}>نظام 6 حصص</option>
+                    <option value="7" {% if active_periods_count == 7 %}selected{% endif %}>نظام 7 حصص (القياسي)</option>
+                    <option value="8" {% if active_periods_count == 8 %}selected{% endif %}>نظام 8 حصص</option>
+                </select>
+            </div>
+
+            <div class="col-md-1 text-end">
+                <button type="submit" class="btn btn-primary btn-sm rounded-pill w-100 fw-bold">
+                    تحديث
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- حاوية عرض وطباعة الجدول المدرسي القياسي A4 Landscape -->
+    <!-- ============================================================== -->
+    <div class="printable-timetable" id="timetablePrintArea" dir="rtl">
+        
+        {% if view_mode == 'weekly_master' or view_mode == 'master' and not selected_day %}
+            <!-- العرض الأسبوعي الشامل لكافة الأيام (الأحد إلى الخميس) معاً في صفحة واحدة -->
+            {% for day_block in weekly_master_data %}
+            <div class="card card-custom p-4 shadow-sm mb-4 border paper-schedule-card">
+                <!-- ترويسة اليوم الرسمية -->
+                <div class="row align-items-center mb-3 pb-2 border-bottom border-2 border-white border-opacity-25">
+                    <div class="col-4 text-start small">
+                        <div class="fw-bold">جمهورية العراق - وزارة التربية</div>
+                        <div class="text-white-50">{{ school.directorate|default:"المديرية العامة للتربية" }}</div>
+                        <div class="fw-bold text-warning">{{ school.school_name|default:"المدرسة" }}</div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <h5 class="fw-bold text-white mb-0">
+                            الجدول العام للمدرسة - يوم ({{ day_block.day_name }})
+                        </h5>
+                        <span class="small fw-bold text-warning">
+                            لوحة الحصص الأسبوعية الموحدة
+                        </span>
+                    </div>
+                    <div class="col-4 text-end small">
+                        <div>العام الدراسي: <strong>{{ current_year.name|default:"2026-2027" }}</strong></div>
+                        <div class="text-white-50">تاريخ الاعتماد: {{ today_date }}</div>
+                        <div class="badge bg-warning text-dark border mt-1">نظام {{ active_periods_count }} حصص</div>
+                    </div>
+                </div>
+
+                <!-- جدول اليوم والشعب -->
+                <div class="table-responsive">
+                    <table class="table table-bordered text-center align-middle timetable-grid mb-0">
+                        <thead>
+                            <tr class="table-dark text-white">
+                                <th style="width: 14%; background-color: #151026;">الصف والشعبة</th>
+                                {% for p in periods_range %}
+                                    <th style="background-color: #151026;">
+                                        <div class="fw-bold text-warning">الحصة {{ p }}</div>
+                                        <span class="font-monospace small opacity-75" id="timing_label_{{ p }}"></span>
+                                    </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in day_block.sections %}
+                                <tr>
+                                    <td class="fw-bold text-white py-3" style="background: rgba(255, 255, 255, 0.04);">
+                                        <div class="fs-6">{{ row.section.school_class.name }}</div>
+                                        <span class="badge bg-primary mt-1">شعبة {{ row.section.name }}</span>
+                                    </td>
+                                    {% for item in row.periods %}
+                                        <td class="slot-cell p-1 {% if not item.slot %}empty-cell{% endif %}"
+                                            onclick="{% if not item.slot %}openAddSlotModalDirect({{ day_block.day_index }}, {{ item.period }}, {{ item.class_id }}, {{ item.section_id }}){% endif %}">
+                                            {% if item.slot %}
+                                                <div class="slot-card p-2 rounded shadow-sm position-relative text-white" style="background-color: {{ item.color }}; min-height: 75px">
+                                                    <div class="fw-bold mb-1" style="font-size: 13.5px">{{ item.slot.subject.name }}</div>
+                                                    <div class="small mb-1 text-light opacity-90" style="font-size: 11px">
+                                                        <i class="bi bi-person me-1"></i>{{ item.slot.teacher.user.get_full_name|default:item.slot.teacher.user.username|default:"غير محدد" }}
+                                                    </div>
+                                                    {% if item.slot.room %}
+                                                        <div class="small text-warning" style="font-size: 10px">
+                                                            <i class="bi bi-geo-alt me-1"></i>{{ item.slot.room }}
+                                                        </div>
+                                                    {% endif %}
+                                                    <button type="button" class="btn btn-sm btn-link text-white p-0 position-absolute top-0 start-0 m-1 d-print-none" onclick="event.stopPropagation(); deleteSlot({{ item.slot.id }});" title="حذف الحصة">
+                                                        <i class="bi bi-x-circle-fill"></i>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-placeholder py-3 d-print-none">
+                                                    <i class="bi bi-plus-circle fs-5 opacity-75 text-info"></i>
+                                                    <div style="font-size: 11px" class="mt-1 text-white-50">إضافة حصة</div>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-white-50 py-4">لم يتم تسجيل شعب مدرسية بعد.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+
+        {% elif view_mode == 'day_master' %}
+            <!-- عرض يوم واحد محدد -->
+            <div class="card card-custom p-4 shadow-sm border paper-schedule-card">
+                <div class="row align-items-center mb-3 pb-2 border-bottom border-2 border-white border-opacity-25">
+                    <div class="col-4 text-start small">
+                        <div class="fw-bold">جمهورية العراق - وزارة التربية</div>
+                        <div class="text-white-50">{{ school.directorate|default:"المديرية العامة للتربية" }}</div>
+                        <div class="fw-bold text-warning">{{ school.school_name|default:"المدرسة" }}</div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <h5 class="fw-bold text-white mb-0">لوحة الحصص المركزية للمدرسة</h5>
+                        <span class="small fw-bold text-warning">
+                            عرض يوم: {{ days_choices|slice:":1"|first|last }}
+                        </span>
+                    </div>
+                    <div class="col-4 text-end small">
+                        <div>العام الدراسي: <strong>{{ current_year.name|default:"2026-2027" }}</strong></div>
+                        <div class="text-white-50">تاريخ الاعتماد: {{ today_date }}</div>
+                        <div class="badge bg-warning text-dark border mt-1">نظام {{ active_periods_count }} حصص</div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered text-center align-middle timetable-grid mb-0">
+                        <thead>
+                            <tr class="table-dark text-white">
+                                <th style="width: 14%; background-color: #151026;">الصف والشعبة</th>
+                                {% for p in periods_range %}
+                                    <th style="background-color: #151026;">
+                                        <div class="fw-bold text-warning">الحصة {{ p }}</div>
+                                    </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in master_rows %}
+                                <tr>
+                                    <td class="fw-bold text-white py-3" style="background: rgba(255, 255, 255, 0.04);">
+                                        <div class="fs-6">{{ row.section.school_class.name }}</div>
+                                        <span class="badge bg-primary mt-1">شعبة {{ row.section.name }}</span>
+                                    </td>
+                                    {% for item in row.periods %}
+                                        <td class="slot-cell p-1 {% if not item.slot %}empty-cell{% endif %}"
+                                            onclick="{% if not item.slot %}openAddSlotModalDirect({{ selected_day }}, {{ item.period }}, {{ item.class_id }}, {{ item.section_id }}){% endif %}">
+                                            {% if item.slot %}
+                                                <div class="slot-card p-2 rounded shadow-sm position-relative text-white" style="background-color: {{ item.color }}; min-height: 75px">
+                                                    <div class="fw-bold mb-1" style="font-size: 13.5px">{{ item.slot.subject.name }}</div>
+                                                    <div class="small mb-1 text-light opacity-90" style="font-size: 11px">
+                                                        <i class="bi bi-person me-1"></i>{{ item.slot.teacher.user.get_full_name|default:item.slot.teacher.user.username|default:"غير محدد" }}
+                                                    </div>
+                                                    {% if item.slot.room %}
+                                                        <div class="small text-warning" style="font-size: 10px"><i class="bi bi-geo-alt me-1"></i>{{ item.slot.room }}</div>
+                                                    {% endif %}
+                                                    <button type="button" class="btn btn-sm btn-link text-white p-0 position-absolute top-0 start-0 m-1 d-print-none" onclick="event.stopPropagation(); deleteSlot({{ item.slot.id }});" title="حذف الحصة">
+                                                        <i class="bi bi-x-circle-fill"></i>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-placeholder py-3 d-print-none">
+                                                    <i class="bi bi-plus-circle fs-5 opacity-75 text-info"></i>
+                                                    <div style="font-size: 11px" class="mt-1 text-white-50">إضافة حصة</div>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="9" class="text-white-50 py-4">لم يتم تسجيل شعب بعد.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         {% else %}
-          <div class="col-md-5">
-            <select
-              name="teacher_id"
-              id="teacherSelectFilter"
-              class="form-select form-select-sm fw-bold"
-              onchange="this.form.submit()"
-            >
-              {% for t in teachers %}
-                <option value="{{ t.id }}" {% if selected_teacher_id == t.id|stringformat:"s" %}selected{% endif %}>
-                  المدرس: {{ t.user.get_full_name }} ({{ t.job_title }})
-                </option>
-              {% endfor %}
-            </select>
-          </div>
+            <!-- جدول الصف أو جدول المعلم -->
+            <div class="card card-custom p-4 shadow-sm border paper-schedule-card">
+                <div class="row align-items-center mb-3 pb-2 border-bottom border-2 border-white border-opacity-25">
+                    <div class="col-4 text-start small">
+                        <div class="fw-bold">جمهورية العراق - وزارة التربية</div>
+                        <div class="text-white-50">{{ school.directorate|default:"المديرية العامة للتربية" }}</div>
+                        <div class="fw-bold text-warning">{{ school.school_name|default:"المدرسة" }}</div>
+                    </div>
+                    <div class="col-4 text-center">
+                        <h5 class="fw-bold text-white mb-0">
+                            {% if view_mode == 'class' %}
+                                جدول الحصص الأسبوعي للصف: <span class="text-warning">{{ selected_class_obj.name }}</span>
+                            {% else %}
+                                جدول الحصص الأسبوعي للمدرس: <span class="text-warning">{{ selected_teacher_obj.user.get_full_name }}</span>
+                            {% endif %}
+                        </h5>
+                        <span class="small fw-bold text-white-50">توزيع حصص الأسبوع الكامل</span>
+                    </div>
+                    <div class="col-4 text-end small">
+                        <div>العام الدراسي: <strong>{{ current_year.name|default:"2026-2027" }}</strong></div>
+                        <div class="text-white-50">تاريخ الاعتماد: {{ today_date }}</div>
+                        <div class="badge bg-warning text-dark border mt-1">نظام {{ active_periods_count }} حصص</div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered text-center align-middle timetable-grid mb-0">
+                        <thead>
+                            <tr class="table-dark text-white">
+                                <th style="width: 14%; background-color: #151026;">اليوم / الحصة</th>
+                                {% for p in periods_range %}
+                                    <th style="background-color: #151026;">
+                                        <div class="fw-bold text-warning">الحصة {{ p }}</div>
+                                    </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in table_rows %}
+                                <tr>
+                                    <td class="fw-bold text-white py-3" style="background: rgba(255, 255, 255, 0.04);">
+                                        <div class="fs-6">{{ row.day_name }}</div>
+                                    </td>
+                                    {% for item in row.periods %}
+                                        <td class="slot-cell p-1 {% if not item.slot %}empty-cell{% endif %}"
+                                            onclick="{% if not item.slot %}openAddSlotModalDirect({{ row.day_index }}, {{ item.period }}, {{ item.class_id|default:'null' }}, {{ item.section_id|default:'null' }}){% endif %}">
+                                            {% if item.slot %}
+                                                <div class="slot-card p-2 rounded shadow-sm position-relative text-white" style="background-color: {{ item.color }}; min-height: 75px">
+                                                    <div class="fw-bold mb-1" style="font-size: 13.5px">{{ item.slot.subject.name }}</div>
+                                                    <div class="small mb-1 text-light opacity-90" style="font-size: 11px">
+                                                        <i class="bi bi-person me-1"></i>{{ item.slot.teacher.user.get_full_name|default:item.slot.teacher.user.username|default:"غير محدد" }}
+                                                    </div>
+                                                    <div class="badge bg-dark bg-opacity-75 text-wrap mb-1" style="font-size: 10px">
+                                                        {{ item.slot.school_class.name }} - شعبة {{ item.slot.section.name }}
+                                                    </div>
+                                                    {% if item.slot.room %}
+                                                        <div class="small text-warning" style="font-size: 10px"><i class="bi bi-geo-alt me-1"></i>{{ item.slot.room }}</div>
+                                                    {% endif %}
+                                                    <button type="button" class="btn btn-sm btn-link text-white p-0 position-absolute top-0 start-0 m-1 d-print-none" onclick="event.stopPropagation(); deleteSlot({{ item.slot.id }});" title="حذف الحصة">
+                                                        <i class="bi bi-x-circle-fill"></i>
+                                                    </button>
+                                                </div>
+                                            {% else %}
+                                                <div class="empty-placeholder py-3 d-print-none">
+                                                    <i class="bi bi-plus-circle fs-5 opacity-75 text-info"></i>
+                                                    <div style="font-size: 11px" class="mt-1 text-white-50">إضافة حصة</div>
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="9" class="text-white-50 py-4">لا توجد بيانات لعرض هذا الجدول.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         {% endif %}
 
-        <div class="col-md-2">
-          <select
-            name="periods_count"
-            id="periodsCountSelect"
-            class="form-select form-select-sm bg-white fw-bold text-primary border-primary"
-            onchange="this.form.submit()"
-          >
-            <option value="5" {% if active_periods_count == 5 %}selected{% endif %}>
-              نظام 5 حصص
-            </option>
-            <option value="6" {% if active_periods_count == 6 %}selected{% url 'portal_dashboard' %}0>
-              نظام 6 حصص (الافتراضي)
-            </option>
-            <option value="7" {% url 'portal_dashboard' %}1selected{% url 'portal_dashboard' %}2>
-              نظام 7 حصص
-            </option>
-            <option value="8" {% url 'portal_dashboard' %}3selected{% url 'portal_dashboard' %}4>
-              نظام 8 حصص
-            </option>
-          </select>
+        <!-- تذييل وتواقيع الطباعة الرسمية A4 -->
+        <div class="row mt-4 pt-3 text-center align-items-end d-none d-print-flex">
+            <div class="col-4">
+                <div class="fw-bold small mb-1">مسؤول الجدول المدرسي</div>
+                <div>..............................</div>
+            </div>
+            <div class="col-4">
+                <div class="small text-muted mb-2">الختم الدائري للمدرسة</div>
+                <div style="height: 40px"></div>
+            </div>
+            <div class="col-4">
+                <div class="fw-bold small mb-1">مدير المدرسة</div>
+                <div class="fw-bold text-dark border-top border-dark d-inline-block pt-1 px-4">
+                    {{ school.director_name|default:"إدارة المدرسة" }}
+                </div>
+            </div>
         </div>
-
-        <div class="col-md-1 text-end">
-          <button type="submit" class="btn btn-dark btn-sm rounded-pill w-100">
-            تحديث
-          </button>
-        </div>
-      </form>
     </div>
 
-    <!-- حاوية الجدول للطباعة والعرض A4 Landscape -->
-    <div
-      class="card card-custom p-4 shadow bg-white border printable-timetable"
-      id="timetablePrintArea"
-      dir="rtl"
-    >
-      <div
-        class="row align-items-center mb-3 pb-2 border-bottom border-2 border-dark"
-      >
-        <div class="col-4 text-start small">
-          <div class="fw-bold">جمهورية العراق - وزارة التربية</div>
-          <div>{% url 'portal_dashboard' %}5</div>
-          <div class="fw-bold text-primary">{% url 'portal_dashboard' %}6</div>
+    <!-- نافذة ضبط توقيتات الحصص والدوام المدرسي -->
+    <div class="modal fade" id="timingModal" tabindex="-1" aria-hidden="true" dir="rtl">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold text-warning">
+                        <i class="bi bi-clock-history me-2"></i>
+                        ضبط توقيتات الحصص والدوام المدرسي
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-white-50 mb-1">وقت بداية الدرس الأول:</label>
+                        <input type="time" id="custom_start_time" class="form-control" value="08:00" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-white-50 mb-1">مدة الحصة الدراسية (بالدقائق):</label>
+                        <input type="number" id="custom_period_duration" class="form-control" value="45" min="30" max="60" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-white-50 mb-1">مدة الاستراحة بين الحصص (بالدقائق):</label>
+                        <input type="number" id="custom_break_duration" class="form-control" value="5" min="0" max="15" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="small fw-bold text-white-50 mb-1">استراحة الفرصة الكبرى (بعد الحصة الثالثة):</label>
+                        <input type="number" id="custom_long_break" class="form-control" value="20" min="10" max="30" />
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="recalculateTimings()">
+                        حفظ وتطبيق التوقيتات
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="col-4 text-center">
-          <h5 class="fw-bold text-dark text-decoration-underline mb-0">
-            {% if view_mode == 'master' %}
-              الجدول العام للمدرسة (لوحة الحصص المركزية)
-            {% elif view_mode == 'class' %}
-              جدول الحصص الأسبوعي للصف
-            {% else %}
-              جدول الحصص الأسبوعي للمدرس
-            {% endif %}
-          </h5>
-          <span class="small fw-bold text-muted">
-            {% if view_mode == 'master' %}
-              لوحة يوم الأسبوع
-            {% elif view_mode == 'class' %}
-              الصف : {{ total_classes }}3
-            {% else %}
-              المدرس : {{ total_classes }}5
-            {% endif %}
-          </span>
-        </div>
-        <div class="col-4 text-end small">
-          <div>
-            العام الدراسي:
-            <strong>{{ total_classes }}7</strong>
-          </div>
-          <div>تاريخ الاعتماد: {{ total_classes }}8</div>
-          <div class="badge bg-light text-dark border">نظام {{ total_classes }}9 حصص</div>
-        </div>
-      </div>
+    </div>
 
-      <!-- شبكة الجدول -->
-      <div class="table-responsive">
-        <table
-          class="table table-bordered text-center align-middle timetable-grid mb-0"
-        >
-          <thead class="table-dark text-white">
-            <tr>
-              <th style="width: 14%">
-                {% if view_mode == 'master' %}
-                  الصف والشعبة
-                {% else %}
-                  اليوم / الحصة
-                {% endif %}
-              </th>
-              {% for p in periods_range %}
-                <th>
-                  <div class="fw-bold">الحصة </div>
-                  <span class="font-monospace small opacity-75"></span>
-              </th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% if view_mode == 'master' %}
-            {% for row in master_rows %}
-              <tr>
-                <td class="table-light fw-bold text-dark py-3">
-                  <div></div>
-                  <span class="badge bg-primary">شعبة </span>
-                </td>
-                {% for item in row.periods %}
-                  <td
-                    class="slot-cell p-1 01empty-cell02"
-                    onclick="03openAddSlotModalDirect(04, 05, 06, 07)08"
-                  >
-                    {% if item.slot %}
-                      <div
-                        class="slot-card p-2 rounded shadow-sm position-relative text-white"
-                        style="background-color: 10; min-height: 80px"
-                      >
-                        <div class="fw-bold mb-1" style="font-size: 13.5px">
-                          11
-                        </div>
-                        <div class="small mb-1 text-light" style="font-size: 11px">
-                          <i class="bi bi-person me-1"></i>
-                          12
-                        </div>
-                        {% if item.slot.room %}
-                          <div class="small text-warning" style="font-size: 10px">
-                            <i class="bi bi-geo-alt me-1"></i>
-                            14
-                          </div>
-                        {% endif %}
+    <!-- نافذة إضافة وإسناد حصة جديدة -->
+    <div class="modal fade" id="slotModal" tabindex="-1" aria-hidden="true" dir="rtl">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold text-warning">
+                        <i class="bi bi-calendar-plus me-2"></i>
+                        إسناد حصة دراسية في الجدول
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="slotForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action_type" value="save_slot" />
+                    <input type="hidden" name="slot_id" id="modal_slot_id" value="" />
+                    <input type="hidden" name="day" id="modal_day" value="0" />
+                    <input type="hidden" name="period" id="modal_period" value="1" />
 
-                        <button
-                          type="button"
-                          class="btn btn-sm btn-link text-white p-0 position-absolute top-0 start-0 m-1 d-print-none"
-                          onclick="
-                            event.stopPropagation();
-                            deleteSlot(16);
-                          "
-                          title="حذف الحصة"
-                        >
-                          <i class="bi bi-x-circle-fill"></i>
+                    <div class="modal-body p-4">
+                        <div class="alert alert-info py-2 small fw-bold mb-3 d-flex align-items-center gap-2">
+                            <i class="bi bi-info-circle fs-5"></i>
+                            <span id="modal_time_label">اليوم: الأحد | الحصة الأولى</span>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="small fw-bold text-white-50 mb-1">المادة الدراسية:</label>
+                                <select name="subject_id" class="form-select" required>
+                                    {% for sub in subjects %}
+                                        <option value="{{ sub.id }}">{{ sub.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="small fw-bold text-white-50 mb-1">المعلم المسؤول (مع فحص التفرغ والنصاب):</label>
+                                <select name="teacher_id" class="form-select">
+                                    <option value="">-- بدون معلم حالياً --</option>
+                                    {% for t in teachers %}
+                                        <option value="{{ t.id }}">{{ t.user.get_full_name }} ({{ t.job_title|default:"مدرس" }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-6">
+                                <label class="small fw-bold text-white-50 mb-1">الصف:</label>
+                                <select name="class_id" class="form-select" required id="modal_class_select">
+                                    {% for c in classes %}
+                                        <option value="{{ c.id }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-6">
+                                <label class="small fw-bold text-white-50 mb-1">الشعبة:</label>
+                                <select name="section_id" class="form-select" id="modal_section_select">
+                                    <option value="">عامة</option>
+                                    {% for c in classes %}
+                                        {% for s in c.sections.all %}
+                                            <option value="{{ s.id }}">{{ c.name }} - شعبة {{ s.name }}</option>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-6">
+                                <label class="small fw-bold text-white-50 mb-1">القاعة / المختبر:</label>
+                                <input type="text" name="room" class="form-control" placeholder="مثال: مختبر العلوم" />
+                            </div>
+
+                            <div class="col-6">
+                                <label class="small fw-bold text-white-50 mb-1">ملاحظات الحصة:</label>
+                                <input type="text" name="notes" class="form-control" placeholder="حصة تفاعلية" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">
+                            <i class="bi bi-check2-circle me-1"></i> حفظ وفحص التعارض
                         </button>
-                      </div>
-                    {% else %}
-                      <div class="empty-placeholder text-muted py-3 d-print-none">
-                        <i class="bi bi-plus-circle fs-5 opacity-50"></i>
-                        <div style="font-size: 10px" class="mt-1">إضافة حصة</div>
-                      </div>
-                    {% endif %}
-                  </td>
-                {% endfor %}
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="9" class="text-muted py-4">
-                  لم يتم تسجيل شُعب مدرسية بعد. يرجى إضافتها من إدارة الصفوف.
-                </td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            {% for row in table_rows %}
-              <tr>
-                <td class="table-light fw-bold fs-6 text-dark py-3">
-                  4
-                </td>
-                {% for item in row.periods %}
-                  <td
-                    class="slot-cell p-1 6empty-cell7"
-                    onclick="8openAddSlotModalDirect(9, 0, '1', '2')3"
-                  >
-                    {% if item.slot %}
-                      <div
-                        class="slot-card p-2 rounded shadow-sm position-relative text-white"
-                        style="background-color: 5; min-height: 80px"
-                      >
-                        <div class="fw-bold mb-1" style="font-size: 13.5px">
-                          6
-                        </div>
-                        <div class="small mb-1 text-light" style="font-size: 11px">
-                          <i class="bi bi-person me-1"></i>
-                          7
-                        </div>
-                        <div
-                          class="badge bg-dark bg-opacity-50 text-wrap mb-1"
-                          style="font-size: 10px"
-                        >
-                          8 9- 4041
-                        </div>
-                        {% if item.slot.room %}
-                          <div class="small text-warning" style="font-size: 10px">
-                            <i class="bi bi-geo-alt me-1"></i>
-                            43
-                          </div>
-                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-                        <button
-                          type="button"
-                          class="btn btn-sm btn-link text-white p-0 position-absolute top-0 start-0 m-1 d-print-none"
-                          onclick="
-                            event.stopPropagation();
-                            deleteSlot(45);
-                          "
-                          title="حذف الحصة"
-                        >
-                          <i class="bi bi-x-circle-fill"></i>
+    <!-- نافذة نصاب المعلمين الأسبوعي -->
+    <div class="modal fade" id="quotaModal" tabindex="-1" aria-hidden="true" dir="rtl">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold text-warning">
+                        <i class="bi bi-person-lines-fill me-2"></i>
+                        كشف ومطابقة نصاب المعلمين الأسبوعي (24 حصة)
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm text-center align-middle mb-0" style="font-size: 13px">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ت</th>
+                                    <th>اسم المعلم</th>
+                                    <th>العنوان الوظيفي</th>
+                                    <th style="width: 175px">الحصص المطلوبة (تعديل النصاب)</th>
+                                    <th>المجدولة</th>
+                                    <th>المتبقية</th>
+                                    <th>حالة النصاب</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in teachers_quota_data %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td class="fw-bold text-start ps-2 text-white">{{ item.teacher.user.get_full_name }}</td>
+                                        <td>{{ item.teacher.job_title|default:"مدرس" }}</td>
+                                        <td>
+                                            <form method="POST" class="d-flex align-items-center justify-content-center gap-1 m-0">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action_type" value="update_teacher_quota" />
+                                                <input type="hidden" name="teacher_id" value="{{ item.teacher.id }}" />
+                                                <input type="number" name="required_periods" value="{{ item.required }}" min="1" max="40" class="form-control form-control-sm text-center fw-bold text-warning" style="width: 70px; height: 32px" />
+                                                <button type="submit" class="btn btn-sm btn-primary px-2 py-0" style="height: 32px" title="حفظ النصاب">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                        <td class="font-monospace text-primary fw-bold fs-6">{{ item.scheduled }}</td>
+                                        <td class="font-monospace text-warning fw-bold fs-6">{{ item.remaining }}</td>
+                                        <td>
+                                            {% if item.remaining == 0 %}
+                                                <span class="badge bg-success">مكتمل النصاب</span>
+                                            {% elif item.remaining > 0 %}
+                                                <span class="badge bg-warning text-dark">متبقي {{ item.remaining }} حصة</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">فوق النصاب (+{{ item.over }})</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="7" class="text-white-50 py-3">لا يوجد معلمون مسجلون بعد.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">إغلاق</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة الاستبدال والاحتياط اليومي -->
+    <div class="modal fade" id="substituteModal" tabindex="-1" aria-hidden="true" dir="rtl">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h6 class="modal-title fw-bold text-info">
+                        <i class="bi bi-arrow-left-right me-2"></i>
+                        تسجيل استبدال معلم (حصص الاحتياط)
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action_type" value="add_substitution" />
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="small fw-bold text-white-50 mb-1">اختر الحصة المراد استبدالها:</label>
+                            <select name="slot_id" class="form-select" required>
+                                {% for s in all_slots %}
+                                    <option value="{{ s.id }}">
+                                        {{ s.school_class.name }} (شعبة {{ s.section.name }}) - {{ s.subject.name }} [الحصة {{ s.period }} - {{ s.get_day_display }}]
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small fw-bold text-white-50 mb-1">المعلم البديل (شاغل حصة الاحتياط):</label>
+                            <select name="substitute_teacher_id" class="form-select" required>
+                                {% for t in teachers %}
+                                    <option value="{{ t.id }}">{{ t.user.get_full_name }} ({{ t.job_title|default:"مدرس" }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="small fw-bold text-white-50 mb-1">سبب الاستبدال:</label>
+                            <input type="text" name="reason" class="form-control" value="إجازة طارئة / ظرف رسمي" required />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">
+                            <i class="bi bi-check2-circle me-1"></i> تأكيد تكليف الاحتياط
                         </button>
-                      </div>
-                    {% else %}
-                      <div class="empty-placeholder text-muted py-3 d-print-none">
-                        <i class="bi bi-plus-circle fs-5 opacity-50"></i>
-                        <div style="font-size: 10px" class="mt-1">إضافة حصة</div>
-                      </div>
-                    {% endif %}
-                  </td>
-                {% endfor %}
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="9" class="text-muted py-4">
-                  لا توجد بيانات متاحة لعرض الجدول.
-                </td>
-              </tr>
-            {% endfor %}
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- تذييل الطباعة -->
-    <div class="row mt-4 pt-3 text-center align-items-end d-none d-print-flex">
-      <div class="col-4">
-        <div class="fw-bold small mb-1">مسؤول الجدول المدرسي</div>
-        <div>..............................</div>
-      </div>
-      <div class="col-4">
-        <div class="small text-muted mb-2">الختم الدائري للمدرسة</div>
-        <div style="height: 40px"></div>
-      </div>
-      <div class="col-4">
-        <div class="fw-bold small mb-1">مدير المدرسة</div>
-        <div
-          class="fw-bold text-dark border-top border-dark d-inline-block pt-1 px-4"
-        >
-          {{ school.director_name|default:"إدارة المدرسة" }}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- نافذة ضبط توقيتات الحصص واليوم الدراسي -->
-  <div
-    class="modal fade"
-    id="timingModal"
-    tabindex="-1"
-    aria-hidden="true"
-    dir="rtl"
-  >
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <div class="modal-header bg-dark text-white">
-          <h6 class="modal-title fw-bold">
-            <i class="bi bi-clock-history me-2"></i>
-            ضبط توقيتات الحصص والدوام المدرسي
-          </h6>
-          <button
-            type="button"
-            class="btn-close btn-close-white"
-            data-bs-dismiss="modal"
-          ></button>
-        </div>
-        <div class="modal-body p-4">
-          <div class="mb-3">
-            <label class="small fw-bold">وقت بداية الدرس الأول:</label>
-            <input
-              type="time"
-              id="custom_start_time"
-              class="form-control"
-              value="08:00"
-            />
-          </div>
-          <div class="mb-3">
-            <label class="small fw-bold">مدة الحصة الدراسية (بالدقائق):</label>
-            <input
-              type="number"
-              id="custom_period_duration"
-              class="form-control"
-              value="45"
-              min="30"
-              max="60"
-            />
-          </div>
-          <div class="mb-3">
-            <label class="small fw-bold">
-              مدة الاستراحة بين الحصص (بالدقائق):
-            </label>
-            <input
-              type="number"
-              id="custom_break_duration"
-              class="form-control"
-              value="5"
-              min="0"
-              max="15"
-            />
-          </div>
-          <div class="mb-3">
-            <label class="small fw-bold">
-              استراحة الفرصة الكبرى (بعد الحصة الثالثة):
-            </label>
-            <input
-              type="number"
-              id="custom_long_break"
-              class="form-control"
-              value="20"
-              min="10"
-              max="30"
-            />
-          </div>
-        </div>
-        <div class="modal-footer bg-light">
-          <button
-            type="button"
-            class="btn btn-secondary rounded-pill px-3"
-            data-bs-dismiss="modal"
-          >
-            إلغاء
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary rounded-pill px-4 fw-bold"
-            onclick="recalculateTimings()"
-          >
-            حفظ وتطبيق التوقيتات
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- نافذة إضافة حصة -->
-  <div
-    class="modal fade"
-    id="slotModal"
-    tabindex="-1"
-    aria-hidden="true"
-    dir="rtl"
-  >
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <div class="modal-header bg-primary text-white">
-          <h6 class="modal-title fw-bold">
-            <i class="bi bi-clock-history me-2"></i>
-            إسناد حصة دراسية جديدة
-          </h6>
-          <button
-            type="button"
-            class="btn-close btn-close-white"
-            data-bs-dismiss="modal"
-          ></button>
-        </div>
-        <form method="POST" id="slotForm">
-          {% csrf_token %}
-          <input type="hidden" name="action_type" value="save_slot" />
-          <input type="hidden" name="slot_id" id="modal_slot_id" value="" />
-          <input type="hidden" name="day" id="modal_day" value="0" />
-          <input type="hidden" name="period" id="modal_period" value="1" />
-
-          <div class="modal-body p-4">
-            <div class="alert alert-info py-2 small fw-bold mb-3">
-              <span id="modal_time_label">اليوم: الأحد | الحصة الأولى</span>
+                    </div>
+                </form>
             </div>
-
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="small fw-bold">المادة الدراسية:</label>
-                <select name="subject_id" class="form-select" required>
-                  {% for sub in subjects %}
-                    <option value="55">56</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="col-12">
-                <label class="small fw-bold">
-                  المعلم المسؤول (مع فحص التفرغ والنصاب):
-                </label>
-                <select name="teacher_id" class="form-select">
-                  <option value="">-- بدون مدرس حالياً --</option>
-                  {% for t in teachers %}
-                    <option value="59">
-                      60 (61)
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="col-6">
-                <label class="small fw-bold">الصف:</label>
-                <select
-                  name="class_id"
-                  class="form-select"
-                  required
-                  id="modal_class_select"
-                >
-                  {% for c in classes %}
-                    <option value="64">65</option>
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="col-6">
-                <label class="small fw-bold">الشعبة:</label>
-                <select
-                  name="section_id"
-                  class="form-select"
-                  id="modal_section_select"
-                >
-                  <option value="">عامة</option>
-                  {% for c in classes %}
-                    {% for s in c.sections.all %}
-                      <option value="69">
-                        70 - شعبة 71
-                      </option>
-                    {% endfor %}
-                  {% endfor %}
-                </select>
-              </div>
-
-              <div class="col-6">
-                <label class="small fw-bold">القاعة / المختبر:</label>
-                <input
-                  type="text"
-                  name="room"
-                  class="form-control"
-                  placeholder="مثال: مختبر الحاسوب"
-                />
-              </div>
-
-              <div class="col-6">
-                <label class="small fw-bold">ملاحظات الحصة:</label>
-                <input
-                  type="text"
-                  name="notes"
-                  class="form-control"
-                  placeholder="حصة تفاعلية"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-footer bg-light">
-            <button
-              type="button"
-              class="btn btn-secondary rounded-pill px-3"
-              data-bs-dismiss="modal"
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary rounded-pill px-4 fw-bold"
-            >
-              حفظ وفحص التعارض
-            </button>
-          </div>
-        </form>
-      </div>
+        </div>
     </div>
-  </div>
 
-  <!-- نافذة نصاب المعلمين -->
-  <div
-    class="modal fade"
-    id="quotaModal"
-    tabindex="-1"
-    aria-hidden="true"
-    dir="rtl"
-  >
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <div class="modal-header bg-warning text-dark">
-          <h6 class="modal-title fw-bold">
-            <i class="bi bi-person-lines-fill me-2"></i>
-            كشف ومطابقة نصاب المعلمين الأسبوعي
-          </h6>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-          ></button>
-        </div>
-        <div class="modal-body p-4">
-          <div class="table-responsive">
-            <table
-              class="table table-bordered table-sm text-center align-middle mb-0"
-              style="font-size: 13px"
-            >
-              <thead class="table-light">
-                <tr>
-                  <th>ت</th>
-                  <th>اسم المعلم</th>
-                  <th>العنوان الوظيفي</th>
-                  <th style="width: 175px">الحصص المطلوبة (تعديل النصاب)</th>
-                  <th>المجدولة</th>
-                  <th>المتبقية</th>
-                  <th>حالة النصاب</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for item in teachers_quota_data %}
-                  <tr>
-                    <td>75</td>
-                    <td class="fw-bold text-start ps-2">76</td>
-                    <td>77</td>
-                    <td>
-                      <form
-                        method="POST"
-                        class="d-flex align-items-center justify-content-center gap-1 m-0"
-                      >
-                        {% csrf_token %}
-                        <input
-                          type="hidden"
-                          name="action_type"
-                          value="update_teacher_quota"
-                        />
-                        <input
-                          type="hidden"
-                          name="teacher_id"
-                          value="79"
-                        />
-                        <input
-                          type="number"
-                          name="required_periods"
-                          value="80"
-                          min="1"
-                          max="40"
-                          class="form-control form-control-sm text-center fw-bold text-primary"
-                          style="width: 70px; height: 32px"
-                        />
-                        <button
-                          type="submit"
-                          class="btn btn-sm btn-primary px-2 py-0"
-                          style="height: 32px"
-                          title="حفظ النصاب"
-                        >
-                          <i class="bi bi-check-lg"></i>
-                        </button>
-                      </form>
-                    </td>
-                    <td class="font-monospace text-primary fw-bold fs-6">
-                      81
-                    </td>
-                    <td class="font-monospace text-danger fw-bold fs-6">
-                      82
-                    </td>
-                    <td>
-                      {% if item.remaining == 0 %}
-                        <span class="badge bg-success">مكتمل النصاب</span>
-                      {% elif item.remaining > 0 %}
-                        <span class="badge bg-warning text-dark">
-                          متبقي 85 حصة
-                        </span>
-                      {% else %}
-                        <span class="badge bg-danger">
-                          فوق النصاب (+87)
-                        </span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td colspan="7" class="text-muted py-3">
-                      لا يوجد معلمين مسجلين بعد.
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-footer bg-light py-2">
-          <button
-            type="button"
-            class="btn btn-secondary btn-sm rounded-pill px-3"
-            data-bs-dismiss="modal"
-          >
-            إغلاق
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+    <!-- نموذج حذف الحصة المخفي -->
+    <form id="deleteSlotForm" method="POST" style="display: none">
+        {% csrf_token %}
+        <input type="hidden" name="action_type" value="delete_slot" />
+        <input type="hidden" name="slot_id" id="delete_slot_id" value="" />
+    </form>
 
-  <!-- نافذة الاستبدال والاحتياط اليومي -->
-  <div
-    class="modal fade"
-    id="substituteModal"
-    tabindex="-1"
-    aria-hidden="true"
-    dir="rtl"
-  >
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <div class="modal-header bg-info text-dark">
-          <h6 class="modal-title fw-bold">
-            <i class="bi bi-arrow-left-right me-2"></i>
-            تسجيل استبدال معلم (حصص الاحتياط)
-          </h6>
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="modal"
-          ></button>
-        </div>
-        <form method="POST">
-          {% csrf_token %}
-          <input type="hidden" name="action_type" value="add_substitution" />
-          <div class="modal-body p-4">
-            <div class="mb-3">
-              <label class="small fw-bold">
-                اختر الحصة المراد استبدالها اليوم:
-              </label>
-              <select name="slot_id" class="form-select" required>
-                {% for s in all_slots %}
-                  <option value="93">
-                    94 (95) - 96
-                    [97]
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
+    <script>
+        const DAYS_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+        const PERIODS_NAMES = ["", "الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة", "السادسة", "السابعة", "الثامنة"];
 
-            <div class="mb-3">
-              <label class="small fw-bold">
-                المعلم البديل (شاغل حصة الاحتياط):
-              </label>
-              <select name="substitute_teacher_id" class="form-select" required>
-                {% for t in teachers %}
-                  <option value="">
-                     ()
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
+        function openAddSlotModalDirect(day, period, classId, sectionId) {
+            document.getElementById("modal_slot_id").value = "";
+            document.getElementById("modal_day").value = day;
+            document.getElementById("modal_period").value = period;
+            document.getElementById("modal_time_label").innerText = `اليوم: ${DAYS_NAMES[day]} | الحصة ${PERIODS_NAMES[period] || period}`;
 
-            <div class="mb-3">
-              <label class="small fw-bold">سبب الاستبدال:</label>
-              <input
-                type="text"
-                name="reason"
-                class="form-control"
-                value="إجازة طارئة / ظرف رسمي"
-                required
-              />
-            </div>
-          </div>
-          <div class="modal-footer bg-light">
-            <button
-              type="button"
-              class="btn btn-secondary rounded-pill px-3"
-              data-bs-dismiss="modal"
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              class="btn btn-primary rounded-pill px-4 fw-bold"
-            >
-              تأكيد الاستبدال
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+            if (classId && classId !== 'null') {
+                document.getElementById("modal_class_select").value = classId;
+            }
+            if (sectionId && sectionId !== 'null') {
+                document.getElementById("modal_section_select").value = sectionId;
+            }
 
-  <form id="deleteSlotForm" method="POST" style="display: none">
-    {% csrf_token %}
-    <input type="hidden" name="action_type" value="delete_slot" />
-    <input type="hidden" name="slot_id" id="delete_slot_id" value="" />
-  </form>
-
-  <script>
-    const DAYS_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
-    const PERIODS_NAMES = [
-      "",
-      "الأولى",
-      "الثانية",
-      "الثالثة",
-      "الرابعة",
-      "الخامسة",
-      "السادسة",
-      "السابعة",
-      "الثامنة",
-    ];
-
-    function openAddSlotModalDirect(day, period, classId, sectionId) {
-      document.getElementById("modal_slot_id").value = "";
-      document.getElementById("modal_day").value = day;
-      document.getElementById("modal_period").value = period;
-      document.getElementById("modal_time_label").innerText =
-        `اليوم: ${DAYS_NAMES[day]} | الحصة ${PERIODS_NAMES[period]}`;
-
-      if (classId) {
-        document.getElementById("modal_class_select").value = classId;
-      }
-      if (sectionId) {
-        document.getElementById("modal_section_select").value = sectionId;
-      }
-
-      const myModal = new bootstrap.Modal(document.getElementById("slotModal"));
-      myModal.show();
-    }
-
-    function deleteSlot(slotId) {
-      if (confirm("هل أنت متأكد من حذف هذه الحصة من الجدول؟")) {
-        document.getElementById("delete_slot_id").value = slotId;
-        document.getElementById("deleteSlotForm").submit();
-      }
-    }
-
-    function recalculateTimings() {
-      const startTimeStr =
-        document.getElementById("custom_start_time").value || "08:00";
-      const duration =
-        parseInt(document.getElementById("custom_period_duration").value) || 45;
-      const breakDuration =
-        parseInt(document.getElementById("custom_break_duration").value) || 5;
-      const longBreak =
-        parseInt(document.getElementById("custom_long_break").value) || 20;
-
-      let [currentHour, currentMin] = startTimeStr.split(":").map(Number);
-
-      for (let p = 1; p <= 8; p++) {
-        const startStr = formatTime(currentHour, currentMin);
-
-        // إضافة مدة الحصة
-        let endMin = currentMin + duration;
-        let endHour = currentHour + Math.floor(endMin / 60);
-        endMin = endMin % 60;
-        const endStr = formatTime(endHour, endMin);
-
-        const labelEl = document.getElementById("timing_label_" + p);
-        if (labelEl) {
-          labelEl.innerText = `${startStr} - ${endStr}`;
+            const myModal = new bootstrap.Modal(document.getElementById("slotModal"));
+            myModal.show();
         }
 
-        // إضافة وقت الاستراحة للحصة التالية
-        let b = p === 3 ? longBreak : breakDuration;
-        currentMin = endMin + b;
-        currentHour = endHour + Math.floor(currentMin / 60);
-        currentMin = currentMin % 60;
-      }
+        function deleteSlot(slotId) {
+            if (confirm("هل أنت متأكد من حذف هذه الحصة من الجدول المدرسي؟")) {
+                document.getElementById("delete_slot_id").value = slotId;
+                document.getElementById("deleteSlotForm").submit();
+            }
+        }
 
-      const modalEl = bootstrap.Modal.getInstance(
-        document.getElementById("timingModal"),
-      );
-      if (modalEl) modalEl.hide();
-    }
+        function recalculateTimings() {
+            const startTimeStr = document.getElementById("custom_start_time").value || "08:00";
+            const duration = parseInt(document.getElementById("custom_period_duration").value) || 45;
+            const breakDuration = parseInt(document.getElementById("custom_break_duration").value) || 5;
+            const longBreak = parseInt(document.getElementById("custom_long_break").value) || 20;
 
-    function formatTime(h, m) {
-      const formattedH = h.toString().padStart(2, "0");
-      const formattedM = m.toString().padStart(2, "0");
-      return `${formattedH}:${formattedM}`;
-    }
+            let [currentHour, currentMin] = startTimeStr.split(":").map(Number);
 
-    document.addEventListener("DOMContentLoaded", function () {
-      const params = new URLSearchParams(window.location.search);
-      const dayVal = params.get("day") || "";
-      const clsId = params.get("class_id") || "";
-      const secId = params.get("section_id") || "";
-      const tchId = params.get("teacher_id") || "";
-      const pCount = params.get("periods_count") || "";
+            for (let p = 1; p <= 8; p++) {
+                const startStr = formatTime(currentHour, currentMin);
+                let endMin = currentMin + duration;
+                let endHour = currentHour + Math.floor(endMin / 60);
+                endMin = endMin % 60;
+                const endStr = formatTime(endHour, endMin);
 
-      const daySel = document.getElementById("daySelectFilter");
-      if (daySel && dayVal) daySel.value = dayVal;
+                const labelEls = document.querySelectorAll("#timing_label_" + p);
+                labelEls.forEach(el => {
+                    el.innerText = `${startStr} - ${endStr}`;
+                });
 
-      const clsSel = document.getElementById("classSelectFilter");
-      if (clsSel && clsId) clsSel.value = clsId;
+                let b = (p === 3) ? longBreak : breakDuration;
+                currentMin = endMin + b;
+                currentHour = endHour + Math.floor(currentMin / 60);
+                currentMin = currentMin % 60;
+            }
 
-      const secSel = document.getElementById("sectionSelectFilter");
-      if (secSel && secId) secSel.value = secId;
+            const modalEl = bootstrap.Modal.getInstance(document.getElementById("timingModal"));
+            if (modalEl) modalEl.hide();
+        }
 
-      const tchSel = document.getElementById("teacherSelectFilter");
-      if (tchSel && tchId) tchSel.value = tchId;
+        function formatTime(h, m) {
+            return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+        }
+    </script>
 
-      const pSel = document.getElementById("periodsCountSelect");
-      if (pSel && pCount) pSel.value = pCount;
-    });
-  </script>
+    <style>
+        .timetable-grid th,
+        .timetable-grid td {
+            vertical-align: middle;
+            height: 75px;
+        }
 
-  <style>
-    .timetable-grid th,
-    .timetable-grid td {
-      vertical-align: middle;
-      height: 80px;
-    }
+        .slot-cell {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
 
-    .slot-cell {
-      cursor: pointer;
-      transition: all 0.2s ease-in-out;
-    }
+        .empty-cell:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
 
-    .empty-cell:hover {
-      background-color: #f8fafc;
-    }
+        .slot-card {
+            transition: transform 0.15s ease;
+        }
 
-    .slot-card {
-      transition: transform 0.15s ease;
-    }
+        .slot-card:hover {
+            transform: scale(1.02);
+        }
 
-    .slot-card:hover {
-      transform: scale(1.02);
-    }
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 8mm;
+            }
 
-    @media print {
-      @page {
-        size: A4 landscape;
-        margin: 8mm;
-      }
+            body {
+                background: #FFFFFF !important;
+                color: #000000 !important;
+            }
 
-      body * {
-        visibility: hidden;
-      }
+            body * {
+                visibility: hidden;
+            }
 
-      #timetablePrintArea,
-      #timetablePrintArea * {
-        visibility: visible;
-      }
+            #timetablePrintArea,
+            #timetablePrintArea * {
+                visibility: visible;
+                color: #000000 !important;
+                background-color: transparent !important;
+            }
 
-      #timetablePrintArea {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        margin: 0;
-        padding: 0 !important;
-        border: none !important;
-        box-shadow: none !important;
-      }
+            .paper-schedule-card {
+                background: #FFFFFF !important;
+                border: 1px solid #000000 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                break-after: page;
+                margin-bottom: 20px !important;
+                padding: 10px !important;
+            }
 
-      .d-print-none {
-        display: none !important;
-      }
-    }
-  </style>
-{% endif %}
+            .table-dark {
+                background-color: #000000 !important;
+                color: #FFFFFF !important;
+            }
+
+            .table-dark th {
+                background-color: #000000 !important;
+                color: #FFFFFF !important;
+            }
+
+            .slot-card {
+                border: 1px solid #000000 !important;
+                color: #000000 !important;
+                background-color: #f1f5f9 !important;
+            }
+
+            #timetablePrintArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            .d-print-none {
+                display: none !important;
+            }
+        }
+    </style>
 {% endblock %}
-
-

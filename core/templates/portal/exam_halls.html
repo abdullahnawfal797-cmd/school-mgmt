@@ -1,32 +1,346 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
-{% block title %}إدارة القاعات الامتحانية وتوزيع المقاعد الذكية{% endblock %}
+{% block title %}إدارة ومعاينة القاعات الامتحانية وتوزيع المقاعد الذكية{% endblock %}
+
+{% block extra_css %}
+<style>
+    .desk-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(94, 53, 177, 0.15);
+        border-radius: 16px;
+        padding: 14px;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+        position: relative;
+    }
+
+    .desk-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(94, 53, 177, 0.12);
+        border-color: var(--primary-purple);
+    }
+
+    .desk-number-badge {
+        font-size: 1.25rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ede7f6 0%, #d1c4e9 100%);
+        color: var(--primary-purple);
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid rgba(94, 53, 177, 0.2);
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 d-print-none" dir="rtl">
+<div class="d-flex justify-content-between align-items-center mb-4 d-print-none flex-wrap gap-2" dir="rtl">
     <div>
         <h5 class="fw-bold text-primary mb-0">
-            <i class="bi bi-mortarboard-fill me-2"></i>منظومة إدارة اللجان والامتحانات المدرسية
+            <i class="bi bi-mortarboard-fill me-2"></i>منظومة إدارة ومعاينة اللجان والامتحانات المدرسية
         </h5>
-        <span class="text-muted small">العام الدراسي الفعّال: <strong>{{ current_year.name|default:"غير محدد" }}</strong></span>
+        <span class="text-muted small">العام الدراسي الفعّال: <strong>{{ current_year.name|default:"غير محدد" }}</strong> | إجمالي القاعات: <strong>{{ halls.count }}</strong></span>
     </div>
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-success rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#newSessionModal">
+    <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-outline-success rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#newSessionModal">
             <i class="bi bi-plus-circle me-1"></i> إضافة دورة امتحانية
         </button>
-        <button type="button" class="btn btn-outline-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#newHallModal">
+        <button type="button" class="btn btn-outline-primary rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#newHallModal">
             <i class="bi bi-door-open me-1"></i> إضافة قاعة امتحانية
         </button>
-        <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
+        <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold">
             <i class="bi bi-house-door-fill me-1"></i> الرئيسية
         </a>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- 1. قسم المعاينة التفاعلية المباشرة لمقاعد وتوزيع القاعات الامتحانية -->
+<!-- ========================================================================= -->
+<div class="card card-custom p-4 shadow-sm mb-4" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold text-primary mb-1">
+                <i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>معاينة وتفقد مقاعد القاعات الامتحانية
+            </h5>
+            <span class="text-muted small">
+                استعراض فوري لخرائط جلوس وتوزيع طلاب القاعات لمنع الغش والاطلاع على أرقام المقاعد.
+            </span>
+        </div>
+        {% if selected_session %}
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'print_exam_labels' selected_session.id %}{% if selected_hall_id %}?hall={{ selected_hall_id }}{% endif %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                <i class="bi bi-tags me-1"></i> طباعة لواصق المقاعد
+            </a>
+            <a href="{% url 'print_exam_attendance' selected_session.id %}{% if selected_hall_id %}?hall={{ selected_hall_id }}{% endif %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                <i class="bi bi-printer me-1"></i> طباعة شيت الحضور
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- شريط الفلاتر والتصفية والبحث في القاعات -->
+    <form method="GET" action="{% url 'portal_exam_halls' %}" class="row g-2 align-items-center mb-4 p-3 rounded-4 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+        <div class="col-12 col-md-4">
+            <label class="small text-muted fw-bold mb-1">الدورة الامتحانية:</label>
+            <select name="session_id" class="form-select fw-bold rounded-pill" onchange="this.form.submit()">
+                {% for s in sessions %}
+                <option value="{{ s.id }}" {% if selected_session and selected_session.id == s.id %}selected{% endif %}>
+                    {{ s.title }} ({{ s.academic_year.name|default:"عام غير محدد" }})
+                </option>
+                {% empty %}
+                <option value="">لا توجد دورات مسجلة</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="small text-muted fw-bold mb-1">القاعة الامتحانية:</label>
+            <select name="hall_id" class="form-select rounded-pill" onchange="this.form.submit()">
+                <option value="">-- كافة القاعات الامتحانية --</option>
+                {% for h in halls %}
+                <option value="{{ h.id }}" {% if selected_hall_id == h.id|stringformat:"i" %}selected{% endif %}>
+                    {{ h.name }} (سعة: {{ h.capacity }} مقعد)
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="small text-muted fw-bold mb-1">بحث عن طالب أو مقعد:</label>
+            <div class="input-group">
+                <input type="text" name="q" class="form-control rounded-start-pill" placeholder="اسم الطالب أو رقم المقعد..." value="{{ search_q }}">
+                <button type="submit" class="btn btn-primary rounded-end-pill px-3 fw-bold">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- تبويبات نمط العرض: كروت المقاعد التفاعلية / جدول الكشوفات -->
+    <!-- تبويبات نمط العرض: المخطط الهندسي / كروت المقاعد التفاعلية / جدول الكشوفات -->
+    <ul class="nav nav-pills mb-3 gap-2" id="examHallsTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'layout' or selected_hall_id or not preview_seats.exists %}active{% endif %} rounded-pill fw-bold" id="hall-layout-tab" data-bs-toggle="pill" data-bs-target="#hall-layout-preview" type="button" role="tab">
+                <i class="bi bi-aspect-ratio-fill me-1"></i> 🏛️ المخطط الهندسي وتخطيط القاعات
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'grid' and not selected_hall_id and preview_seats.exists %}active{% endif %} rounded-pill fw-bold" id="grid-view-tab" data-bs-toggle="pill" data-bs-target="#grid-preview" type="button" role="tab">
+                <i class="bi bi-grid-3x3-gap-fill me-1"></i> كروت المقاعد الموزعة
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if active_tab == 'table' %}active{% endif %} rounded-pill fw-bold" id="table-view-tab" data-bs-toggle="pill" data-bs-target="#table-preview" type="button" role="tab">
+                <i class="bi bi-table me-1"></i> الكشف التفصيلي للطلاب والمقاعد
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="examHallsTabContent">
+        <!-- 1. المخطط الهندسي ومعاينة القاعات التفاعلية المباشرة (Visual Seating Plan) -->
+        <div class="tab-pane fade {% if active_tab == 'layout' or selected_hall_id or not preview_seats.exists %}show active{% endif %}" id="hall-layout-preview" role="tabpanel">
+            {% for item in halls_layout_data %}
+            {% if not selected_hall_id or selected_hall_id == item.hall.id|stringformat:"i" %}
+            <div class="hall-plan-card mb-4 p-4 rounded-4 border shadow-sm" id="hall_layout_{{ item.hall.id }}" style="background: rgba(30, 24, 48, 0.7); border-color: rgba(255, 255, 255, 0.1) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom flex-wrap gap-2" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <div>
+                        <h5 class="fw-bold text-warning mb-1">
+                            <i class="bi bi-door-open-fill me-2"></i>{{ item.hall.name }}
+                        </h5>
+                        <div class="d-flex gap-2 flex-wrap text-muted small">
+                            <span><i class="bi bi-geo-alt me-1"></i>الموقع: <strong>{{ item.hall.location|default:"المبنى الرئيسي" }}</strong></span>
+                            <span>•</span>
+                            <span><i class="bi bi-view-stacked me-1"></i>عدد الخطوط: <strong>{{ item.lines_count }} خطوط</strong></span>
+                            <span>•</span>
+                            <span><i class="bi bi-distribute-vertical me-1"></i>الرحلات بكل خط: <strong>{{ item.desks_per_line }} رحلة</strong></span>
+                            <span>•</span>
+                            <span><i class="bi bi-people me-1"></i>طبيعة المقعد: 
+                                {% if item.is_double %}
+                                <strong class="text-warning">مقعد ثنائي (طالبان)</strong>
+                                {% else %}
+                                <strong class="text-primary">مقعد فردي (طالب واحد)</strong>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-3 py-2 fs-6 rounded-pill">
+                            <i class="bi bi-check-circle-fill me-1"></i> السعة الكلية: {{ item.capacity }} مقعد
+                        </span>
+                        {% if item.assigned_seats_count > 0 %}
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 px-3 py-2 fs-6 rounded-pill">
+                            <i class="bi bi-person-fill-check me-1"></i> المشغول: {{ item.assigned_seats_count }} طالب
+                        </span>
+                        {% else %}
+                        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 px-3 py-2 fs-6 rounded-pill">
+                            <i class="bi bi-sparkles me-1"></i> القاعة جاهزة للتوزيع
+                        </span>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editHallModal_{{ item.hall.id }}">
+                            <i class="bi bi-pencil-square me-1"></i> تعديل القاعة
+                        </button>
+                    </div>
+                </div>
+
+                <!-- الهيكل المعماري والرحلات داخل القاعة -->
+                <div class="room-blueprint p-4 rounded-4 border position-relative" style="background: rgba(17, 14, 26, 0.95); border-color: rgba(255, 255, 255, 0.12) !important; overflow-x: auto;">
+                    
+                    <!-- منصة المراقب والسبورة الأمامية (صدر القاعة) -->
+                    <div class="proctor-podium mx-auto mb-4 py-2 px-4 rounded-pill text-center shadow-sm" style="max-width: 480px; background: linear-gradient(135deg, rgba(224, 107, 34, 0.25) 0%, rgba(94, 53, 177, 0.35) 100%); border: 1px solid rgba(224, 107, 34, 0.4);">
+                        <span class="fw-bold text-warning small">
+                            <i class="bi bi-easel-fill me-2"></i>منصة المراقب والسبورة الأمامية (صدر القاعة الامتحانية)
+                        </span>
+                    </div>
+
+                    <!-- رؤوس الخطوط / الأعمدة -->
+                    <div class="d-flex justify-content-around mb-3 text-center text-muted small fw-bold">
+                        <div style="width: 50px;"></div>
+                        {% for c in item.grid_rows.0.cols %}
+                        <div style="flex: 1; max-width: {% if item.is_double %}260px{% else %}160px{% endif %};">
+                            <span class="badge bg-dark border border-secondary text-info px-3 py-1 rounded-pill">
+                                <i class="bi bi-arrow-down-short me-1"></i>الخط {{ c.col_idx }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- شبكة الرحلات والمقاعد -->
+                    <div class="d-flex flex-column gap-3">
+                        {% for row in item.grid_rows %}
+                        <div class="d-flex align-items-center justify-content-around gap-2">
+                            <div class="text-muted small fw-bold text-nowrap px-1" style="width: 50px; font-size: 11px;">
+                                صف {{ row.row_idx }}
+                            </div>
+                            {% for col in row.cols %}
+                            <div class="desk-container p-2 rounded-3 border text-center position-relative" style="flex: 1; max-width: {% if item.is_double %}260px{% else %}160px{% endif %}; background: rgba(30, 24, 48, 0.85); border-color: rgba(255, 255, 255, 0.12) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                                <div class="d-flex justify-content-around gap-1">
+                                    {% for seat in col.seats %}
+                                    <div class="seat-cell p-2 rounded-2 flex-fill border text-center position-relative {% if seat.is_assigned %}border-primary{% else %}border-secondary border-opacity-50{% endif %}" style="background: {% if seat.is_assigned %}rgba(94, 53, 177, 0.25){% else %}rgba(255, 255, 255, 0.03){% endif %}; min-width: 65px;">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="badge {% if seat.is_assigned %}bg-primary{% else %}bg-secondary bg-opacity-50 text-white{% endif %} rounded-pill px-2 py-0" style="font-size: 11px;">
+                                                #{{ seat.seat_number }}
+                                            </span>
+                                            {% if item.is_double %}
+                                            <span class="text-white-50" style="font-size: 9px;">ط{{ seat.desk_pos }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if seat.is_assigned %}
+                                        <div class="fw-bold text-white small text-truncate" title="{{ seat.assignment.student.full_name }}" style="font-size: 11px;">
+                                            {{ seat.assignment.student.full_name }}
+                                        </div>
+                                        <div class="text-white-50 text-truncate" style="font-size: 10px;">
+                                            {{ seat.assignment.student.current_class.name }}
+                                        </div>
+                                        {% else %}
+                                        <div class="text-muted small py-1" style="font-size: 10px;">
+                                            <i class="bi bi-check2 text-success"></i> جاهز
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- المدخل والباب الخلفي للقاعة -->
+                    <div class="room-entrance text-center mt-4 pt-2 border-top border-secondary text-muted small">
+                        <span class="badge bg-dark border border-secondary text-white-50 px-3 py-1 rounded-pill">
+                            <i class="bi bi-door-closed me-1"></i>المدخل والباب الخلفي للقاعة
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <div class="text-center py-5 rounded-4 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                <i class="bi bi-building-x text-muted display-4 d-block mb-2"></i>
+                <h6 class="fw-bold text-secondary">لا توجد قاعات امتحانية مسجلة حتى الآن.</h6>
+                <p class="text-muted small mb-0">يرجى الضغط على زر "إضافة قاعة امتحانية" بالأعلى للبدء في إنشاء وتخطيط القاعات فورياً.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 2. كروت المقاعد الامتحانية التفاعلية (Grid View) -->
+        <div class="tab-pane fade {% if active_tab == 'grid' and not selected_hall_id and preview_seats.exists %}show active{% endif %}" id="grid-preview" role="tabpanel">
+            <div class="row g-3">
+                {% for seat in preview_seats %}
+                <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                    <div class="card card-custom p-3 border rounded-4 shadow-sm h-100 position-relative overflow-hidden">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-primary px-3 py-1 rounded-pill fs-6 fw-bold">
+                                مقعد #{{ seat.seat_number }}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill small">
+                                {{ seat.exam_hall.name }}
+                            </span>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-1">{{ seat.student.full_name }}</h6>
+                        <div class="text-muted small mb-2">
+                            {{ seat.student.current_class.name }} - شعبة {{ seat.student.section.name|default:"أ" }}
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top small text-muted">
+                            <span class="fw-bold text-primary">مقعد رقم: {{ seat.seat_number }}</span>
+                            <span>صف {{ seat.desk_row|default:"1" }} / عمود {{ seat.desk_col|default:"1" }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-5 rounded-4 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <i class="bi bi-inbox text-muted display-4 d-block mb-2"></i>
+                    <h6 class="fw-bold text-secondary">لا توجد مقاعد مسجلة للمعاينة بحسب الفلاتر المحددة.</h6>
+                    <p class="text-muted small mb-0">يرجى تشغيل خوارزمية التوزيع الذكي للمقاعد بالأسفل لتوزيع الطلاب على القاعات تلقائياً.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 3. جدول الكشوفات الرسمية (Table View) -->
+        <div class="tab-pane fade {% if active_tab == 'table' %}show active{% endif %}" id="table-preview" role="tabpanel">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 10%;">رقم المقعد</th>
+                            <th style="width: 15%;">القاعة</th>
+                            <th style="width: 38%;">اسم الطالب الرباعي واللقب</th>
+                            <th style="width: 22%;">المرحلة والشعبة</th>
+                            <th style="width: 15%;">موقع الرحلة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for seat in preview_seats %}
+                        <tr>
+                            <td class="fw-bold fs-6 text-warning">{{ seat.seat_number }}</td>
+                            <td><span class="badge" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">{{ seat.exam_hall.name }}</span></td>
+                            <td class="text-start fw-bold pe-3">{{ seat.student.full_name }}</td>
+                            <td>{{ seat.student.current_class.name }} - شعبة {{ seat.student.section.name|default:"أ" }}</td>
+                            <td class="small text-muted">خط {{ seat.desk_col|default:"1" }} / رحلة {{ seat.desk_row|default:"1" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-muted py-4">لا توجد مقاعد مسجلة حالياً.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="row g-4 mb-4" dir="rtl">
     <!-- تشغيل خوارزمية توزيع المقاعد ومكافحة الغش -->
     <div class="col-12 col-lg-7">
-        <div class="card p-4 shadow-sm border-start border-primary border-4 h-100">
+        <div class="card card-custom p-4 shadow-sm border-start border-primary border-4 h-100">
             <h5 class="fw-bold text-primary mb-2">
                 <i class="bi bi-cpu-fill me-1"></i> خوارزمية توزيع المقاعد الذكية (مكافحة الغش)
             </h5>
@@ -53,9 +367,9 @@
                     <div class="row g-2">
                         {% for cls in classes %}
                         <div class="col-6 col-md-4">
-                            <div class="form-check border p-2 rounded bg-light">
+                            <div class="form-check border p-2 rounded" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
                                 <input class="form-check-input ms-2" type="checkbox" name="classes" value="{{ cls.id }}" id="cls_{{ cls.id }}" checked>
-                                <label class="form-check-label fw-bold small" for="cls_{{ cls.id }}">{{ cls.name }}</label>
+                                <label class="form-check-label fw-bold small text-white" for="cls_{{ cls.id }}">{{ cls.name }}</label>
                             </div>
                         </div>
                         {% empty %}
@@ -65,40 +379,40 @@
                 </div>
 
                 <button type="submit" name="distribute_seats" class="btn btn-primary w-100 py-2 fw-bold mt-2 shadow-sm rounded-pill">
-                    <i class="bi bi-shuffle me-1"></i> بدء التوزيع الذكي للمقاعد وتوليد القوائم
+                    <i class="bi bi-shuffle me-1"></i> توليد وتوزيع الطلاب آلياً (مكافحة الغش)
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- طباعة الملصقات والشيتات المعتمدة للدورات -->
+    <!-- طباعة وثائق ولواصق الدورات -->
     <div class="col-12 col-lg-5">
-        <div class="card p-4 shadow-sm border-start border-success border-4 h-100">
+        <div class="card card-custom p-4 shadow-sm border-start border-success border-4 h-100">
             <h5 class="fw-bold text-success mb-2">
-                <i class="bi bi-printer-fill me-1"></i> طباعة وثائق القاعات الامتحانية
+                <i class="bi bi-printer-fill me-1"></i> وثائق وطباعة اللجان الامتحانية
             </h5>
             <p class="text-muted small mb-3">
-                طباعة ملصقات المقاعد (Desk Stickers) وقوائم تفقد الحضور والغياب اليومية للجان الامتحانية.
+                طباعة ملصقات المقاعد (لواصق المقاعد الامتحانية) وقوائم تفقد الحضور والغياب اليومية للجان الامتحانية المدرسية.
             </p>
 
             <div class="list-group">
                 {% for session in sessions %}
-                <div class="list-group-item p-3 mb-2 border rounded">
-                    <h6 class="fw-bold mb-1 text-dark">{{ session.title }}</h6>
-                    <div class="small text-muted mb-2">
+                <div class="list-group-item p-3 mb-2 border rounded-4 shadow-sm" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <h6 class="fw-bold mb-1 text-white">{{ session.title }}</h6>
+                    <div class="small text-white-50 mb-2">
                         السنة: {{ session.academic_year.name|default:"---" }} | القاعات المخصصة: {{ session.halls.count }}
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <a href="{% url 'print_exam_labels' session.id %}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3">
-                            <i class="bi bi-tags me-1"></i> ملصقات المقاعد
+                        <a href="{% url 'print_exam_labels' session.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
+                            <i class="bi bi-tags me-1"></i> لواصق المقاعد
                         </a>
-                        <a href="{% url 'print_exam_attendance' session.id %}" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                        <a href="{% url 'print_exam_attendance' session.id %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold">
                             <i class="bi bi-card-checklist me-1"></i> شيت الحضور
                         </a>
                     </div>
                 </div>
                 {% empty %}
-                <div class="text-center text-muted py-4 border rounded bg-light">
+                <div class="text-center text-muted py-4 border rounded" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
                     <i class="bi bi-calendar-x fs-2 d-block mb-1 opacity-50"></i>
                     لم يتم تسجيل دورات امتحانية حتى الآن.<br>
                     <button class="btn btn-sm btn-success rounded-pill mt-2 px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#newSessionModal">
@@ -114,39 +428,61 @@
 <!-- جدول القاعات الامتحانية المسجلة وسعاتها -->
 <div class="row" dir="rtl">
     <div class="col-12">
-        <div class="card p-4 shadow-sm">
+        <div class="card card-custom p-4 shadow-sm">
             <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-                <h6 class="fw-bold text-secondary mb-0">
-                    <i class="bi bi-building-fill-check me-1"></i> بيانات وسعات القاعات الامتحانية بالمدرسة
+                <h6 class="fw-bold text-white mb-0">
+                    <i class="bi bi-building-fill-check text-warning me-1"></i> بيانات وسعات القاعات الامتحانية بالمدرسة
                 </h6>
-                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#newHallModal">
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#newHallModal">
                     <i class="bi bi-plus-circle me-1"></i> إضافة قاعة جديدة
                 </button>
             </div>
 
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13px;">
-                    <thead class="table-light">
+                    <thead>
                         <tr>
                             <th>اسم / رقم القاعة</th>
                             <th>الموقع / الجناح</th>
-                            <th>السعة الكلية للمقاعد</th>
-                            <th>مصفوفة المقاعد (صفوف × أعمدة)</th>
+                            <th>عدد الخطوط</th>
+                            <th>طبيعة المقعد / الرحلة</th>
+                            <th>عدد الرحلات بكل خط</th>
+                            <th>السعة الاستيعابية</th>
+                            <th style="width: 250px;">إجراءات المعاينة والتحكم</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for hall in halls %}
                         <tr>
-                            <td class="fw-bold text-primary">{{ hall.name }}</td>
+                            <td class="fw-bold text-warning fs-6">{{ hall.name }}</td>
                             <td>{{ hall.location|default:"المبنى الرئيسي" }}</td>
-                            <td><span class="badge bg-success fs-6">{{ hall.capacity }} طالب</span></td>
-                            <td>{{ hall.rows_count }} صفوف × {{ hall.cols_count }} أعمدة</td>
+                            <td><span class="badge bg-info text-dark rounded-pill px-3 py-1 fw-bold">{{ hall.lines_count|default:hall.cols_count }} خطوط</span></td>
+                            <td>
+                                {% if hall.desk_type == 'double' %}
+                                <span class="badge bg-warning text-dark rounded-pill px-3 py-1 fw-bold"><i class="bi bi-people-fill me-1"></i>مقعد ثنائي (طالبان)</span>
+                                {% else %}
+                                <span class="badge bg-primary rounded-pill px-3 py-1 fw-bold"><i class="bi bi-person-fill me-1"></i>مقعد فردي (طالب واحد)</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ hall.desks_per_line|default:hall.rows_count }} رحلة</td>
+                            <td><span class="badge bg-success fs-6 rounded-pill px-3 py-1">{{ hall.capacity }} طالب</span></td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                    <a href="{% url 'portal_exam_halls' %}?hall_id={{ hall.id }}&tab=layout#hall_layout_{{ hall.id }}" class="btn btn-sm btn-outline-info rounded-pill px-2 fw-bold">
+                                        <i class="bi bi-eye-fill me-1"></i> معاينة القاعة
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-2 fw-bold" data-bs-toggle="modal" data-bs-target="#editHallModal_{{ hall.id }}">
+                                        <i class="bi bi-pencil-square me-1"></i> تعديل
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 fw-bold" data-bs-toggle="modal" data-bs-target="#deleteHallModal_{{ hall.id }}">
+                                        <i class="bi bi-trash3-fill me-1"></i> حذف
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-muted py-4">
-                                لا توجد قاعات مسجلة بالمدرسة بعد. اضغط على زر "إضافة قاعة جديدة" بالأعلى لتسجيل القاعات وسعاتها.
-                            </td>
+                            <td colspan="7" class="text-muted py-4">لم يتم تسجيل أي قاعات امتحانية حتى الآن.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -161,34 +497,40 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow">
             <div class="modal-header bg-success text-white">
-                <h6 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>إضافة دورة امتحانية جديدة</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h6 class="modal-title fw-bold"><i class="bi bi-calendar2-plus-fill me-2"></i>إنشاء دورة امتحانية جديدة</h6>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{% url 'portal_exam_halls' %}">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="create_session">
-                <div class="modal-body p-4 text-start">
+                <div class="modal-body p-4 text-start" dir="rtl">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">اسم الدورة الامتحانية:</label>
-                        <input type="text" name="title" class="form-control" placeholder="مثال: امتحانات نصف السنة 2026-2027" required>
+                        <label class="form-label small fw-bold">اسم / عنوان الدورة الامتحانية:</label>
+                        <input type="text" name="title" class="form-control fw-bold" placeholder="مثال: امتحانات نصف السنة - الدور الأول" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold mb-2">القاعات المعتمدة لهذه الدورة:</label>
-                        {% for h in halls %}
-                        <div class="form-check mb-1">
-                            <input class="form-check-input ms-2" type="checkbox" name="halls" value="{{ h.id }}" id="sh_{{ h.id }}" checked>
-                            <label class="form-check-label small" for="sh_{{ h.id }}">{{ h.name }} (سعة: {{ h.capacity }} مقعد)</label>
+                        <label class="form-label small fw-bold text-muted">العام الدراسي المعتمد:</label>
+                        <div class="p-2 rounded-3 border d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.05);">
+                            <span class="fw-bold text-primary"><i class="bi bi-calendar-check me-2"></i>{{ current_year.name|default:"2026-2027" }}</span>
+                            <span class="badge bg-success px-2 py-1">العام الدراسي الفعال تلقائياً 🟢</span>
+                        </div>
+                        <small class="text-muted" style="font-size: 11px;">يتم ربط الدورة الامتحانية بالعام الدراسي الفعال حالياً بصورة آلية دون الحاجة لتحديده يدوياً.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">القاعات المعتمدة لهذه الدورة:</label>
+                        {% for hall in halls %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="halls" value="{{ hall.id }}" id="hall_{{ hall.id }}" checked>
+                            <label class="form-check-label small" for="hall_{{ hall.id }}">{{ hall.name }} (سعة: {{ hall.capacity }})</label>
                         </div>
                         {% empty %}
-                        <div class="alert alert-warning small py-2 mb-0">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i> يرجى إضافة قاعات أولاً لتحديدها ضمن هذه الدورة الامتحانية.
-                        </div>
+                        <small class="text-danger">يرجى إضافة قاعة امتحانية أولاً قبل إنشاء الدورة.</small>
                         {% endfor %}
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer border-top border-0 justify-content-center" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                     <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">حفظ الدورة</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">حفظ الدورة</button>
                 </div>
             </form>
         </div>
@@ -200,40 +542,168 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow">
             <div class="modal-header bg-primary text-white">
-                <h6 class="modal-title fw-bold"><i class="bi bi-door-open me-2"></i>إضافة قاعة امتحانية</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h6 class="modal-title fw-bold"><i class="bi bi-door-open me-2"></i>إضافة قاعة امتحانية جديدة</h6>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{% url 'portal_exam_halls' %}">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="create_hall">
-                <div class="modal-body p-4 text-start">
+                <div class="modal-body p-4 text-start" dir="rtl">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">اسم أو رقم القاعة:</label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: القاعة رقم 1" required>
+                        <input type="text" name="name" class="form-control fw-bold" placeholder="مثال: القاعة رقم 1 (أو قاعة الخوارزمي)" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">الموقع / الجناح (اختياري):</label>
                         <input type="text" name="location" class="form-control" placeholder="مثال: الطابق الثاني - الجناح الأيمن">
                     </div>
-                    <div class="row g-2 mb-2">
+                    <div class="row g-3 mb-3">
                         <div class="col-6">
-                            <label class="form-label small fw-bold">عدد الصفوف (Rows):</label>
-                            <input type="number" name="rows_count" class="form-control" value="6" min="1" required>
+                            <label class="form-label small fw-bold">عدد الخطوط في القاعة:</label>
+                            <input type="number" name="lines_count" id="new_lines_count" class="form-control fw-bold" value="3" min="1" max="10" oninput="recalcNewCapacity()" required>
+                            <small class="text-muted">خطان، 3 خطوط، 4 أو أكثر</small>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-bold">عدد الأعمدة (Columns):</label>
-                            <input type="number" name="cols_count" class="form-control" value="4" min="1" required>
+                            <label class="form-label small fw-bold">طبيعة المقعد / الرحلة:</label>
+                            <select name="desk_type" id="new_desk_type" class="form-select fw-bold" onchange="recalcNewCapacity()" required>
+                                <option value="single" selected>مقعد فردي (طالب واحد)</option>
+                                <option value="double">مقعد ثنائي (طالبان)</option>
+                            </select>
+                            <small class="text-muted">فردي أو رحلة مزدوجة</small>
                         </div>
                     </div>
-                    <small class="text-muted d-block mt-1">يتم احتساب السعة الكلية تلقائياً (الصفوف × الأعمدة).</small>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">عدد الرحلات في كل خط:</label>
+                        <input type="number" name="desks_per_line" id="new_desks_per_line" class="form-control fw-bold" value="6" min="1" max="30" oninput="recalcNewCapacity()" required>
+                        <small class="text-muted">عدد المقاعد المتتالية طولياً في كل خط</small>
+                    </div>
+                    <div class="p-3 rounded-3 text-center border" style="background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15) !important;">
+                        <span class="text-muted small d-block mb-1">السعة الاستيعابية المحتسبة تلقائياً:</span>
+                        <span class="badge bg-success fs-5 px-4 py-2 rounded-pill" id="new_hall_capacity_badge">18 طالب</span>
+                    </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer border-top border-0 justify-content-center" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                     <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">حفظ القاعة</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">حفظ القاعة</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-{% endblock %}
 
+<!-- نوافذ تعديل وحذف القاعات الامتحانية (Modals لكل قاعة) -->
+{% for hall in halls %}
+<!-- نافذة تعديل القاعة -->
+<div class="modal fade" id="editHallModal_{{ hall.id }}" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h6 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>تعديل بيانات القاعة ({{ hall.name }})</h6>
+                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'portal_exam_halls' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="edit_hall">
+                <input type="hidden" name="hall_id" value="{{ hall.id }}">
+                <div class="modal-body p-4 text-start" dir="rtl">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">اسم أو رقم القاعة:</label>
+                        <input type="text" name="name" class="form-control fw-bold" value="{{ hall.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">الموقع / الجناح:</label>
+                        <input type="text" name="location" class="form-control" value="{{ hall.location|default:'' }}">
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">عدد الخطوط:</label>
+                            <input type="number" name="lines_count" id="edit_lines_{{ hall.id }}" class="form-control fw-bold" value="{{ hall.lines_count|default:hall.cols_count }}" min="1" max="10" oninput="recalcEditCapacity('{{ hall.id }}')" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">طبيعة المقعد / الرحلة:</label>
+                            <select name="desk_type" id="edit_desk_type_{{ hall.id }}" class="form-select fw-bold" onchange="recalcEditCapacity('{{ hall.id }}')" required>
+                                <option value="single" {% if hall.desk_type == 'single' %}selected{% endif %}>مقعد فردي (طالب واحد)</option>
+                                <option value="double" {% if hall.desk_type == 'double' %}selected{% endif %}>مقعد ثنائي (طالبان)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">عدد الرحلات في كل خط:</label>
+                        <input type="number" name="desks_per_line" id="edit_desks_{{ hall.id }}" class="form-control fw-bold" value="{{ hall.desks_per_line|default:hall.rows_count }}" min="1" max="30" oninput="recalcEditCapacity('{{ hall.id }}')" required>
+                    </div>
+                    <div class="p-3 rounded-3 text-center border" style="background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.15) !important;">
+                        <span class="text-muted small d-block mb-1">السعة الاستيعابية المحدثة:</span>
+                        <span class="badge bg-success fs-5 px-4 py-2 rounded-pill" id="edit_capacity_badge_{{ hall.id }}">{{ hall.capacity }} طالب</span>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-0 justify-content-center" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm text-dark">حفظ التعديلات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة تأكيد حذف القاعة -->
+<div class="modal fade" id="deleteHallModal_{{ hall.id }}" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h6 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>تأكيد حذف القاعة الامتحانية</h6>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'portal_exam_halls' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action_type" value="delete_hall">
+                <input type="hidden" name="hall_id" value="{{ hall.id }}">
+                <div class="modal-body p-4 text-center" dir="rtl">
+                    <i class="bi bi-trash3-fill text-danger display-4 d-block mb-3"></i>
+                    <h6 class="fw-bold mb-2">هل أنت متأكد تماماً من حذف القاعة ({{ hall.name }})؟</h6>
+                    <p class="text-muted small mb-0">
+                        سيؤدي هذا الإجراء إلى حذف القاعة نهائياً وإلغاء توزيع أي مقاعد كانت مخصصة لطلابها في الدورات الامتحانية الحالية.
+                    </p>
+                </div>
+                <div class="modal-footer border-top border-0 justify-content-center" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">تراجع</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">نعم، احذف القاعة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+function recalcNewCapacity() {
+    var lines = parseInt(document.getElementById('new_lines_count').value) || 1;
+    var desks = parseInt(document.getElementById('new_desks_per_line').value) || 1;
+    var type = document.getElementById('new_desk_type').value;
+    var mult = (type === 'double') ? 2 : 1;
+    var cap = lines * desks * mult;
+    var badge = document.getElementById('new_hall_capacity_badge');
+    if (badge) badge.innerText = cap + ' طالب';
+}
+
+function recalcEditCapacity(hallId) {
+    var lines = parseInt(document.getElementById('edit_lines_' + hallId).value) || 1;
+    var desks = parseInt(document.getElementById('edit_desks_' + hallId).value) || 1;
+    var type = document.getElementById('edit_desk_type_' + hallId).value;
+    var mult = (type === 'double') ? 2 : 1;
+    var cap = lines * desks * mult;
+    var badge = document.getElementById('edit_capacity_badge_' + hallId);
+    if (badge) badge.innerText = cap + ' طالب';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var tab = urlParams.get('tab');
+    if (tab === 'layout' || window.location.hash.indexOf('hall_layout_') !== -1) {
+        var layoutBtn = document.getElementById('hall-layout-tab');
+        if (layoutBtn && window.bootstrap && window.bootstrap.Tab) {
+            new bootstrap.Tab(layoutBtn).show();
+        }
+    }
+});
+</script>
+{% endblock %}

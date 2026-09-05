@@ -1,137 +1,367 @@
-﻿{% extends 'portal/base_portal.html' %}
-{% block title %}الرئيسية - منظومة الإدارة المدرسية الحديثة{% endblock %}
-{% block content %}
+{% extends 'portal/base_portal.html' %}
 
-<!-- هوية المدرسة -->
-<div class="card-custom mb-4">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div>
-            <h4 class="fw-bold text-primary mb-1">{{ school.school_name|default:"اسم المدرسة / المؤسسة التعليمية" }}</h4>
-            <div class="text-muted small">
-                {{ school.directorate|default:"المديرية العامة للتربية" }} - {{ school.sub_directorate|default:"قسم التربية" }}
-                <span style="display:inline-block; margin: 0 8px;">•</span>
-                <span style="color:#059669; font-weight:bold;">الاشتراك مفعل</span>
+
+{% block title %}الرئيسية - منظومة الإدارة المدرسية الشاملة{% endblock %}
+
+
+{% block content %}
+<!-- بطاقة هوية المدرسة وتحديد العام الدراسي وحالة الاشتراك -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card card-custom p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <h4 class="fw-bold text-primary mb-0">{{ school.school_name }}</h4>
+                        {% if not school.is_trial_or_license_valid %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1 small">
+                                <i class="bi bi-exclamation-octagon-fill me-1"></i> انتهت فترة التجربة / الصلاحية
+                            </span>
+                        {% elif school.is_trial %}
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3 py-1 small">
+                                <i class="bi bi-clock-history me-1"></i> نسخة تجريبية (متبقي {{ school.days_remaining }} يوم)
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 small">
+                                <i class="bi bi-patch-check-fill me-1"></i> اشتراك مفعّل رسمياً (متبقي {{ school.days_remaining }} يوم)
+                            </span>
+                        {% endif %}
+                    </div>
+                    <p class="text-muted small mb-0">{{ school.directorate }} - {{ school.sub_directorate }}{% if school.director_name %} | إدارة: {{ school.director_name }}{% endif %}</p>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <form method="POST" action="{% url 'portal_set_current_year' %}"
+                        class="d-flex align-items-center gap-2">
+                        {% csrf_token %}
+                        <span class="badge p-2" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">العام الفعال:</span>
+                        <select name="year_id" class="form-select form-select-sm rounded-pill"
+                            onchange="this.form.submit()">
+                            {% for yr in academic_years %}
+                            <option value="{{ yr.id }}" {% if yr.is_current %}selected{% endif %}>
+                                {{ yr.name }}{% if yr.is_current %} (الحالي){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
             </div>
-        </div>
-        <div>
-            <form method="POST" action="{% url 'portal_set_current_year' %}" class="d-flex align-items-center gap-2">
-                {% csrf_token %}
-                <label class="small fw-bold text-muted">العام الفعال:</label>
-                <select name="academic_year_id" class="form-select" onchange="this.form.submit()">
-                    {% for year in academic_years %}
-                        <option value="{{ year.id }}" {% if year.is_current %}selected{% endif %}>{{ year.name }}</option>
-                    {% endfor %}
-                </select>
-            </form>
         </div>
     </div>
 </div>
 
 <!-- 1. شؤون الطلاب والقيود -->
-<div class="portal-section-title">شؤون الطلاب والقيود</div>
-<div class="portal-grid">
-    <a href="{% url 'portal_general_registry' %}" class="portal-btn-card">
-        <span class="card-icon">📖</span>
-        <span class="card-label">القيد العام</span>
-    </a>
-    <a href="{% url 'portal_students_manage' %}" class="portal-btn-card">
-        <span class="card-icon">👨‍🎓</span>
-        <span class="card-label">الطلاب والقبول</span>
-    </a>
-    <a href="{% url 'portal_parents_manage' %}" class="portal-btn-card">
-        <span class="card-icon">👨‍👩‍👧‍👦</span>
-        <span class="card-label">أولياء الأمور</span>
-    </a>
-    <a href="{% url 'portal_attendance_manage' %}" class="portal-btn-card">
-        <span class="card-icon">📅</span>
-        <span class="card-label">الحضور والغياب</span>
-    </a>
-    <a href="{% url 'portal_general_registry' %}?status=graduated" class="portal-btn-card">
-        <span class="card-icon">🎓</span>
-        <span class="card-label">أرشيف التخرج</span>
-    </a>
-    <a href="{% url 'portal_settings' %}" class="portal-btn-card">
-        <span class="card-icon">🛡️</span>
-        <span class="card-label">حالة الاشتراك</span>
-    </a>
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary mb-1"><i class="bi bi-grid-3x3-gap-fill me-2"></i>شؤون الطلاب والقيود</h6>
+    </div>
+
+    <!-- سجل القيد العام -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_general_registry' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-purple">
+                <i class="bi bi-journal-bookmark-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">القيد العام</span>
+        </a>
+    </div>
+
+    <!-- إدارة وتسجيل الطلاب -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_students_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-amber">
+                <i class="bi bi-person-plus-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">الطلاب والقبول</span>
+        </a>
+    </div>
+
+    <!-- أولياء الأمور -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_parents_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-blue">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">أولياء الأمور</span>
+        </a>
+    </div>
+
+    <!-- سجل الحضور والغياب اليومي -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_attendance_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-coral">
+                <i class="bi bi-calendar-check-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">الحضور والغياب</span>
+        </a>
+    </div>
+
+    <!-- أرشيف المسيرة الأكاديمية والتخرج -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_general_registry' %}?status=graduated" class="app-grid-btn">
+            <div class="app-icon-circle icon-mint">
+                <i class="bi bi-mortarboard-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">أرشيف التخرج</span>
+        </a>
+    </div>
+
+    <!-- تفعيل الاشتراك والترخيص (يفتح نافذة المودال مباشرة) -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#activationModal" class="app-grid-btn">
+            <div class="app-icon-circle icon-pink">
+                <i class="bi bi-patch-check-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">حالة الاشتراك</span>
+        </a>
+    </div>
 </div>
 
 <!-- 2. التعليم والهيئة التدريسية -->
-<div class="portal-section-title">التعليم والهيئة التدريسية</div>
-<div class="portal-grid">
-    <a href="{% url 'portal_teachers_manage' %}" class="portal-btn-card">
-        <span class="card-icon">👨‍🏫</span>
-        <span class="card-label">الكادر التدريسي</span>
-    </a>
-    <a href="{% url 'portal_classes_manage' %}" class="portal-btn-card">
-        <span class="card-icon">🏫</span>
-        <span class="card-label">الصفوف والمراحل</span>
-    </a>
-    <a href="{% url 'portal_classes_manage' %}" class="portal-btn-card">
-        <span class="card-icon">👥</span>
-        <span class="card-label">الشعب الدراسية</span>
-    </a>
-    <a href="{% url 'portal_subjects_manage' %}" class="portal-btn-card">
-        <span class="card-icon">📚</span>
-        <span class="card-label">المواد والمناهج</span>
-    </a>
-    <a href="{% url 'portal_timetable' %}" class="portal-btn-card">
-        <span class="card-icon">🗓️</span>
-        <span class="card-label">جدول الحصص</span>
-    </a>
-    <a href="{% url 'portal_grades_manage' %}" class="portal-btn-card">
-        <span class="card-icon">📝</span>
-        <span class="card-label">رصد الدرجات</span>
-    </a>
-</div>
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary mb-1"><i class="bi bi-book-half me-2"></i>التعليم والهيئة التدريسية</h6>
+    </div>
 
-<!-- 3. السجلات الرسمية والامتحانات -->
-<div class="portal-section-title">السجلات الرسمية والامتحانات</div>
-<div class="portal-grid">
-    <a href="{% url 'portal_records_manage' %}" class="portal-btn-card">
-        <span class="card-icon">📁</span>
-        <span class="card-label">السجلات المدرسية</span>
-    </a>
-    <a href="{% url 'portal_records_manage' %}?tab=midyear" class="portal-btn-card">
-        <span class="card-icon">📊</span>
-        <span class="card-label">السجل الوسطي</span>
-    </a>
-    <a href="{% url 'portal_records_manage' %}?tab=master" class="portal-btn-card">
-        <span class="card-icon">📑</span>
-        <span class="card-label">القوائم الجامعة</span>
-    </a>
-    <a href="{% url 'portal_exam_halls' %}" class="portal-btn-card">
-        <span class="card-icon">🪑</span>
-        <span class="card-label">القاعات والجلوس</span>
-    </a>
-    <a href="{% url 'portal_letter_builder' %}" class="portal-btn-card">
-        <span class="card-icon">✉️</span>
-        <span class="card-label">صانع الكتب</span>
-    </a>
-    <a href="{% url 'portal_promotion' %}" class="portal-btn-card">
-        <span class="card-icon">🔄</span>
-        <span class="card-label">الترحيل السنوي</span>
-    </a>
-</div>
+    <!-- الكادر التدريسي -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_teachers_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-mint">
+                <i class="bi bi-person-workspace"></i>
+            </div>
+            <span class="fw-bold small text-center">الكادر التدريسي</span>
+        </a>
+    </div>
 
-<!-- الإحصائيات السريعة -->
-<div class="stats-grid">
-    <div class="stat-card green">
-        <div class="text-muted small fw-bold">الطلاب المسجلون</div>
-        <div class="stat-number">{{ total_students|default:"0" }}</div>
+    <!-- المراحل والصفوف -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_classes_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-blue">
+                <i class="bi bi-door-open-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">الصفوف والمراحل</span>
+        </a>
     </div>
-    <div class="stat-card blue">
-        <div class="text-muted small fw-bold">الكادر التدريسي</div>
-        <div class="stat-number">{{ total_teachers|default:"0" }}</div>
+
+    <!-- الشعب المدرسية -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_classes_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-purple">
+                <i class="bi bi-diagram-2-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">الشعب الدراسية</span>
+        </a>
     </div>
-    <div class="stat-card yellow">
-        <div class="text-muted small fw-bold">المراحل والصفوف</div>
-        <div class="stat-number">{{ total_classes|default:"0" }}</div>
+
+    <!-- المواد والكتب المقررة -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_subjects_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-amber">
+                <i class="bi bi-journal-text"></i>
+            </div>
+            <span class="fw-bold small text-center">المواد والمناهج</span>
+        </a>
     </div>
-    <div class="stat-card purple">
-        <div class="text-muted small fw-bold">الكتب والمراسلات</div>
-        <div class="stat-number">{{ total_letters|default:"0" }}</div>
+
+    <!-- جدول الحصص الأسبوعي -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_timetable' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-mint">
+                <i class="bi bi-calendar3"></i>
+            </div>
+            <span class="fw-bold small text-center">جدول الحصص</span>
+        </a>
+    </div>
+
+    <!-- رصد الدرجات -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_grades_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-pink">
+                <i class="bi bi-award-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">رصد الدرجات</span>
+        </a>
     </div>
 </div>
 
+<!-- 3. السجلات المدرسية والوثائق الأصولية -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary mb-1"><i class="bi bi-folder2-open me-2"></i>السجلات الرسمية والقوائم الامتحانية</h6>
+    </div>
+
+    <!-- السجلات وقوائم الدرجات الشاملة -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_records_manage' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-blue">
+                <i class="bi bi-journal-check"></i>
+            </div>
+            <span class="fw-bold small text-center">السجلات المدرسية</span>
+        </a>
+    </div>
+
+    <!-- السجل الوسطي المباشر -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_records_manage' %}?record_type=middle_record" class="app-grid-btn">
+            <div class="app-icon-circle icon-coral">
+                <i class="bi bi-table"></i>
+            </div>
+            <span class="fw-bold small text-center">السجل الوسطي</span>
+        </a>
+    </div>
+
+    <!-- القوائم الجامعة (الشيت العام) -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_records_manage' %}?record_type=master_sheet" class="app-grid-btn">
+            <div class="app-icon-circle icon-purple">
+                <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">القوائم الجامعة</span>
+        </a>
+    </div>
+
+    <!-- قوائم الامتحان الشفهي -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_records_manage' %}?record_type=oral_exam" class="app-grid-btn">
+            <div class="app-icon-circle icon-mint">
+                <i class="bi bi-mic-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">قوائم الشفهي</span>
+        </a>
+    </div>
+
+    <!-- البطاقة المدرسية والقيد الفردي -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_records_manage' %}?record_type=individual_record" class="app-grid-btn">
+            <div class="app-icon-circle icon-amber">
+                <i class="bi bi-person-lines-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">البطاقة المدرسية</span>
+        </a>
+    </div>
+
+    <!-- سجل درجات المدرسين -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_records_manage' %}?record_type=teacher_grades" class="app-grid-btn">
+            <div class="app-icon-circle icon-pink">
+                <i class="bi bi-clipboard2-data-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">درجات المدرسين</span>
+        </a>
+    </div>
+
+    <!-- كارتات نتائج الطلبة -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_student_result_cards' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-indigo">
+                <i class="bi bi-person-badge-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">كارتات النتائج</span>
+        </a>
+    </div>
+</div>
+
+<!-- 4. الامتحانات والترحيل والإدارة الرسمية -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <h6 class="fw-bold text-secondary mb-1"><i class="bi bi-shield-check me-2"></i>الامتحانات والترحيل والإدارة الرسمية</h6>
+    </div>
+
+    <!-- القاعات ومكافحة الغش -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_exam_halls' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-purple">
+                <i class="bi bi-card-checklist"></i>
+            </div>
+            <span class="fw-bold small text-center">القاعات والجلوس</span>
+        </a>
+    </div>
+
+    <!-- الدورات الامتحانية -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_exam_halls' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-blue">
+                <i class="bi bi-calendar2-range-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">الدورات الامتحانية</span>
+        </a>
+    </div>
+
+    <!-- صانع الكتب والتأييدات -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_letter_builder' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-coral">
+                <i class="bi bi-file-earmark-text-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">صانع الكتب</span>
+        </a>
+    </div>
+
+    <!-- الأرشيف المركزي والكتب الرسمية -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_official_archive' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-mint">
+                <i class="bi bi-archive-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">الأرشيف المركزي</span>
+        </a>
+    </div>
+
+    <!-- محرك الترحيل السنوي -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_promotion' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-pink">
+                <i class="bi bi-arrow-repeat"></i>
+            </div>
+            <span class="fw-bold small text-center">الترحيل السنوي</span>
+        </a>
+    </div>
+
+    <!-- إعدادات وهوية المدرسة -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="{% url 'portal_settings' %}" class="app-grid-btn">
+            <div class="app-icon-circle icon-amber">
+                <i class="bi bi-gear-fill"></i>
+            </div>
+            <span class="fw-bold small text-center">إعدادات وهوية</span>
+        </a>
+    </div>
+
+    <!-- دليل الاستخدام الشامل للمنظومة -->
+    <div class="col-4 col-md-3 col-lg-2">
+        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#userGuideModal" class="app-grid-btn" style="border-color: rgba(255, 107, 53, 0.45);">
+            <div class="app-icon-circle icon-orange">
+                <i class="bi bi-book-half"></i>
+            </div>
+            <span class="fw-bold small text-center" style="color: #FF6B35;">دليل الاستخدام</span>
+        </a>
+    </div>
+</div>
+
+<!-- بطاقات الإحصائيات -->
+<div class="row g-3">
+    <div class="col-6 col-md-3">
+        <div class="card card-custom p-3 text-center border-bottom border-primary border-4">
+            <h6 class="text-muted small mb-1">الطلاب المسجلون</h6>
+            <h4 class="fw-bold mb-0 text-primary">{{ students_count }}</h4>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card card-custom p-3 text-center border-bottom border-success border-4">
+            <h6 class="text-muted small mb-1">الكادر التدريسي</h6>
+            <h4 class="fw-bold mb-0 text-success">{{ teachers_count }}</h4>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card card-custom p-3 text-center border-bottom border-info border-4">
+            <h6 class="text-muted small mb-1">المراحل والصفوف</h6>
+            <h4 class="fw-bold mb-0 text-info">{{ classes_count }}</h4>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card card-custom p-3 text-center border-bottom border-warning border-4">
+            <h6 class="text-muted small mb-1">الكتب والمراسلات</h6>
+            <h4 class="fw-bold mb-0 text-warning">{{ pending_docs }}</h4>
+        </div>
+    </div>
+</div>
 {% endblock %}

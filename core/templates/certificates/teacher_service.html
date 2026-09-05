@@ -1,0 +1,46 @@
+{% extends "certificates/base_doc.html" %}
+
+{% block title %}تأييد استمرار بالخدمة - {{ teacher.user.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="doc-title-container">
+    <div class="doc-title">تأييد استمرار بالخدمة</div>
+</div>
+
+<div class="doc-body">
+    <p style="margin-bottom: 20px; font-weight: bold; font-size: 16px;">
+        إلى / {{ destination|default:"إلى من يهمه الأمر" }}
+    </p>
+
+    <p style="margin-bottom: 25px;">
+        م / <u>تأييد استمرار بالخدمة الوظيفية</u>
+    </p>
+
+    <p style="text-indent: 30px; line-height: 2.2;">
+        نؤيد لكم بأن السيد/السيدة <strong>{{ teacher.user.get_full_name }}</strong>،
+        الذي يحمل العنوان الوظيفي <strong>({{ teacher.job_title|default:"مدرس / معلم" }})</strong>
+        والرقم الإحصائي <strong>({{ teacher.statistical_code|default:"------" }})</strong>،
+        مستمر/ة بالخدمة الفعلية والدوام الرسمي في مدرستنا منذ تاريخ مباشرته/ا في
+        <strong>{{ teacher.hire_date|default:"تاريخ المباشرة الرسمي" }}</strong>
+        ولحد تاريخ تحرير هذا الكتاب، وهو/هي غير منقطع/ة عن العمل ولا يزال/تزال يمارس/تمارس مهامه/ا التعليمية والتربوية على أكمل وجه.
+    </p>
+
+    <p style="text-indent: 30px; margin-top: 15px; line-height: 2.2;">
+        بناءً على طلبه/ا زوّد/ت بهذا التأييد لتقديمه إلى جهتكم الموقرة لغرض <strong>({{ purpose|default:"المعاملات الرسمية والمصرفية" }})</strong> دون أدنى مسؤولية أو التزام مالي يترتب على إدارة المدرسة.
+    </p>
+</div>
+
+<div class="signatures-grid">
+    <div class="sig-box">
+        <div class="sig-title">منظم التأييد</div>
+        <div class="sig-name">المعاون الإداري</div>
+    </div>
+    <div class="sig-box">
+        <div class="stamp-placeholder">ختم المدرسة الرسمي</div>
+    </div>
+    <div class="sig-box">
+        <div class="sig-title">مدير المدرسة</div>
+        <div class="sig-name">إدارة المدرسة</div>
+    </div>
+</div>
+{% endblock %}

@@ -1,6 +1,7 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}بوابة ترحيل الطلبة وتوزيع المراحل{% endblock %}
+
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 d-print-none" dir="rtl">
@@ -33,7 +34,7 @@
             {% if c.is_final_stage %}
             <span class="badge bg-danger ms-1">تخرج نهائي</span>
             {% elif c.next_class %}
-            <span class="badge bg-light text-dark ms-1">← {{ c.next_class.name }}</span>
+            <span class="badge ms-1" style="background: rgba(255, 255, 255, 0.15); color: #ffffff;">← {{ c.next_class.name }}</span>
             {% else %}
             <span class="badge bg-warning text-dark ms-1">بدون صف لاحق</span>
             {% endif %}
@@ -50,33 +51,43 @@
     <div class="col-12 col-lg-4">
         <div class="card p-4 border-start border-primary border-4 shadow-sm mb-4">
             <h6 class="fw-bold text-primary mb-3">
-                <i class="bi bi-sliders me-1"></i> ضبط سنوات الترحيل
+                <i class="bi bi-sliders me-1"></i> ضبط سنوات الترحيل الأصولي
             </h6>
             
             <div class="mb-3">
-                <label class="small fw-bold">السنة المنتهية (المُراد ترحيل نتائجها):</label>
-                <select id="global_from_year" class="form-select fw-bold">
+                <label class="small fw-bold">السنة المنتهية (سنة النتائج المُراد ترحيلها):</label>
+                <select id="global_from_year" class="form-select fw-bold" onchange="onYearChange()">
                     {% for y in academic_years %}
-                    <option value="{{ y.id }}" {% if y.id == current_year.id %}selected{% endif %}>{{ y.name }}</option>
+                    <option value="{{ y.id }}" {% if y.id == from_yr.id %}selected{% endif %}>{{ y.name }}{% if y.is_current %} (العام الحالي){% endif %}</option>
                     {% endfor %}
                 </select>
             </div>
             
             <div class="mb-3">
-                <label class="small fw-bold">السنة الجديدة (المستهدفة):</label>
-                <select id="global_to_year" class="form-select fw-bold text-success">
+                <label class="small fw-bold">السنة الدراسية الجديدة (المستهدفة للترفيع):</label>
+                <select id="global_to_year" class="form-select fw-bold text-success" onchange="onYearChange()">
                     {% for y in academic_years %}
-                    <option value="{{ y.id }}">{{ y.name }}</option>
+                    <option value="{{ y.id }}" {% if y.id == to_yr.id %}selected{% endif %}>{{ y.name }}</option>
                     {% endfor %}
                 </select>
             </div>
 
-            <div class="alert alert-info small py-2 mb-3">
-                الصف الحالي: <strong>{{ target_class.name }}</strong><br>
-                الصف اللاحق عند النجاح: <strong>{{ target_class.next_class.name|default:"تخرج نهائي أو غير محدد" }}</strong>
+            <div class="alert alert-info small py-3 mb-3 border-0 rounded-3">
+                <div class="mb-1">الصف الحالي: <strong class="text-primary fs-6">{{ target_class.name }}</strong></div>
+                {% if has_branching %}
+                <div class="text-success fw-bold">
+                    <i class="bi bi-signpost-split me-1"></i> مسار الترفيع الأصولي: 
+                    <br><span class="badge bg-primary mt-1">🔬 الرابع العلمي</span> أو <span class="badge bg-info mt-1">📚 الرابع الأدبي</span>
+                </div>
+                {% elif deterministic_next %}
+                <div>الصف اللاحق الحتمي: <strong class="text-success fs-6">← {{ deterministic_next.name }}</strong></div>
+                <small class="text-muted d-block mt-1">يتم الترفيع برمجياً للصف الذي يليه حتمياً وفق السلم العراقي دون قفز.</small>
+                {% else %}
+                <div class="text-danger fw-bold"><i class="bi bi-mortarboard me-1"></i> مرحلة منتهية (تخرج نهائي)</div>
+                {% endif %}
             </div>
 
-            <form method="POST" action="{% url 'portal_promotion' %}" onsubmit="syncYearFields(this); return confirm('هل تريد تطبيق الترحيل الآلي لطلبة صف ({{ target_class.name }}) استناداً لدرجاتهم؟ الناجح ينتقل، والراسب أو المكمل يبقى في صفه.');">
+            <form method="POST" action="{% url 'portal_promotion' %}" onsubmit="syncYearFields(this); return confirm('هل تريد تطبيق الترحيل الآلي لطلبة صف ({{ target_class.name }}) استناداً لدرجاتهم للسنة المنتهية؟ الناجح ينتقل للصف اللاحق، والراسب أو المكمل يبقى في صفه.');">
                 {% csrf_token %}
                 <input type="hidden" name="action_type" value="auto_promote_class">
                 <input type="hidden" name="class_id" value="{{ target_class.id }}">
@@ -92,6 +103,17 @@
 
     <!-- جدول الطلبة مع الترحيل اليدوي والتحديد الفردي والجماعي -->
     <div class="col-12 col-lg-8">
+        {% if quarantined_count > 0 %}
+        <div class="alert alert-warning py-3 px-4 mb-4 border-0 rounded-4 shadow-sm d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <i class="bi bi-shield-lock-fill text-warning fs-4 me-2"></i>
+                <strong>حماية من الترفيع المزدوج:</strong>
+                تم حجب <strong>({{ quarantined_count }})</strong> طالب تم ترحيلهم حديثاً إلى هذا الصف من مرحلة أدنى في نفس الدورة.
+            </div>
+            <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold">محجوبون تلقائياً 🛡️</span>
+        </div>
+        {% endif %}
+
         <form method="POST" action="{% url 'portal_promotion' %}" onsubmit="syncYearFields(this);">
             {% csrf_token %}
             <input type="hidden" name="action_type" value="manual_promote_class">
@@ -99,17 +121,33 @@
             <input type="hidden" name="from_year_id" class="sync_from_yr">
             <input type="hidden" name="to_year_id" class="sync_to_yr">
 
-            <div class="card p-4 shadow-sm">
+            <div class="card p-4 shadow-sm border-0 rounded-4">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                     <h6 class="fw-bold text-dark mb-0">
-                        <i class="bi bi-people-fill me-2 text-primary"></i>طلبة صف ({{ target_class.name }}) المؤهلون للترحيل
+                        <i class="bi bi-people-fill me-2 text-primary"></i>طلبة صف ({{ target_class.name }}) الفعليون المؤهلون للترحيل
                     </h6>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 small fw-bold" onclick="setAllDecisions('promote')">
-                            تحديد الكل كناجحين
+                    <div class="d-flex gap-1 flex-wrap">
+                        {% if has_branching %}
+                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-2 py-1 small fw-bold" onclick="setAllDecisions('promote_scientific')">
+                            الكل علمي 🔬
                         </button>
-                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 small fw-bold" onclick="setAllDecisions('stay')">
-                            تحديد الكل كباقين
+                        <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-2 py-1 small fw-bold" onclick="setAllDecisions('promote_literary')">
+                            الكل أدبي 📚
+                        </button>
+                        {% elif target_class.is_final_stage or not deterministic_next %}
+                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1 small fw-bold" onclick="setAllDecisions('graduate')">
+                            الكل تخرج 🎓
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-2 py-1 small fw-bold" onclick="setAllDecisions('promote')">
+                            تحديد الكل كناجحين ➔
+                        </button>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 small fw-bold" onclick="setAllDecisions('stay')">
+                            تحديد الكل كراسبين ⛔
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1 small fw-bold" onclick="resetDefaultDecisions()" title="إعادة التحديد وفق النتيجة المحسوبة">
+                            استعادة التحديد التلقائي 🔄
                         </button>
                     </div>
                 </div>
@@ -119,10 +157,10 @@
                         <thead class="table-light">
                             <tr>
                                 <th style="width: 5%;">#</th>
-                                <th style="width: 30%;">اسم الطالب</th>
-                                <th style="width: 15%;">الشعبة</th>
-                                <th style="width: 25%;">النتيجة المحسوبة</th>
-                                <th style="width: 25%;">قرار الترحيل للسنة الجديدة</th>
+                                <th style="width: 32%;">اسم الطالب</th>
+                                <th style="width: 13%;">الشعبة</th>
+                                <th style="width: 22%;">النتيجة المحسوبة</th>
+                                <th style="width: 28%;">قرار الترحيل للسنة الجديدة</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -133,32 +171,43 @@
                                     {{ item.student.full_name }}
                                     <input type="hidden" name="student_ids" value="{{ item.student.id }}">
                                 </td>
-                                <td><span class="badge bg-light text-dark border">{{ item.student.section.name|default:"---" }}</span></td>
+                                <td><span class="badge" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">{{ item.student.section.name|default:"---" }}</span></td>
                                 <td>
                                     {% if item.computed_status == 'passed' %}
-                                    <span class="badge bg-success">{{ item.status_text }}</span>
+                                    <span class="badge bg-success px-2 py-1"><i class="bi bi-check-circle me-1"></i>{{ item.status_text }}</span>
                                     {% elif item.computed_status == 're-exam' %}
-                                    <span class="badge bg-warning text-dark">{{ item.status_text }}</span>
+                                    <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-exclamation-triangle me-1"></i>{{ item.status_text }}</span>
                                     {% elif item.computed_status == 'failed' %}
-                                    <span class="badge bg-danger">{{ item.status_text }}</span>
+                                    <span class="badge bg-danger px-2 py-1"><i class="bi bi-x-circle me-1"></i>{{ item.status_text }}</span>
                                     {% else %}
-                                    <span class="badge bg-secondary">{{ item.status_text }}</span>
+                                    <span class="badge bg-secondary px-2 py-1">{{ item.status_text }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <select name="decision_{{ item.student.id }}" class="form-select form-select-sm fw-bold decision-selector">
-                                        {% if target_class.is_final_stage or not target_class.next_class %}
-                                        <option value="graduate" {% if item.computed_status == 'passed' %}selected{% endif %} class="text-success">🎓 تخرج نهائي</option>
+                                    <select name="decision_{{ item.student.id }}" data-default="{{ item.default_decision }}" class="form-select form-select-sm fw-bold decision-selector text-start">
+                                        {% if has_branching %}
+                                        <option value="promote_scientific" {% if item.default_decision == 'promote_scientific' %}selected{% endif %} class="text-primary">🔬 ترفيع إلى (الرابع العلمي)</option>
+                                        <option value="promote_literary" {% if item.default_decision == 'promote_literary' %}selected{% endif %} class="text-info">📚 ترفيع إلى (الرابع الأدبي)</option>
+                                        <option value="stay" {% if item.default_decision == 'stay' %}selected{% endif %} class="text-danger">⛔ بقاء بالصف الحالي (رسوب / إكمال)</option>
+                                        {% elif target_class.is_final_stage or not deterministic_next %}
+                                        <option value="graduate" {% if item.default_decision == 'graduate' %}selected{% endif %} class="text-success">🎓 تخرج نهائي (إكمال المرحلة)</option>
+                                        <option value="stay" {% if item.default_decision == 'stay' %}selected{% endif %} class="text-danger">⛔ بقاء بالصف الحالي (رسوب / إكمال)</option>
                                         {% else %}
-                                        <option value="promote" {% if item.computed_status == 'passed' %}selected{% endif %} class="text-primary">ترفيع إلى ({{ target_class.next_class.name }})</option>
+                                        <option value="promote" {% if item.default_decision == 'promote' %}selected{% endif %} class="text-primary">➔ ترفيع إلى ({{ deterministic_next.name }})</option>
+                                        <option value="stay" {% if item.default_decision == 'stay' %}selected{% endif %} class="text-danger">⛔ بقاء بالصف الحالي (رسوب / إكمال)</option>
                                         {% endif %}
-                                        <option value="stay" {% if item.computed_status != 'passed' %}selected{% endif %} class="text-danger">بقاء بالصف الحالي (رسوب / إكمال)</option>
                                     </select>
                                 </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="text-muted py-4">لا يوجد طلبة مسجلين حالياً في هذا الصف.</td>
+                                <td colspan="5" class="text-muted py-4">
+                                    {% if quarantined_count > 0 %}
+                                    لا يوجد طلبة فعليون أصليون مؤهلون للترحيل (تم ترحيل جميع طلبة هذا الصف أو حجب المرحلين حديثاً).
+                                    {% else %}
+                                    لا يوجد طلبة مسجلين حالياً في هذا الصف.
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -166,9 +215,9 @@
                 </div>
 
                 {% if students_data %}
-                <div class="mt-3 text-end">
-                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
-                        <i class="bi bi-check-circle me-1"></i> اعتماد وحفظ الترحيل
+                <div class="mt-4 text-end">
+                    <button type="submit" class="btn btn-success rounded-pill px-5 py-2 fw-bold shadow">
+                        <i class="bi bi-check2-circle me-1"></i> اعتماد وحفظ الترحيل وتصفير درجات العام الجديد
                     </button>
                 </div>
                 {% endif %}
@@ -187,12 +236,33 @@ function syncYearFields(formEl) {
     formEl.querySelectorAll('.sync_to_yr').forEach(el => el.value = toVal);
 }
 
+function onYearChange() {
+    const fromVal = document.getElementById('global_from_year').value;
+    const toVal = document.getElementById('global_to_year').value;
+    const url = new URL(window.location.href);
+    url.searchParams.set('from_year', fromVal);
+    url.searchParams.set('to_year', toVal);
+    window.location.href = url.toString();
+}
+
 function setAllDecisions(val) {
     document.querySelectorAll('.decision-selector').forEach(sel => {
-        sel.value = val;
+        // check if option exists
+        const opt = sel.querySelector(`option[value="${val}"]`);
+        if (opt) {
+            sel.value = val;
+        }
+    });
+}
+
+function resetDefaultDecisions() {
+    document.querySelectorAll('.decision-selector').forEach(sel => {
+        const def = sel.getAttribute('data-default');
+        if (def) {
+            sel.value = def;
+        }
     });
 }
 </script>
 {% endblock %}
-
 

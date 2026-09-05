@@ -19,7 +19,9 @@ from django.db.models import Sum, Avg, Count, Q
 from django.contrib import messages
 from django.db import transaction
 from django.conf import settings
-from django.http import FileResponse
+from django.http import FileResponse, JsonResponse, HttpResponse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.urls import reverse
 
 from .models import (
     User, Parent, Teacher, SchoolClass, Section,
@@ -37,18 +39,194 @@ from .serializers import (
     InvoiceSerializer
 )
 from .tasks import send_absence_notification, send_invoice_reminder
-from .licensing import get_machine_fingerprint, verify_and_apply_license, generate_license_key
+from .licensing import (
+    get_machine_fingerprint,
+    verify_and_apply_license,
+    generate_license_key,
+    verify_and_apply_license_file,
+    generate_license_file_data
+)
+
+# قائمة الصفوف العراقية الرسمية الـ 15 الثابتة
+IRAQI_STANDARD_CLASSES = [
+    (1, 'الاول الابتدائي', False),
+    (2, 'الثاني الابتدائي', False),
+    (3, 'الثالث الابتدائي', False),
+    (4, 'الرابع الابتدائي', False),
+    (5, 'الخامس الابتدائي', False),
+    (6, 'السادس الابتدائي', True),
+    (7, 'الاول المتوسط', False),
+    (8, 'الثاني المتوسط', False),
+    (9, 'الثالث المتوسط', True),
+    (10, 'الرابع العلمي', False),
+    (11, 'الرابع الادبي', False),
+    (12, 'الخامس العلمي', False),
+    (13, 'الخامس الادبي', False),
+    (14, 'السادس العلمي', True),
+    (15, 'السادس الادبي', True),
+]
+
+
+def seed_iraqi_official_classes(school):
+    """تهيئة الصفوف الرسمية لوزارة التربية العراقية تلقائياً بحسب مرحلة المدرسة وصفوف التخرج"""
+    school_level = getattr(school, 'school_level', 'secondary')
+    
+    all_stages = [
+        (1, 'الاول الابتدائي', 'primary'),
+        (2, 'الثاني الابتدائي', 'primary'),
+        (3, 'الثالث الابتدائي', 'primary'),
+        (4, 'الرابع الابتدائي', 'primary'),
+        (5, 'الخامس الابتدائي', 'primary'),
+        (6, 'السادس الابتدائي', 'primary'),
+        (7, 'الاول المتوسط', 'intermediate'),
+        (8, 'الثاني المتوسط', 'intermediate'),
+        (9, 'الثالث المتوسط', 'intermediate'),
+        (10, 'الرابع العلمي', 'secondary'),
+        (11, 'الرابع الادبي', 'secondary'),
+        (12, 'الخامس العلمي', 'secondary'),
+        (13, 'الخامس الادبي', 'secondary'),
+        (14, 'السادس العلمي', 'secondary'),
+        (15, 'السادس الادبي', 'secondary'),
+    ]
+
+    if school_level == 'primary':
+        selected_stages = [s for s in all_stages if s[2] == 'primary']
+        final_names = ['السادس الابتدائي']
+    elif school_level in ['intermediate', 'middle']:
+        selected_stages = [s for s in all_stages if s[2] == 'intermediate']
+        final_names = ['الثالث المتوسط']
+    elif school_level == 'basic':
+        selected_stages = [s for s in all_stages if s[2] in ['primary', 'intermediate']]
+        final_names = ['الثالث المتوسط']
+    elif school_level == 'preparatory':
+        selected_stages = [s for s in all_stages if s[2] == 'secondary']
+        final_names = ['السادس العلمي', 'السادس الادبي', 'السادس الأدبي']
+    elif school_level in ['all_stages', 'all', 'comprehensive']:
+        selected_stages = all_stages
+        final_names = ['السادس الابتدائي', 'الثالث المتوسط', 'السادس العلمي', 'السادس الادبي', 'السادس الأدبي']
+    else:  # secondary
+        selected_stages = [s for s in all_stages if s[2] in ['intermediate', 'secondary']]
+        final_names = ['السادس العلمي', 'السادس الادبي', 'السادس الأدبي']
+
+    created_count = 0
+    with transaction.atomic():
+        for order, name, lvl in selected_stages:
+            is_final = any(fn in name for fn in final_names)
+            cls_obj, created = SchoolClass.objects.get_or_create(
+                name=name,
+                defaults={
+                    'level_order': order,
+                    'is_final_stage': is_final
+                }
+            )
+            if cls_obj.is_final_stage != is_final or cls_obj.level_order != order:
+                cls_obj.is_final_stage = is_final
+                cls_obj.level_order = order
+                cls_obj.save()
+            if not cls_obj.sections.exists():
+                Section.objects.create(school_class=cls_obj, name="أ", capacity=40)
+            if created:
+                created_count += 1
+
+        # ربط الصفوف بالصف اللاحق الحتمي في قاعدة البيانات
+        for c in SchoolClass.objects.all():
+            nxt = get_next_promotion_stage(c, school_level)
+            if c.next_class != nxt:
+                c.next_class = nxt
+                c.save(update_fields=['next_class'])
+
+    return created_count
+
+
+OFFICIAL_PROMOTION_CHAIN = {
+    'الاول الابتدائي': 'الثاني الابتدائي',
+    'الأول الابتدائي': 'الثاني الابتدائي',
+    'الثاني الابتدائي': 'الثالث الابتدائي',
+    'الثالث الابتدائي': 'الرابع الابتدائي',
+    'الرابع الابتدائي': 'الخامس الابتدائي',
+    'الخامس الابتدائي': 'السادس الابتدائي',
+    'السادس الابتدائي': None,
+    'الاول المتوسط': 'الثاني المتوسط',
+    'الأول المتوسط': 'الثاني المتوسط',
+    'الثاني المتوسط': 'الثالث المتوسط',
+    'الثالث المتوسط': None,  # تفرع استثنائي إلى الرابع العلمي أو الرابع الأدبي في المدارس الثانوية
+    'الرابع العلمي': 'الخامس العلمي',
+    'الخامس العلمي': 'السادس العلمي',
+    'السادس العلمي': None,
+    'الرابع الادبي': 'الخامس الادبي',
+    'الرابع الأدبي': 'الخامس الأدبي',
+    'الخامس الادبي': 'السادس الادبي',
+    'الخامس الأدبي': 'السادس الأدبي',
+    'السادس الادبي': None,
+    'السادس الأدبي': None,
+}
+
+
+def get_next_promotion_stage(cls_obj, school_level='secondary'):
+    """
+    تحديد الصف اللاحق التلقائي الحتمي بحسب السلم التعليمي العراقي الرسمي المعتمد:
+    لا يسمح بالقفز أو التحديد اليدوي العشوائي. كل صف يرتبط حتمياً بالصف الذي يليه.
+    """
+    if not cls_obj or cls_obj.is_final_stage:
+        return None
+
+    c_name = cls_obj.name.strip()
+
+    # إذا كان السادس الابتدائي، وفي مدرسة شاملة أو أساسية وبها الأول المتوسط
+    if 'السادس الابتدائي' in c_name:
+        if school_level in ['basic', 'all_stages', 'all', 'comprehensive']:
+            return SchoolClass.objects.filter(name__icontains='الاول المتوسط').first()
+        return None
+
+    # إذا كان الثالث المتوسط، يخضع لتفرع علمي/أدبي في المدارس الثانوية
+    if 'الثالث المتوسط' in c_name:
+        return None
+
+    # إذا كان سادس إعدادي (علمي أو أدبي)
+    if any(s in c_name for s in ['السادس العلمي', 'السادس الأدبي', 'السادس الادبي']):
+        return None
+
+    target_name = OFFICIAL_PROMOTION_CHAIN.get(c_name)
+    if target_name:
+        dest = SchoolClass.objects.filter(name=target_name).first()
+        if not dest:
+            dest = SchoolClass.objects.filter(name__icontains=target_name).first()
+        if dest:
+            return dest
+
+    # fallback أصولي بناءً على ترتيب المرحلة المتتالية بدقة (level_order + 1)
+    return SchoolClass.objects.filter(level_order=cls_obj.level_order + 1).first()
+
+
+def get_third_intermediate_branches():
+    """الحصول على صفي التفرع (الرابع العلمي والرابع الأدبي) للثالث المتوسط"""
+    scientific = SchoolClass.objects.filter(name__icontains='الرابع العلمي').first()
+    literary = SchoolClass.objects.filter(name__icontains='الرابع الادبي').first() or SchoolClass.objects.filter(name__icontains='الرابع الأدبي').first()
+    return scientific, literary
 
 
 def round_integer(val):
     """دالة لتقريب الدرجات والمعدلات إلى أقرب عدد صحيح دون كسور"""
-    if val is None:
+    if val is None or val == '':
         return None
     try:
         d = Decimal(str(val))
         return int(d.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
     except Exception:
         return int(round(float(val)))
+
+
+def get_active_academic_year():
+    """الحصول على العام الدراسي المفعل أو إنشاء واحد تلقائياً في حال النقص"""
+    year = AcademicYear.objects.filter(is_current=True).first()
+    if not year:
+        year = AcademicYear.objects.first()
+        if not year:
+            year = AcademicYear.objects.create(name="2026-2027", is_current=True)
+        else:
+            year.is_current = True
+            year.save()
+    return year
 
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -350,7 +528,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
 
 # ======================================================================
-# واجهات الـ API التجارية المخصصة للتشغيل الهجين (Online / Offline / Sync)
+# واجهات الـ API التجارية
 # ======================================================================
 
 class SyncEngineViewSet(viewsets.ViewSet):
@@ -420,13 +598,13 @@ class SystemUpdateAPI(APIView):
             'current_installed_version': client_version,
             'latest_available_version': latest_version,
             'has_update': False,
-            'update_notes': 'المنظومة محدثة بالكامل وتعمل وفق معايير 2026-2027.',
+            'update_notes': 'المنظومة محدثة بالكامل وتعمل وفق معايير وزارة التربية 2026-2027.',
             'download_url': None
         })
 
 
 # ======================================================================
-# دوال استخراج وطباعة الوثائق والتأييدات الرسمية (HTML / Print / PDF)
+# دوال استخراج وطباعة الوثائق
 # ======================================================================
 
 def teacher_service_certificate_view(request, teacher_id):
@@ -443,7 +621,7 @@ def teacher_service_certificate_view(request, teacher_id):
         'purpose': purpose,
         'doc_number': doc_number,
         'today_date': timezone.now().strftime('%Y/%m/%d'),
-        'academic_year': AcademicYear.objects.filter(is_current=True).first(),
+        'academic_year': get_active_academic_year(),
     }
     return render(request, 'certificates/teacher_service.html', context)
 
@@ -488,7 +666,7 @@ def student_transcript_view(request, student_id):
         'destination': destination,
         'doc_number': doc_number,
         'today_date': timezone.now().strftime('%Y/%m/%d'),
-        'academic_year': AcademicYear.objects.filter(is_current=True).first(),
+        'academic_year': get_active_academic_year(),
     }
     return render(request, 'certificates/student_transcript.html', context)
 
@@ -496,13 +674,37 @@ def student_transcript_view(request, student_id):
 def class_master_sheet_view(request, class_id):
     school = SchoolSettings.get_settings()
     school_class = get_object_or_404(SchoolClass, pk=class_id)
-    students = Student.objects.filter(current_class=school_class, is_deleted=False).select_related('user', 'section').order_by('user__first_name')
-    subjects = Subject.objects.all().order_by('id')
+    
+    section_id = request.GET.get('section_id')
+    students_qs = Student.objects.filter(current_class=school_class, is_deleted=False).select_related('user', 'section')
+    if section_id and section_id.isdigit():
+        students_qs = students_qs.filter(section_id=int(section_id))
+    students = list(students_qs.order_by('section__name', 'user__first_name', 'user__last_name', 'id'))
+    
+    # استحضار المواد الرسمية المعتمدة للمرحلة الدراسية
+    official_subject_names = get_stage_official_subjects(school_class)
+    subjects = []
+    for s_name in official_subject_names:
+        sub_obj = Subject.objects.filter(name=s_name).first()
+        if not sub_obj:
+            sub_obj = Subject.objects.filter(name__icontains=s_name.split()[0]).first()
+        if sub_obj and sub_obj not in subjects:
+            subjects.append(sub_obj)
+        elif not sub_obj:
+            sub_obj, _ = Subject.objects.get_or_create(name=s_name, defaults={'code': f'SUB_{len(subjects)+1}'})
+            if sub_obj not in subjects:
+                subjects.append(sub_obj)
 
     sheet_data = []
+    from collections import defaultdict
+    current_year = get_active_academic_year()
+    all_grades = Grade.objects.filter(student__in=students, academic_year=current_year.name if current_year else '2026-2027')
+    grades_by_student = defaultdict(dict)
+    for g in all_grades:
+        grades_by_student[g.student_id][g.subject_id] = g
 
     for st in students:
-        student_grades = {g.subject_id: g for g in Grade.objects.filter(student=st)}
+        student_grades = grades_by_student.get(st.id, {})
         subjects_grades = []
         tot = Decimal('0')
         valid_count = 0
@@ -542,29 +744,255 @@ def class_master_sheet_view(request, class_id):
             'result': res
         })
 
+    # تقسيم البيانات إلى صفحات بحيث لا تتجاوز كل صفحة 27 طالباً كحد أقصى (PAGINATION_LIMIT = 27)
+    PAGINATION_LIMIT = 27
+    total_students = len(sheet_data)
+    pages_data = []
+
+    if total_students == 0:
+        pages_data.append({
+            'page_number': 1,
+            'students': [],
+            'start_idx': 0,
+            'is_last': True,
+        })
+    else:
+        total_pages = (total_students + PAGINATION_LIMIT - 1) // PAGINATION_LIMIT
+        for page_idx in range(total_pages):
+            start_i = page_idx * PAGINATION_LIMIT
+            end_i = min(start_i + PAGINATION_LIMIT, total_students)
+            chunk = sheet_data[start_i:end_i]
+            pages_data.append({
+                'page_number': page_idx + 1,
+                'students': chunk,
+                'start_idx': start_i,
+                'is_last': (page_idx + 1 == total_pages),
+            })
+
     context = {
         'school': school,
         'school_class': school_class,
         'subjects': subjects,
         'sheet_data': sheet_data,
+        'pages_data': pages_data,
+        'total_pages': len(pages_data),
+        'total_students': total_students,
         'today_date': timezone.now().strftime('%Y/%m/%d'),
-        'academic_year': AcademicYear.objects.filter(is_current=True).first(),
+        'academic_year': get_active_academic_year(),
     }
     return render(request, 'certificates/master_sheet.html', context)
 
 
+def portal_student_result_cards(request, student_id=None):
+    """
+    منظومة طباعة نتائج الطلبة المدرسية (كارت النتيجة الرسمي / بطاقة درجات الطالب)
+    - يدعم الطباعة الفردية لطالب محدد، أو الطباعة الجماعية لطلاب الشعبة/الصف بالكامل
+    - يحتوي كارت النتيجة لكل طالب على الترويسة المدرسية وبيانات الطالب
+    - جدول المواد بالأعمدة الإلزامية الثمانية حصراً:
+      1. المادة
+      2. درجة الفصل الأول
+      3. درجة نصف السنة
+      4. درجة الفصل الثاني
+      5. درجة السعي السنوي
+      6. درجة الامتحان النهائي
+      7. الدرجة النهائية
+      8. الملاحظات
+    - خانات سفلية مخصصة للنتيجة النهائية: المجموع، المعدل، والقرار (ناجح/مكمل/راسب) مع التوقيعات الرسمية
+    - تجهيز وضع الطباعة الجماعية بنسق مناسب (كارتين في الصفحة A4 مع خط القص، أو كارت لكل صفحة)
+    """
+    school = SchoolSettings.get_settings()
+    current_year = get_active_academic_year()
+    classes = SchoolClass.objects.all().order_by('level_order')
+
+    selected_student_id = student_id or request.GET.get('student_id')
+    selected_class_id = request.GET.get('class_id')
+    selected_section_id = request.GET.get('section_id')
+    print_layout = request.GET.get('layout', '2up')
+
+    selected_class = None
+    sections = []
+    students_list = []
+
+    if selected_student_id:
+        single_student = get_object_or_404(Student.objects.select_related('user', 'current_class', 'section'), pk=selected_student_id)
+        selected_class = single_student.current_class
+        selected_class_id = str(selected_class.id) if selected_class else ''
+        selected_section_id = str(single_student.section_id) if single_student.section_id else ''
+        if selected_class:
+            sections = list(selected_class.sections.all().order_by('name'))
+        students_list = [single_student]
+    else:
+        if not selected_class_id and classes.exists():
+            selected_class = classes.first()
+            selected_class_id = str(selected_class.id)
+        elif selected_class_id:
+            selected_class = get_object_or_404(SchoolClass, pk=selected_class_id)
+
+        if selected_class:
+            sections = list(selected_class.sections.all().order_by('name'))
+            st_qs = Student.objects.filter(current_class=selected_class, is_deleted=False).select_related('user', 'section')
+            if selected_section_id and selected_section_id.isdigit():
+                st_qs = st_qs.filter(section_id=int(selected_section_id))
+            students_list = list(st_qs.order_by('section__name', 'user__first_name', 'user__last_name', 'id'))
+
+    # استحضار المواد الرسمية للصف
+    official_subject_names = get_stage_official_subjects(selected_class)
+    class_subjects = []
+    for s_name in official_subject_names:
+        sub_obj = Subject.objects.filter(name=s_name).first()
+        if not sub_obj:
+            sub_obj = Subject.objects.filter(name__icontains=s_name.split()[0]).first()
+        if sub_obj and sub_obj not in class_subjects:
+            class_subjects.append(sub_obj)
+        elif not sub_obj:
+            sub_obj, _ = Subject.objects.get_or_create(name=s_name, defaults={'code': f'SUB_{len(class_subjects)+1}'})
+            if sub_obj not in class_subjects:
+                class_subjects.append(sub_obj)
+
+    # تجهيز بطاقة النتيجة لكل طالب بالأعمدة الإلزامية الثمانية
+    cards_data = []
+    from collections import defaultdict
+    all_grades = Grade.objects.filter(student__in=students_list, academic_year=current_year.name if current_year else '2026-2027')
+    grades_by_student = defaultdict(dict)
+    for g in all_grades:
+        grades_by_student[g.student_id][g.subject_id] = g
+
+    for st in students_list:
+        student_grades = grades_by_student.get(st.id, {})
+        subjects_rows = []
+        total_sum = Decimal('0')
+        valid_count = 0
+        total_decision = Decimal('0')
+        failed_subjects = []
+
+        for sub in class_subjects:
+            g = student_grades.get(sub.id)
+            if g:
+                f_term = g.first_term_effort
+                mid = g.midyear_exam
+                s_term = g.second_term_effort
+                annual = g.annual_effort
+                fin = g.final_exam_round2 if g.final_exam_round2 is not None else g.final_exam_round1
+                final_val = g.final_grade_after_decision if g.final_grade_after_decision is not None else g.final_grade
+
+                if final_val is not None:
+                    total_sum += final_val
+                    valid_count += 1
+                    if final_val < Decimal('50.0'):
+                        failed_subjects.append(sub.name)
+
+                if g.decision_marks:
+                    total_decision += g.decision_marks
+
+                # الملاحظات
+                if final_val is not None:
+                    if g.decision_marks and g.decision_marks > 0:
+                        note = "ناجح بالقرار"
+                    elif final_val >= Decimal('50.0'):
+                        note = "ناجح"
+                    elif g.final_exam_round2 is not None and final_val < Decimal('50.0'):
+                        note = "راسب دور ثانٍ"
+                    else:
+                        note = "مكمل"
+                else:
+                    note = "---"
+
+                subjects_rows.append({
+                    'subject': sub.name,
+                    'first_term': str(round_integer(f_term)) if f_term is not None else "---",
+                    'midyear': str(round_integer(mid)) if mid is not None else "---",
+                    'second_term': str(round_integer(s_term)) if s_term is not None else "---",
+                    'annual_effort': str(round_integer(annual)) if annual is not None else "---",
+                    'final_exam': str(round_integer(fin)) if fin is not None else "---",
+                    'final_grade': str(round_integer(final_val)) if final_val is not None else "---",
+                    'notes': note,
+                    'is_failed': final_val is not None and final_val < Decimal('50.0')
+                })
+            else:
+                subjects_rows.append({
+                    'subject': sub.name,
+                    'first_term': "---",
+                    'midyear': "---",
+                    'second_term': "---",
+                    'annual_effort': "---",
+                    'final_exam': "---",
+                    'final_grade': "---",
+                    'notes': "---",
+                    'is_failed': False
+                })
+
+        avg_val = round_integer(total_sum / Decimal(str(valid_count))) if valid_count > 0 else 0
+
+        # القرار النهائي
+        if valid_count == 0:
+            final_result = "قيد الإنجاز"
+            result_badge = "secondary"
+        elif len(failed_subjects) == 0:
+            final_result = "ناجح بالقرار" if total_decision > 0 else "ناجح"
+            result_badge = "success"
+        elif len(failed_subjects) <= 2:
+            final_result = f"مكمل في ({'، '.join(failed_subjects)})"
+            result_badge = "warning"
+        else:
+            final_result = "راسب"
+            result_badge = "danger"
+
+        cards_data.append({
+            'student': st,
+            'subjects_rows': subjects_rows,
+            'total_sum': str(round_integer(total_sum)) if valid_count > 0 else "---",
+            'avg': str(avg_val) if valid_count > 0 else "---",
+            'total_decision': str(round_integer(total_decision)),
+            'final_result': final_result,
+            'result_badge': result_badge,
+            'failed_count': len(failed_subjects),
+        })
+
+    # تقسيم البطاقات لأزواج (2 في الصفحة A4) للطباعة الجماعية
+    cards_pairs = [cards_data[i:i + 2] for i in range(0, len(cards_data), 2)]
+
+    class_students_list = []
+    if selected_class:
+        class_students_list = list(Student.objects.filter(current_class=selected_class, is_deleted=False).order_by('user__first_name'))
+
+    context = {
+        'school': school,
+        'current_year': current_year,
+        'classes': classes,
+        'selected_class': selected_class,
+        'selected_class_id': selected_class_id,
+        'sections': sections,
+        'selected_section_id': selected_section_id,
+        'class_students_list': class_students_list,
+        'selected_student_id': selected_student_id,
+        'cards_data': cards_data,
+        'cards_pairs': cards_pairs,
+        'total_cards': len(cards_data),
+        'print_layout': print_layout,
+        'today_date': timezone.now().strftime('%Y/%m/%d'),
+        'single_mode': bool(selected_student_id),
+    }
+    return render(request, 'portal/student_result_cards.html', context)
+
+
 # ======================================================================
-# دوال البوابة التفاعلية والترخيص السري
+# دوال البوابة التفاعلية والترخيص
 # ======================================================================
 
 def portal_license_lock(request):
-    """شاشة القفل المالي عند انتهاء الأسبوع التجريبي أو الاشتراك"""
     school = SchoolSettings.get_settings()
     machine_id = get_machine_fingerprint()
 
     if request.method == 'POST':
+        license_file = request.FILES.get('license_file')
         license_key = request.POST.get('license_key', '').strip()
-        success, message = verify_and_apply_license(school, license_key)
+        if license_file:
+            success, message = verify_and_apply_license_file(school, license_file.read())
+        elif license_key:
+            success, message = verify_and_apply_license(school, license_key)
+        else:
+            success, message = False, "يرجى إدخال مفتاح التفعيل أو اختيار ملف الترخيص (.lic)."
+
         if success:
             messages.success(request, message)
             return redirect('portal_dashboard')
@@ -580,11 +1008,18 @@ def portal_license_lock(request):
 
 
 def portal_license_activate(request):
-    """دالة استقبال كود التفعيل من النافذة المنبثقة لمدير المدرسة"""
     if request.method == 'POST':
-        license_key = request.POST.get('license_key', '').strip()
         school = SchoolSettings.get_settings()
-        success, message = verify_and_apply_license(school, license_key)
+        license_file = request.FILES.get('license_file')
+        license_key = request.POST.get('license_key', '').strip()
+
+        if license_file:
+            success, message = verify_and_apply_license_file(school, license_file.read())
+        elif license_key:
+            success, message = verify_and_apply_license(school, license_key)
+        else:
+            success, message = False, "يرجى إدخال مفتاح التفعيل أو اختيار ملف الترخيص (.lic)."
+
         if success:
             messages.success(request, message)
         else:
@@ -595,11 +1030,9 @@ def portal_license_activate(request):
 
 
 def owner_key_generator(request):
-    """شاشة سرية محمية للمطور والمالك لتوليد التراخيص للأجهزة"""
     OWNER_USER = "abdullahnawfal97"
     OWNER_PASS = "111997111997"
 
-    # 1. التحقق من جلسة المالك
     if not request.session.get('is_owner_authenticated'):
         if request.method == 'POST':
             u = (request.POST.get('username') or request.POST.get('owner_user') or '').strip().lower()
@@ -614,19 +1047,30 @@ def owner_key_generator(request):
 
         return render(request, 'portal/owner_login.html')
 
-    # 2. بعد نجاح المصادقة: توليد التراخيص
     generated_key = None
     target_machine = ""
     selected_plan = "YEAR"
 
-    if request.method == 'POST' and request.POST.get('action_type') == 'generate':
+    if request.method == 'POST':
+        action_type = request.POST.get('action_type')
         target_machine = request.POST.get('machine_id', '').strip().upper()
         selected_plan = request.POST.get('plan', 'YEAR')
-        if target_machine:
-            generated_key = generate_license_key(target_machine, plan=selected_plan)
-            messages.success(request, "تم توليد مفتاح التفعيل بنجاح!")
-        else:
-            messages.error(request, "يرجى كتابة معرف الحاسبة (Machine ID).")
+
+        if action_type == 'generate':
+            if target_machine:
+                generated_key = generate_license_key(target_machine, plan=selected_plan)
+                messages.success(request, "تم توليد مفتاح التفعيل بنجاح!")
+            else:
+                messages.error(request, "يرجى كتابة معرف الحاسبة (Machine ID).")
+
+        elif action_type == 'download_lic':
+            if target_machine:
+                lic_json = generate_license_file_data(target_machine, plan=selected_plan)
+                response = HttpResponse(lic_json, content_type='application/json; charset=utf-8')
+                response['Content-Disposition'] = f'attachment; filename="Madrasati_{target_machine[:8]}.lic"'
+                return response
+            else:
+                messages.error(request, "يرجى كتابة معرف الحاسبة لتوليد ملف الترخيص.")
 
     context = {
         'is_authenticated': True,
@@ -641,12 +1085,11 @@ def portal_dashboard(request):
     school = SchoolSettings.get_settings()
     today = timezone.now().date()
 
-    if not school.is_subscription_active or not school.subscription_end_date or school.subscription_end_date < today:
+    if not school.is_trial_or_license_valid:
         return redirect('portal_license_lock')
 
     machine_id = get_machine_fingerprint()
-
-    current_year = AcademicYear.objects.filter(is_current=True).first()
+    current_year = get_active_academic_year()
     academic_years = AcademicYear.objects.all().order_by('name')
     students_count = Student.objects.filter(is_deleted=False, student_status='active').count()
     teachers_count = Teacher.objects.count()
@@ -654,7 +1097,7 @@ def portal_dashboard(request):
     pending_docs = OfficialDocument.objects.filter(status='pending').count()
     recent_docs = OfficialDocument.objects.all().order_by('-created_at')[:5]
 
-    days_left = (school.subscription_end_date - today).days if school.subscription_end_date else 0
+    days_left = school.days_remaining
 
     context = {
         'school': school,
@@ -681,9 +1124,170 @@ def portal_set_current_year(request):
     return redirect('portal_dashboard')
 
 
+def generate_stress_test_data(target_count=1200):
+    """توليد سريع بدفعات ضخمة لـ 1,200 طالب مع درجات كاملة لجميع المواد لاختبار الضغط"""
+    import random
+    from decimal import Decimal
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    FIRST_NAMES = [
+        "محمد", "علي", "أحمد", "حسين", "حسن", "عمر", "يوسف", "زيد", "مصطفى", "كرار",
+        "سجاد", "عباس", "جعفر", "إبراهيم", "حيدر", "خالد", "عبدالله", "مهدي", "باقر",
+        "فاطمة", "زينب", "مريم", "زهراء", "نور", "هدى", "سارة", "آية", "بنين", "تبارك"
+    ]
+    MID_NAMES = ["علي", "حسين", "محمد", "كريم", "عباس", "جاسم", "راضي", "كاظم", "صالح", "هادي", "فاضل", "مهدي"]
+    LAST_NAMES = ["الربيعي", "الجبوري", "الساعدي", "التميمي", "الشمري", "المالكي", "الزبيدي", "الخفاجي", "العامري", "اللامي", "الكعبي", "الجنابي"]
+
+    classes = list(SchoolClass.objects.all().order_by('level_order'))
+    if not classes:
+        for i, name in enumerate(["الأول الابتدائي", "الثاني الابتدائي", "الثالث الابتدائي", "الرابع الابتدائي", "الخامس الابتدائي", "السادس الابتدائي"], start=1):
+            classes.append(SchoolClass.objects.create(name=name, level_order=i))
+
+    all_sections = []
+    for cls in classes:
+        for sec_name in ['أ', 'ب', 'ج', 'د']:
+            sec, _ = Section.objects.get_or_create(school_class=cls, name=sec_name, defaults={'capacity': 50})
+            all_sections.append(sec)
+
+    class_subjects_map = {}
+    for cls in classes:
+        class_subjects_map[cls.id] = []
+        for s_name in get_stage_official_subjects(cls):
+            sub_obj, _ = Subject.objects.get_or_create(name=s_name, defaults={'code': f'SUB_{len(class_subjects_map[cls.id])+1}'})
+            class_subjects_map[cls.id].append(sub_obj)
+
+    users_to_create = []
+    user_metadata = []
+    current_time_str = timezone.now().strftime('%y%m%d%H%M')
+
+    for i in range(1, target_count + 1):
+        uname = f"stress_std_{current_time_str}_{i:04d}"
+        f_name = random.choice(FIRST_NAMES)
+        m_name = random.choice(MID_NAMES)
+        l_name = random.choice(LAST_NAMES)
+        full_quad = f"{f_name} {m_name} {random.choice(MID_NAMES)}"
+        users_to_create.append(User(
+            username=uname,
+            first_name=full_quad,
+            last_name=l_name,
+            is_student=True
+        ))
+        target_class = classes[(i - 1) % len(classes)]
+        cls_secs = [s for s in all_sections if s.school_class_id == target_class.id]
+        target_sec = cls_secs[((i - 1) // len(classes)) % len(cls_secs)] if cls_secs else None
+        user_metadata.append((uname, target_class, target_sec, i))
+
+    created_users = User.objects.bulk_create(users_to_create, batch_size=1000)
+    user_map = {u.username: u for u in created_users}
+
+    students_to_create = []
+    for uname, cls, sec, idx in user_metadata:
+        u_obj = user_map[uname]
+        students_to_create.append(Student(
+            user=u_obj,
+            current_class=cls,
+            section=sec,
+            registration_number=f"REG-2026-{idx:04d}",
+            national_id=f"199{random.randint(100000000, 999999999)}",
+            student_status='active'
+        ))
+
+    created_students = Student.objects.bulk_create(students_to_create, batch_size=1000)
+
+    grades_to_create = []
+    for st in created_students:
+        cls_subs = class_subjects_map.get(st.current_class_id, [])
+        for sub in cls_subs:
+            f1 = Decimal(str(random.randint(45, 98)))
+            mid = Decimal(str(random.randint(45, 95)))
+            f2 = Decimal(str(random.randint(45, 98)))
+            ann = round_integer((f1 + mid + f2) / Decimal('3'))
+            fin = Decimal(str(random.randint(45, 98)))
+            tot_final = round_integer((ann + fin) / Decimal('2'))
+
+            dec = Decimal('0')
+            dec_grade = None
+            if 45 <= tot_final < 50:
+                dec = Decimal(str(50 - tot_final))
+                dec_grade = Decimal('50')
+                status = 'passed_by_decision'
+            elif tot_final >= 50:
+                status = 'passed'
+            else:
+                status = 'supplementary' if tot_final >= 40 else 'failed'
+
+            grades_to_create.append(Grade(
+                student=st,
+                subject=sub,
+                first_term_effort=f1,
+                midyear_exam=mid,
+                second_term_effort=f2,
+                annual_effort=ann,
+                final_exam_round1=fin,
+                final_grade=tot_final,
+                decision_marks=dec,
+                final_grade_after_decision=dec_grade,
+                status=status
+            ))
+
+    Grade.objects.bulk_create(grades_to_create, batch_size=2000)
+    return target_count
+
+
+def clear_stress_test_data():
+    """مسح وتطهير كافة بيانات اختبار الضغط بالكامل"""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    test_users = User.objects.filter(username__startswith='stress_std_')
+    count = test_users.count()
+    Grade.objects.filter(student__user__in=test_users).delete()
+    Student.objects.filter(user__in=test_users).delete()
+    test_users.delete()
+    return count
+
+
 def portal_settings(request):
     school = SchoolSettings.get_settings()
+    current_year = get_active_academic_year()
     if request.method == 'POST':
+        action_type = request.POST.get('action_type')
+        stress_action = request.POST.get('stress_action')
+        
+        if action_type == 'set_academic_year' or stress_action == 'set_academic_year':
+            year_id = request.POST.get('academic_year_id')
+            new_year_name = request.POST.get('new_academic_year_name', '').strip()
+            new_year = None
+            if new_year_name:
+                new_year, _ = AcademicYear.objects.get_or_create(
+                    name=new_year_name,
+                    defaults={'is_current': True}
+                )
+            elif year_id:
+                new_year = get_object_or_404(AcademicYear, pk=year_id)
+                
+            if new_year:
+                AcademicYear.objects.all().update(is_current=False)
+                new_year.is_current = True
+                new_year.save()
+                request.session['active_academic_year_id'] = new_year.id
+                messages.success(request, f"تم بنجاح اعتماد وتفعيل العام الدراسي ({new_year.name}). كافة بيانات وسجلات السنوات السابقة محفوظة بأمان تام في الأرشيف المركزي.")
+            return redirect('portal_settings')
+
+        # أدوات الاختبار محجوبة في بيئة الإنتاج
+        if stress_action in ('generate_stress_data', 'clear_stress_data'):
+            messages.warning(request, 'أدوات الاختبار غير متاحة في هذا الإصدار.')
+            return redirect('portal_settings')
+
+        ministry_code = request.POST.get('ministry_school_code', '').strip()
+        if not ministry_code:
+            messages.error(request, 'الرمز الإحصائي الوزاري للمدرسة (كود التربية) إجباري ولا يمكن تركه فارغاً.')
+            return redirect('portal_settings')
+
+        # حفظ المرحلة القديمة للكشف عن تغيير مرحلة المدرسة
+        old_school_level = school.school_level
+
+        school.ministry_school_code = ministry_code
         school.school_name = request.POST.get('school_name', school.school_name)
         school.director_name = request.POST.get('director_name', school.director_name)
         school.directorate = request.POST.get('directorate', school.directorate)
@@ -693,13 +1297,55 @@ def portal_settings(request):
         daily_p = request.POST.get('daily_periods_count')
         if daily_p:
             school.daily_periods_count = int(daily_p)
-        if 'logo' in request.FILES:
+        if request.POST.get('remove_logo') == '1':
+            if school.logo:
+                school.logo.delete(save=False)
+                school.logo = None
+            messages.success(request, 'تمت إزالة الشعار بنجاح والعودة للشعار الافتراضي.')
+        elif 'logo' in request.FILES:
             school.logo = request.FILES['logo']
+            messages.success(request, 'تم تحديث وتبديل شعار المدرسة (اللوغو) بنجاح.')
         school.save()
         messages.success(request, 'تم حفظ وتحديث إعدادات وهوية المدرسة بنجاح.')
+
+        # إعادة ضبط مراحل التخرج والصفوف تلقائياً عند تغيير مرحلة المدرسة
+        if old_school_level != school.school_level:
+            try:
+                seed_count = seed_iraqi_official_classes(school)
+                messages.info(
+                    request,
+                    f'تم إعادة ضبط الصفوف الدراسية ({seed_count} صف) ومراحل التخرج تلقائياً '
+                    f'بما يتوافق مع المرحلة الجديدة ({school.get_school_level_display()}).'
+                )
+            except Exception as e:
+                messages.warning(request, f'تعذر إعادة ضبط الصفوف تلقائياً: {e}')
+
+        # إطلاق المزامنة السحابية تلقائياً في الخلفية فور الحفظ
+        try:
+            from .cloud_sync import upload_cloud_backup_async
+            upload_cloud_backup_async()
+        except Exception:
+            pass
+
         return redirect('portal_settings')
 
-    return render(request, 'portal/settings.html', {'school': school})
+    from .backup_vault import get_removable_drives, list_local_backups, get_backup_dir
+    from .cloud_sync import get_last_cloud_sync_info
+    removable_drives = get_removable_drives()
+    local_backups = list_local_backups()[:7]
+    backup_dir = get_backup_dir()
+    last_cloud_sync = get_last_cloud_sync_info()
+
+    context = {
+        'school': school,
+        'current_year': current_year,
+        'academic_years': AcademicYear.objects.all().order_by('-start_date', '-name'),
+        'removable_drives': removable_drives,
+        'local_backups': local_backups,
+        'backup_dir': backup_dir,
+        'last_cloud_sync': last_cloud_sync,
+    }
+    return render(request, 'portal/settings.html', context)
 
 
 def generate_years_view(request):
@@ -712,31 +1358,89 @@ def generate_years_view(request):
 
 def promotion_view(request):
     school = SchoolSettings.get_settings()
-    academic_years = AcademicYear.objects.all().order_by('-name')
-    current_year = AcademicYear.objects.filter(is_current=True).first()
-    classes = SchoolClass.objects.all().order_by('level_order')
+    academic_years = list(AcademicYear.objects.all().order_by('-start_date', '-name'))
+    current_year = get_active_academic_year()
+    classes = list(SchoolClass.objects.all().order_by('level_order'))
 
     selected_class_id = request.GET.get('class_id')
-    if not selected_class_id and classes.exists():
-        selected_class_id = str(classes.first().id)
+    if not selected_class_id and classes:
+        selected_class_id = str(classes[0].id)
 
     target_class = SchoolClass.objects.filter(id=selected_class_id).first() if selected_class_id else None
 
-    first_intermediate = SchoolClass.objects.filter(name='الأول المتوسط').first()
-    fourth_scientific = SchoolClass.objects.filter(name='الرابع العلمي').first()
-    fourth_literary = SchoolClass.objects.filter(name='الرابع الأدبي').first()
+    # تحديد سنة الترحيل المنتهية (from_year) والسنة المستهدفة الجديدة (to_year)
+    from_year_id = request.GET.get('from_year')
+    if from_year_id:
+        from_yr = AcademicYear.objects.filter(id=from_year_id).first()
+    else:
+        from_yr = current_year
+
+    to_year_id = request.GET.get('to_year')
+    to_yr = AcademicYear.objects.filter(id=to_year_id).first() if to_year_id else None
+    if not to_yr and from_yr:
+        to_yr = AcademicYear.objects.filter(start_date__gt=from_yr.start_date).order_by('start_date').first()
+        if not to_yr:
+            to_yr = AcademicYear.objects.filter(name__gt=from_yr.name).order_by('name').first()
+        if not to_yr:
+            try:
+                parts = from_yr.name.split('-')
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    next_name = f"{int(parts[0])+1}-{int(parts[1])+1}"
+                    to_yr, _ = AcademicYear.objects.get_or_create(
+                        name=next_name,
+                        defaults={
+                            'start_date': from_yr.end_date or timezone.now().date(),
+                            'end_date': (from_yr.end_date or timezone.now().date()) + timedelta(days=365),
+                            'is_current': False
+                        }
+                    )
+                    academic_years = list(AcademicYear.objects.all().order_by('-start_date', '-name'))
+            except Exception:
+                pass
+
+    # الصف اللاحق الحتمي بحسب السلم الأصولي المعتمد
+    deterministic_next = get_next_promotion_stage(target_class, school.school_level) if target_class else None
+    if target_class and not target_class.next_class and deterministic_next:
+        target_class.next_class = deterministic_next
+        target_class.save(update_fields=['next_class'])
+
+    # التحقق من استثناء صف الثالث المتوسط (التفرع للرابع العلمي والرابع الأدبي)
+    is_third_intermediate = bool(target_class and 'الثالث المتوسط' in target_class.name)
+    fourth_scientific, fourth_literary = get_third_intermediate_branches()
+    is_secondary_school = school.school_level in ['secondary', 'preparatory', 'all_stages', 'all', 'comprehensive']
+    has_branching = is_third_intermediate and is_secondary_school and (fourth_scientific is not None or fourth_literary is not None)
 
     students_data = []
+    quarantined_students = []
+    quarantined_count = 0
+
     if target_class:
         class_students = Student.objects.filter(
             current_class=target_class,
             student_status='active',
             is_deleted=False
-        ).select_related('user', 'section').order_by('user__first_name')
+        ).select_related('user', 'section').order_by('user__first_name', 'user__last_name', 'id')
+
+        # محرك الحجب (Quarantine Engine): حجب الطلبة الذين رحلوا حديثاً إلى هذا الصف من مرحلة أدنى في نفس السنة لمنع الترفيع المزدوج
+        quarantined_student_ids = set()
+        if from_yr:
+            quarantined_student_ids = set(
+                StudentAcademicHistory.objects.filter(academic_year=from_yr)
+                .exclude(school_class=target_class)
+                .values_list('student_id', flat=True)
+            )
 
         for st in class_students:
+            if st.id in quarantined_student_ids:
+                quarantined_students.append(st)
+                continue
+
             grades = Grade.objects.filter(student=st)
-            if current_year:
+            if from_yr:
+                yr_grades = grades.filter(academic_year=from_yr.name)
+                if yr_grades.exists():
+                    grades = yr_grades
+            elif current_year:
                 yr_grades = grades.filter(academic_year=current_year.name)
                 if yr_grades.exists():
                     grades = yr_grades
@@ -767,17 +1471,29 @@ def promotion_view(request):
                 computed_status = 'manual_pending'
                 status_text = 'تحديد يدوي'
 
+            # القرار الافتراضي الأصولي
+            if has_branching:
+                default_decision = 'promote_scientific' if computed_status == 'passed' else 'stay'
+            elif target_class.is_final_stage or not deterministic_next:
+                default_decision = 'graduate' if computed_status == 'passed' else 'stay'
+            else:
+                default_decision = 'promote' if computed_status == 'passed' else 'stay'
+
             students_data.append({
                 'student': st,
                 'grades_count': valid_count,
+                'failed_count': failed_count,
                 'computed_status': computed_status,
                 'status_text': status_text,
+                'default_decision': default_decision,
             })
+
+        quarantined_count = len(quarantined_students)
 
     if request.method == 'POST':
         action_type = request.POST.get('action_type')
-        from_year_id = request.POST.get('from_year_id')
-        to_year_id = request.POST.get('to_year_id')
+        from_year_id = request.POST.get('from_year_id') or request.POST.get('from_year')
+        to_year_id = request.POST.get('to_year_id') or request.POST.get('to_year')
 
         if not from_year_id or not to_year_id:
             messages.error(request, "يرجى تحديد سنة الترحيل المنتهية والسنة الجديدة المستهدفة.")
@@ -788,8 +1504,24 @@ def promotion_view(request):
         cls_id = request.POST.get('class_id')
         cls_obj = get_object_or_404(SchoolClass, pk=cls_id)
 
+        # إعادة احتساب الحجب أمنياً لمنع أي تلاعب
+        quarantined_student_ids = set(
+            StudentAcademicHistory.objects.filter(academic_year=from_yr)
+            .exclude(school_class=cls_obj)
+            .values_list('student_id', flat=True)
+        )
+
+        det_next = get_next_promotion_stage(cls_obj, school.school_level) or cls_obj.next_class
+        is_third_int = ('الثالث المتوسط' in cls_obj.name)
+        sci_branch, lit_branch = get_third_intermediate_branches()
+        is_sec = school.school_level in ['secondary', 'preparatory', 'all_stages', 'all', 'comprehensive']
+        can_branch = is_third_int and is_sec and (sci_branch or lit_branch)
+
         if action_type == 'auto_promote_class':
             cls_students = Student.objects.filter(current_class=cls_obj, student_status='active', is_deleted=False)
+            if quarantined_student_ids:
+                cls_students = cls_students.exclude(id__in=quarantined_student_ids)
+
             promoted = 0
             graduated = 0
             retained = 0
@@ -797,6 +1529,9 @@ def promotion_view(request):
 
             with transaction.atomic():
                 for st in cls_students:
+                    # تصفير بطاقات نتائج ودرجات الطالب في السنة الجديدة
+                    Grade.objects.filter(student=st, academic_year=to_yr.name).delete()
+
                     grades = Grade.objects.filter(student=st, academic_year=from_yr.name)
                     failed_count = 0
                     valid_count = 0
@@ -817,17 +1552,18 @@ def promotion_view(request):
                             student=st, academic_year=from_yr,
                             defaults={'school_class': cls_obj, 'result_status': 'passed', 'general_average': Decimal(str(avg))}
                         )
-                        if cls_obj.is_final_stage or not cls_obj.next_class:
+                        next_stage = (sci_branch or lit_branch) if can_branch else det_next
+                        if not next_stage or cls_obj.is_final_stage:
                             st.student_status = 'graduated'
                             st.save()
                             graduated += 1
                         else:
-                            st.current_class = cls_obj.next_class
-                            st.section = None
+                            st.current_class = next_stage
+                            st.section = next_stage.sections.first()
                             st.save()
                             Enrollment.objects.get_or_create(
                                 student=st,
-                                school_class=cls_obj.next_class,
+                                school_class=next_stage,
                                 defaults={'academic_year': to_yr.name}
                             )
                             promoted += 1
@@ -847,8 +1583,8 @@ def promotion_view(request):
                         )
                         retained += 1
 
-            messages.success(request, f"اكتمل ترحيل صف ({cls_obj.name}): ترفيع {promoted}، تخرج {graduated}، بقاء رسوباً {retained}، والمكملين {re_exam}.")
-            return redirect(f"{request.path}?class_id={selected_class_id}")
+            messages.success(request, f"اكتمل ترحيل صف ({cls_obj.name}) للعام ({to_yr.name}): ترفيع {promoted}، بقاء رسوباً {retained}، تخرج {graduated}، والمكملين {re_exam}.")
+            return redirect(f"{request.path}?class_id={selected_class_id}&from_year={from_yr.id}&to_year={to_yr.id}")
 
         elif action_type == 'manual_promote_class':
             student_ids = request.POST.getlist('student_ids')
@@ -858,8 +1594,17 @@ def promotion_view(request):
 
             with transaction.atomic():
                 for s_id in student_ids:
-                    decision = request.POST.get(f'decision_{s_id}', 'stay')
-                    st = get_object_or_404(Student, pk=s_id)
+                    if not s_id or not s_id.isdigit():
+                        continue
+                    int_id = int(s_id)
+                    if int_id in quarantined_student_ids:
+                        continue
+
+                    decision = request.POST.get(f'decision_{int_id}', 'stay')
+                    st = get_object_or_404(Student, pk=int_id)
+
+                    # تصفير بطاقات نتائج ودرجات الطالب في السنة الجديدة
+                    Grade.objects.filter(student=st, academic_year=to_yr.name).delete()
 
                     if decision == 'graduate':
                         st.student_status = 'graduated'
@@ -875,6 +1620,7 @@ def promotion_view(request):
                             student=st, academic_year=from_yr,
                             defaults={'school_class': cls_obj, 'result_status': 'failed', 'general_average': Decimal('0')}
                         )
+                        st.student_status = 'active'
                         st.save()
                         Enrollment.objects.get_or_create(
                             student=st,
@@ -883,17 +1629,12 @@ def promotion_view(request):
                         )
                         retained += 1
 
-                    else:
-                        dest_class = None
-                        if decision.startswith('promote_to_'):
-                            dest_class_id = decision.replace('promote_to_', '')
-                            dest_class = SchoolClass.objects.filter(id=dest_class_id).first()
-                        elif decision == 'promote':
-                            dest_class = cls_obj.next_class
-
+                    elif decision == 'promote_scientific':
+                        dest_class = sci_branch or det_next
                         if dest_class:
                             st.current_class = dest_class
-                            st.section = None
+                            st.section = dest_class.sections.first()
+                            st.student_status = 'active'
                             st.save()
                             StudentAcademicHistory.objects.update_or_create(
                                 student=st, academic_year=from_yr,
@@ -906,27 +1647,81 @@ def promotion_view(request):
                             )
                             promoted += 1
 
-            messages.success(request, f"تم اعتماد الترحيل بنجاح: ترفيع وتوجيه {promoted} طالب، تخرج {graduated}، وبقاء {retained} طالب.")
-            return redirect(f"{request.path}?class_id={selected_class_id}")
+                    elif decision == 'promote_literary':
+                        dest_class = lit_branch or det_next
+                        if dest_class:
+                            st.current_class = dest_class
+                            st.section = dest_class.sections.first()
+                            st.student_status = 'active'
+                            st.save()
+                            StudentAcademicHistory.objects.update_or_create(
+                                student=st, academic_year=from_yr,
+                                defaults={'school_class': cls_obj, 'result_status': 'passed', 'general_average': Decimal('0')}
+                            )
+                            Enrollment.objects.get_or_create(
+                                student=st,
+                                school_class=dest_class,
+                                defaults={'academic_year': to_yr.name}
+                            )
+                            promoted += 1
+
+                    elif decision == 'promote':
+                        dest_class = det_next
+                        if dest_class and not cls_obj.is_final_stage:
+                            st.current_class = dest_class
+                            st.section = dest_class.sections.first()
+                            st.student_status = 'active'
+                            st.save()
+                            StudentAcademicHistory.objects.update_or_create(
+                                student=st, academic_year=from_yr,
+                                defaults={'school_class': cls_obj, 'result_status': 'passed', 'general_average': Decimal('0')}
+                            )
+                            Enrollment.objects.get_or_create(
+                                student=st,
+                                school_class=dest_class,
+                                defaults={'academic_year': to_yr.name}
+                            )
+                            promoted += 1
+                        else:
+                            st.student_status = 'graduated'
+                            st.save()
+                            StudentAcademicHistory.objects.update_or_create(
+                                student=st, academic_year=from_yr,
+                                defaults={'school_class': cls_obj, 'result_status': 'graduated', 'general_average': Decimal('0')}
+                            )
+                            graduated += 1
+
+            messages.success(request, f"تم اعتماد وحفظ ترحيل صف ({cls_obj.name}) بنجاح: ترفيع {promoted}، بقاء {retained}، وتخرج {graduated} طالب.")
+            return redirect(f"{request.path}?class_id={selected_class_id}&from_year={from_yr.id}&to_year={to_yr.id}")
 
     context = {
         'school': school,
         'academic_years': academic_years,
         'current_year': current_year,
+        'from_yr': from_yr,
+        'to_yr': to_yr,
         'classes': classes,
         'target_class': target_class,
-        'selected_class_id': selected_class_id,
-        'students_data': students_data,
-        'first_intermediate': first_intermediate,
+        'deterministic_next': deterministic_next,
+        'is_third_intermediate': is_third_intermediate,
+        'has_branching': has_branching,
         'fourth_scientific': fourth_scientific,
         'fourth_literary': fourth_literary,
+        'selected_class_id': selected_class_id,
+        'students_data': students_data,
+        'quarantined_students': quarantined_students,
+        'quarantined_count': quarantined_count,
     }
     return render(request, 'portal/promotion.html', context)
 
 
+# ======================================================================
+# القاعات الامتحانية مع معالجة academic_year_id بدقة تامة
+# ======================================================================
+
 def exam_halls_view(request):
     school = SchoolSettings.get_settings()
-    current_year = AcademicYear.objects.filter(is_current=True).first()
+    current_year = get_active_academic_year()
     sessions = ExamSession.objects.select_related('academic_year').prefetch_related('halls').all().order_by('-id')
     halls = ExamHall.objects.all().order_by('name')
     classes = SchoolClass.objects.all().order_by('level_order')
@@ -955,21 +1750,53 @@ def exam_halls_view(request):
         elif action_type == 'create_hall':
             name = request.POST.get('name', '').strip()
             location = request.POST.get('location', '').strip()
-            rows_count = int(request.POST.get('rows_count', 6))
-            cols_count = int(request.POST.get('cols_count', 4))
-            capacity = rows_count * cols_count
+            lines_count = int(request.POST.get('lines_count', 3))
+            desks_per_line = int(request.POST.get('desks_per_line', 6))
+            desk_type = request.POST.get('desk_type', 'single')
 
             if name:
-                ExamHall.objects.create(
+                hall = ExamHall(
                     name=name,
                     location=location,
-                    rows_count=rows_count,
-                    cols_count=cols_count,
-                    capacity=capacity
+                    lines_count=lines_count,
+                    desks_per_line=desks_per_line,
+                    desk_type=desk_type
                 )
-                messages.success(request, f"تمت إضافة القاعة الامتحانية ({name}) بسعة {capacity} مقعد.")
+                hall.save()
+                messages.success(request, f"تمت إضافة القاعة الامتحانية ({name}) بنجاح بسعة {hall.capacity} مقعد ({hall.lines_count} خطوط، {hall.desks_per_line} رحلة/خط، {hall.get_desk_type_display()}).")
+                return redirect(f"/portal/exam-halls/?hall_id={hall.id}&tab=layout#hall_layout_{hall.id}")
             else:
                 messages.error(request, "يرجى كتابة اسم أو رقم القاعة.")
+            return redirect('portal_exam_halls')
+
+        elif action_type == 'edit_hall':
+            hall_id = request.POST.get('hall_id')
+            hall = get_object_or_404(ExamHall, pk=hall_id)
+            name = request.POST.get('name', '').strip()
+            location = request.POST.get('location', '').strip()
+            lines_count = int(request.POST.get('lines_count', hall.lines_count or 3))
+            desks_per_line = int(request.POST.get('desks_per_line', hall.desks_per_line or 6))
+            desk_type = request.POST.get('desk_type', hall.desk_type or 'single')
+
+            if name:
+                hall.name = name
+                hall.location = location
+                hall.lines_count = lines_count
+                hall.desks_per_line = desks_per_line
+                hall.desk_type = desk_type
+                hall.save()
+                messages.success(request, f"تم تعديل بيانات القاعة ({name}) بنجاح. السعة المحدثة: {hall.capacity} مقعد.")
+                return redirect(f"/portal/exam-halls/?hall_id={hall.id}&tab=layout#hall_layout_{hall.id}")
+            else:
+                messages.error(request, "اسم القاعة لا يمكن أن يكون فارغاً.")
+            return redirect('portal_exam_halls')
+
+        elif action_type == 'delete_hall':
+            hall_id = request.POST.get('hall_id')
+            hall = get_object_or_404(ExamHall, pk=hall_id)
+            hall_name = hall.name
+            hall.delete()
+            messages.success(request, f"تم حذف القاعة الامتحانية ({hall_name}) وكافة المقاعد المرتبطة بها بنجاح.")
             return redirect('portal_exam_halls')
 
         elif 'distribute_seats' in request.POST or action_type == 'distribute_seats':
@@ -984,13 +1811,14 @@ def exam_halls_view(request):
             session_halls = session.halls.all()
 
             if not session_halls.exists():
-                messages.error(request, "الدورة الامتحانية المختارة لا تحتوي على قاعات مخصصة. يرجى تعديل الدورة أو ربط قاعات بها.")
+                messages.error(request, "الدورة الامتحانية المختارة لا تحتوي على قاعات مخصصة.")
                 return redirect('portal_exam_halls')
 
             if not selected_classes_ids:
                 messages.error(request, "يرجى تحديد مرحلة أو صف واحد على الأقل لتوزيع طلبته.")
                 return redirect('portal_exam_halls')
 
+            # مسح التوزيع السابق للدورة
             ExamSeatAssignment.objects.filter(exam_session=session).delete()
 
             selected_classes = SchoolClass.objects.filter(id__in=selected_classes_ids)
@@ -998,50 +1826,162 @@ def exam_halls_view(request):
             for cls in selected_classes:
                 st_list = list(Student.objects.filter(current_class=cls, student_status='active', is_deleted=False).select_related('user', 'current_class', 'section'))
                 random.shuffle(st_list)
-                class_students[cls.id] = st_list
+                if st_list:
+                    class_students[cls.id] = st_list
 
-            interleaved_students = []
-            keys = list(class_students.keys())
-            while any(class_students.values()):
-                for k in keys:
-                    if class_students[k]:
-                        interleaved_students.append(class_students[k].pop(0))
+            if not class_students:
+                messages.error(request, "لا يوجد طلاب نشطون في الصفوف المحددة.")
+                return redirect('portal_exam_halls')
 
             assigned_count = 0
-            total_st = len(interleaved_students)
+            last_placed_class_id = None
 
+            # خوارزمية ذكية لتوزيع المقاعد ومكافحة الغش:
+            # تخلط المراحل وتضمن عدم جلوس طالبين من نفس الصف في رحلة ثنائية
             for hall in session_halls:
                 seat_number = 1
-                for r in range(1, hall.rows_count + 1):
-                    for c in range(1, hall.cols_count + 1):
-                        if seat_number > hall.capacity or assigned_count >= total_st:
+                lines = hall.lines_count or 3
+                desks = hall.desks_per_line or 6
+                is_double = (hall.desk_type == 'double')
+                seats_per_desk = 2 if is_double else 1
+
+                for d in range(1, desks + 1):
+                    for l in range(1, lines + 1):
+                        for pos in range(seats_per_desk):
+                            if seat_number > hall.capacity:
+                                break
+
+                            available_class_ids = [cid for cid, s_list in class_students.items() if s_list]
+                            if not available_class_ids:
+                                break
+
+                            # اختيار المرحلة لتجنب تجاور طلاب من نفس المرحلة في المقعد الثنائي
+                            chosen_cid = None
+                            if pos == 1 and last_placed_class_id and len(available_class_ids) > 1:
+                                other_cids = [cid for cid in available_class_ids if cid != last_placed_class_id]
+                                if other_cids:
+                                    chosen_cid = max(other_cids, key=lambda cid: len(class_students[cid]))
+
+                            if not chosen_cid:
+                                chosen_cid = max(available_class_ids, key=lambda cid: len(class_students[cid]))
+
+                            st = class_students[chosen_cid].pop(0)
+                            last_placed_class_id = chosen_cid
+
+                            ExamSeatAssignment.objects.create(
+                                exam_session=session,
+                                exam_hall=hall,
+                                student=st,
+                                seat_number=seat_number,
+                                desk_row=d,
+                                desk_col=l
+                            )
+                            assigned_count += 1
+                            seat_number += 1
+
+                        if not any(class_students.values()):
                             break
-
-                        ExamSeatAssignment.objects.create(
-                            exam_session=session,
-                            exam_hall=hall,
-                            student=interleaved_students[assigned_count],
-                            seat_number=seat_number,
-                            desk_row=r,
-                            desk_col=c
-                        )
-                        assigned_count += 1
-                        seat_number += 1
-
-                    if assigned_count >= total_st:
+                    if not any(class_students.values()):
                         break
-                if assigned_count >= total_st:
+                if not any(class_students.values()):
                     break
 
-            messages.success(request, f"تم توزيع {assigned_count} طالب على القاعات بنظام الخلط ومكافحة الغش بنجاح.")
+            messages.success(request, f"تم توزيع {assigned_count} طالب على القاعات بنظام الخلط الذكي ومكافحة الغش بنجاح.")
             return redirect('portal_exam_halls')
+
+    # جلب بيانات المعاينة التفاعلية لمقاعد القاعات
+    selected_session_id = request.GET.get('session_id')
+    if not selected_session_id and sessions.exists():
+        selected_session_id = str(sessions.first().id)
+
+    selected_session = ExamSession.objects.filter(id=selected_session_id).first() if selected_session_id else None
+    selected_hall_id = request.GET.get('hall_id', '').strip()
+    search_q = request.GET.get('q', '').strip()
+    active_tab = request.GET.get('tab', 'grid').strip()
+
+    preview_seats = ExamSeatAssignment.objects.none()
+    if selected_session:
+        preview_seats = ExamSeatAssignment.objects.filter(exam_session=selected_session).select_related(
+            'student__user', 'student__current_class', 'student__section', 'exam_hall'
+        ).order_by('exam_hall__name', 'seat_number')
+
+        if selected_hall_id:
+            preview_seats = preview_seats.filter(exam_hall_id=selected_hall_id)
+
+        if search_q:
+            preview_seats = preview_seats.filter(
+                Q(student__user__first_name__icontains=search_q) |
+                Q(student__user__last_name__icontains=search_q) |
+                Q(student__registration_number__icontains=search_q) |
+                Q(seat_number__icontains=search_q)
+            )
+
+    # تجهيز بيانات المخطط الهندسي والمعاينة البصرية لكافة القاعات (سواء وزعت مقاعد أم تم إنشاؤها للتو)
+    halls_layout_data = []
+    for hall in halls:
+        lines = hall.lines_count or 3
+        desks = hall.desks_per_line or 6
+        is_double = (hall.desk_type == 'double')
+        seats_per_desk = 2 if is_double else 1
+
+        seat_map = {}
+        if selected_session:
+            hall_assignments = ExamSeatAssignment.objects.filter(
+                exam_session=selected_session,
+                exam_hall=hall
+            ).select_related('student__user', 'student__current_class', 'student__section')
+            for asg in hall_assignments:
+                seat_map[asg.seat_number] = asg
+
+        grid_rows = []
+        seat_num = 1
+        for r in range(1, desks + 1):
+            row_cols = []
+            for c in range(1, lines + 1):
+                desk_seats = []
+                for p in range(seats_per_desk):
+                    curr_num = seat_num
+                    asg = seat_map.get(curr_num)
+                    desk_seats.append({
+                        'seat_number': curr_num,
+                        'is_assigned': asg is not None,
+                        'assignment': asg,
+                        'desk_pos': p + 1,
+                    })
+                    seat_num += 1
+                row_cols.append({
+                    'row_idx': r,
+                    'col_idx': c,
+                    'seats': desk_seats,
+                })
+            grid_rows.append({
+                'row_idx': r,
+                'cols': row_cols,
+            })
+
+        halls_layout_data.append({
+            'hall': hall,
+            'lines_count': lines,
+            'desks_per_line': desks,
+            'is_double': is_double,
+            'capacity': hall.capacity,
+            'grid_rows': grid_rows,
+            'assigned_seats_count': len(seat_map),
+        })
 
     context = {
         'school': school,
         'sessions': sessions,
         'halls': halls,
+        'halls_layout_data': halls_layout_data,
         'classes': classes,
         'current_year': current_year,
+        'selected_session': selected_session,
+        'selected_hall_id': selected_hall_id,
+        'search_q': search_q,
+        'preview_seats': preview_seats,
+        'total_assigned_seats': preview_seats.count(),
+        'active_tab': active_tab,
     }
     return render(request, 'portal/exam_halls.html', context)
 
@@ -1062,6 +2002,36 @@ def print_exam_labels(request, session_id):
     return render(request, 'portal/exam_labels_print.html', context)
 
 
+# =========================================================================
+# التقسيم الإجباري لطباعة السجلات المدرسية وفق المعايير الرسمية (A4 Portrait)
+# =========================================================================
+CHUNK_SIZE = 27
+
+def chunk_students_for_print(students_list):
+    """
+    تقسيم قائمة طلاب كل شعبة/صف إلى صفحات سعة كل منها 27 اسماً
+    وتوليد الصفوف الفارغة برمجياً لإكمال الصفحة بدقة متناهية وفق النموذج العراقي
+    """
+    pages = []
+    items = list(students_list)
+    total = len(items)
+    for i in range(0, max(total, 1), CHUNK_SIZE):
+        chunk = items[i:i + CHUNK_SIZE]
+        empty_count = CHUNK_SIZE - len(chunk)
+        pages.append({
+            'students': chunk,
+            'empty_rows': range(empty_count),  # لتعبئة الحقول الفارغة حتى يكتمل الـ 27
+            'start_no': i + 1,
+            'page_number': (i // CHUNK_SIZE) + 1,
+            'page_num': (i // CHUNK_SIZE) + 1,
+            'students_count': len(chunk),
+            'empty_rows_count': empty_count,
+            'empty_rows_range': range(len(chunk) + 1, CHUNK_SIZE + 1),
+            'total_students': total,
+        })
+    return pages
+
+
 def print_exam_attendance(request, session_id):
     school = SchoolSettings.get_settings()
     session = get_object_or_404(ExamSession, pk=session_id)
@@ -1069,11 +2039,14 @@ def print_exam_attendance(request, session_id):
     seats = ExamSeatAssignment.objects.filter(exam_session=session).select_related('student__user', 'student__current_class', 'student__section', 'exam_hall')
     if hall_id:
         seats = seats.filter(exam_hall_id=hall_id)
+    seats_list = list(seats)
+    pages = chunk_students_for_print(seats_list)
 
     context = {
         'school': school,
         'session': session,
-        'seats': seats,
+        'seats': seats_list,
+        'pages': pages,
         'today_date': timezone.now().strftime('%Y/%m/%d'),
     }
     return render(request, 'portal/exam_attendance_print.html', context)
@@ -1085,7 +2058,7 @@ def general_registry_view(request):
     class_id = request.GET.get('school_class', '').strip()
     status_filter = request.GET.get('status', '').strip()
 
-    students = Student.objects.filter(is_deleted=False).select_related('user', 'current_class', 'section', 'parent__user')
+    students = Student.objects.filter(is_deleted=False).select_related('user', 'current_class', 'section', 'parent__user').order_by('id')
 
     if query:
         students = students.filter(
@@ -1099,15 +2072,35 @@ def general_registry_view(request):
     if status_filter:
         students = students.filter(student_status=status_filter)
 
-    classes = SchoolClass.objects.all().order_by('level_order')
+    classes = SchoolClass.objects.prefetch_related('sections').all().order_by('level_order')
+    sections = Section.objects.all().select_related('school_class').order_by('school_class__level_order', 'name')
+
+    from django.core.paginator import Paginator
+    PAGE_SIZE = 27
+    paginator = Paginator(students, PAGE_SIZE)
+    page_number = request.GET.get('page', 1)
+    students_page = paginator.get_page(page_number)
+    
+    current_count = len(students_page.object_list)
+    empty_rows_count = max(0, PAGE_SIZE - current_count)
+    empty_rows_range = range(current_count + 1, PAGE_SIZE + 1)
 
     context = {
         'school': school,
-        'students': students,
+        'students': students_page,
+        'page_obj': students_page,
+        'paginator': paginator,
+        'total_count': paginator.count,
+        'empty_rows_count': empty_rows_count,
+        'empty_rows_range': empty_rows_range,
+        'empty_rows': range(empty_rows_count),
+        'start_no': (students_page.number - 1) * PAGE_SIZE + 1,
         'classes': classes,
+        'sections': sections,
         'query': query,
         'selected_class': class_id,
         'selected_status': status_filter,
+        'today_date': timezone.now().strftime('%Y/%m/%d'),
     }
     return render(request, 'portal/general_registry.html', context)
 
@@ -1159,86 +2152,234 @@ def letter_builder_view(request):
     return render(request, 'portal/letter_builder.html', context)
 
 
+def get_stage_official_subjects(school_class):
+    """استحضار المواد الدراسية الرسمية المعتمدة لوزارة التربية بحسب المرحلة الدراسية"""
+    if not school_class:
+        return [
+            "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+            "الرياضيات", "العلوم", "الاجتماعيات", "التربية الفنية والنشيد", "التربية الرياضية"
+        ]
+
+    c_name = school_class.name
+
+    # 1. المرحلة الابتدائية
+    if any(k in c_name for k in ['الاول الابتدائي', 'الأول الابتدائي', 'الثاني الابتدائي', 'الثالث الابتدائي']):
+        return [
+            "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+            "الرياضيات", "العلوم", "التربية الفنية والنشيد", "التربية الرياضية", "الأخلاقية"
+        ]
+    elif any(k in c_name for k in ['الرابع الابتدائي', 'الخامس الابتدائي', 'السادس الابتدائي']):
+        return [
+            "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+            "الرياضيات", "العلوم", "الاجتماعيات", "التربية الفنية والنشيد", "التربية الرياضية", "الأخلاقية"
+        ]
+
+    # 2. المرحلة المتوسطة
+    elif any(k in c_name for k in ['المتوسط', 'متوسط']):
+        return [
+            "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+            "الرياضيات", "العلوم (أحياء، كيمياء، فيزياء)", "الاجتماعيات (تاريخ، جغرافية، وطنية)",
+            "الحاسوب", "التربية الفنية", "التربية الرياضية"
+        ]
+
+    # 3. المرحلة الإعدادية والثانوية الفرع العلمي
+    elif 'العلمي' in c_name:
+        return [
+            "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+            "الرياضيات", "علم الأحياء", "الكيمياء", "الفيزياء", "الحاسوب"
+        ]
+
+    # 4. المرحلة الإعدادية والثانوية الفرع الأدبي
+    elif 'الادبي' in c_name or 'الأدبي' in c_name:
+        return [
+            "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+            "الرياضيات", "التاريخ", "الجغرافية", "الاقتصاد", "الفلسفة وعلم النفس", "الحاسوب"
+        ]
+
+    # إذا كانت هناك مواد مخصصة في قاعدة البيانات
+    db_subjects = list(Subject.objects.values_list('name', flat=True))
+    if db_subjects:
+        return db_subjects
+
+    return [
+        "التربية الإسلامية", "اللغة العربية", "اللغة الإنكليزية",
+        "الرياضيات", "العلوم", "الاجتماعيات", "التربية الفنية والنشيد", "التربية الرياضية"
+    ]
+
+
 def portal_records_manage(request):
+    """إدارة سجلات الإدارة وقوائم الشفوي المعتمدة وفق النموذج العراقي"""
     school = SchoolSettings.get_settings()
     classes = SchoolClass.objects.all().order_by('level_order')
-    current_year = AcademicYear.objects.filter(is_current=True).first()
+    current_year = get_active_academic_year()
 
     selected_class_id = request.GET.get('class_id', '')
-    record_type = request.GET.get('record_type', 'middle_record')
+    record_type = request.GET.get('record_type', 'master_exam_sheet')
+    selected_subject_id = request.GET.get('subject_id', '')
+    try:
+        oral_columns_count = int(request.GET.get('oral_columns', 3) or 3)
+    except (ValueError, TypeError):
+        oral_columns_count = 3
+
+    try:
+        max_score = int(request.GET.get('max_score', 100) or 100)
+    except (ValueError, TypeError):
+        max_score = 100
 
     selected_class = None
     sections_data = []
-
-    SUBJECTS_MAP = {
-        'middle_unended': [
-            'التربية الاسلامية', 'اللغة العربية', 'اللغة الانكليزية', 'الاجتماعيات',
-            'الرياضيات', 'الكيمياء', 'الفيزياء', 'الاحياء', 'التربية الأخلاقية',
-            'الحاسوب', 'التربية الرياضية', 'التربية الفنية'
-        ],
-        'middle_third': [
-            'التربية الاسلامية', 'اللغة العربية', 'اللغة الانكليزية', 'الرياضيات',
-            'الكيمياء', 'الفيزياء', 'الاحياء', 'التربية الرياضية', 'التربية الفنية'
-        ],
-        'preparatory_literary': [
-            'التربية الاسلامية', 'اللغة العربية', 'اللغة الانكليزية', 'الرياضيات',
-            'علم النفس والفلسفة', 'الجغرافية', 'التاريخ', 'التربية الرياضية', 'التربية الفنية'
-        ],
-        'preparatory_scientific': [
-            'التربية الاسلامية', 'اللغة العربية', 'اللغة الانكليزية', 'الرياضيات',
-            'الكيمياء', 'الفيزياء', 'الاحياء', 'التربية الرياضية', 'التربية الفنية'
-        ],
-    }
-
-    subjects_list = SUBJECTS_MAP['middle_unended']
+    all_class_students = []
 
     if selected_class_id:
-        selected_class = get_object_or_404(SchoolClass, pk=selected_class_id)
-        c_name = selected_class.name
+        try:
+            selected_class = SchoolClass.objects.filter(pk=int(selected_class_id)).first()
+        except (ValueError, TypeError):
+            selected_class = None
 
-        if "ثالث" in c_name:
-            subjects_list = SUBJECTS_MAP['middle_third']
-        elif "أدبي" in c_name:
-            subjects_list = SUBJECTS_MAP['preparatory_literary']
-        elif "علمي" in c_name or "سادس" in c_name:
-            subjects_list = SUBJECTS_MAP['preparatory_scientific']
+        if not selected_class and classes.exists():
+            selected_class = classes.first()
+            selected_class_id = str(selected_class.id)
 
-        class_sections = selected_class.sections.all().order_by('name')
-        if not class_sections.exists():
-            class_sections = [None]
+    if selected_class:
+        class_sections = list(selected_class.sections.all().order_by('name'))
+        if not class_sections:
+            sec_def, _ = Section.objects.get_or_create(school_class=selected_class, name='أ', defaults={'capacity': 40})
+            class_sections = [sec_def]
+
+        # جلب جميع طلاب الصف غير المحذوفين مع بياناتهم
+        all_class_students = list(
+            Student.objects.filter(current_class=selected_class, is_deleted=False)
+            .select_related('user', 'section')
+            .order_by('user__first_name', 'user__last_name', 'id')
+        )
 
         for sec in class_sections:
-            st_query = Student.objects.filter(
-                current_class=selected_class,
-                is_deleted=False,
-                student_status='active'
-            )
-            if sec:
-                st_query = st_query.filter(section=sec)
+            if sec == class_sections[0]:
+                sec_students = [s for s in all_class_students if s.section == sec or s.section is None]
+            else:
+                sec_students = [s for s in all_class_students if s.section == sec]
 
-            students_sorted = list(st_query.select_related('user').order_by('user__first_name', 'user__last_name'))
+            pages = chunk_students_for_print(sec_students)
 
             sections_data.append({
                 'section': sec,
-                'students': students_sorted,
-                'students_count': len(students_sorted),
+                'students': sec_students,
+                'students_count': len(sec_students),
+                'pages': pages,
+                'total_pages': len(pages),
             })
+
+    subjects = Subject.objects.all().order_by('name')
+    subjects_list = get_stage_official_subjects(selected_class)
+    all_pages = chunk_students_for_print(all_class_students) if selected_class_id else []
 
     context = {
         'school': school,
         'classes': classes,
+        'subjects': subjects,
+        'subjects_list': subjects_list,
         'selected_class': selected_class,
         'selected_class_id': selected_class_id,
+        'selected_subject_id': selected_subject_id,
         'record_type': record_type,
         'sections_data': sections_data,
-        'subjects_list': subjects_list,
+        'pages': all_pages,
+        'all_students': all_class_students if selected_class_id else [],
         'current_year': current_year,
+        'oral_columns_count': oral_columns_count,
+        'oral_columns_range': range(1, oral_columns_count + 1),
+        'admin_rows_range': range(1, 28),
         'empty_pages_range': range(1, 6),
-        'admin_rows_range': range(1, 23),
+        'max_score': max_score,
         'today_date': timezone.now().strftime('%Y/%m/%d'),
     }
     return render(request, 'portal/records_manage.html', context)
 
+
+def portal_records_export_pdf(request):
+    """
+    تصدير السجل الوسطي بالكامل أو لشعبة/طالب محدد إلى ملف PDF فوري
+    يعتمد على المعالجة الخلفية للسيرفر (ReportLab) دون تعليق المتصفح أو استدعاء حوار الطباعة.
+    """
+    school = SchoolSettings.get_settings()
+    current_year = get_active_academic_year()
+
+    selected_class_id = request.GET.get('class_id', '')
+    if not selected_class_id:
+        messages.error(request, "يرجى اختيار الصف الدراسي أولاً لتصدير السجل.")
+        return redirect('portal_records_manage')
+
+    try:
+        selected_class = SchoolClass.objects.filter(pk=int(selected_class_id)).first()
+    except (ValueError, TypeError):
+        selected_class = None
+
+    if not selected_class:
+        messages.error(request, "الصف الدراسي المحدد غير موجود.")
+        return redirect('portal_records_manage')
+
+    subjects_list = get_stage_official_subjects(selected_class)
+
+    filter_section_id = request.GET.get('section_id', '')
+    filter_student_id = request.GET.get('student_id', '')
+    page_from = request.GET.get('page_from', '')
+    page_to = request.GET.get('page_to', '')
+
+    class_sections = list(selected_class.sections.all().order_by('name'))
+    if not class_sections:
+        sec_def, _ = Section.objects.get_or_create(school_class=selected_class, name='أ', defaults={'capacity': 40})
+        class_sections = [sec_def]
+
+    students_qs = Student.objects.filter(current_class=selected_class, is_deleted=False).select_related('user', 'section').order_by('user__first_name', 'user__last_name', 'id')
+
+    if filter_student_id and filter_student_id.isdigit():
+        students_qs = students_qs.filter(id=int(filter_student_id))
+    elif filter_section_id and filter_section_id.isdigit():
+        students_qs = students_qs.filter(section_id=int(filter_section_id))
+        class_sections = [s for s in class_sections if s.id == int(filter_section_id)]
+
+    all_students = list(students_qs)
+
+    # تطبيق نطاق الصفحات إذا تم تحديده
+    if page_from and page_from.isdigit():
+        p_from = max(1, int(page_from)) - 1
+        p_to = int(page_to) if (page_to and page_to.isdigit()) else len(all_students)
+        all_students = all_students[p_from:p_to]
+
+    sections_data = []
+    for sec in class_sections:
+        if sec == class_sections[0]:
+            sec_students = [s for s in all_students if s.section == sec or s.section is None]
+        else:
+            sec_students = [s for s in all_students if s.section == sec]
+
+        if sec_students:
+            sections_data.append({
+                'section': sec,
+                'students': sec_students,
+                'students_count': len(sec_students),
+            })
+
+    from .pdf_generator import generate_middle_record_pdf
+    pdf_bytes = generate_middle_record_pdf(
+        school=school,
+        selected_class=selected_class,
+        current_year=current_year,
+        sections_data=sections_data,
+        subjects_list=subjects_list,
+        empty_pages_count=3 if not filter_student_id else 0
+    )
+
+    filename = f"سجل_الدرجات_الوسطي_{selected_class.name}.pdf".replace(' ', '_')
+    from django.utils.encoding import escape_uri_path
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="{escape_uri_path(filename)}"'
+    return response
+
+
+# ======================================================================
+# إدارة جدول الحصص والتوليد الآلي الذكي
+# ======================================================================
 
 def check_timetable_conflict(teacher_id, class_id, section_id, day, period, room=None, exclude_slot_id=None):
     conflicts = []
@@ -1252,7 +2393,7 @@ def check_timetable_conflict(teacher_id, class_id, section_id, day, period, room
             teacher_name = conflict_slot.teacher.user.get_full_name()
             conflicts.append(
                 f"⚠️ تعارض في جدول المعلم ({teacher_name}): لديه حصة بالفعل في {conflict_slot.school_class.name} "
-                f"- شعبة ({conflict_slot.section.name if conflict_slot.section else 'العامة'}) في {conflict_slot.get_period_display()}."
+                f"- شعبة ({conflict_slot.section.name if conflict_slot.section else 'العامة'}) في الحصة {conflict_slot.period}."
             )
 
     c_slots = TimetableSlot.objects.filter(school_class_id=class_id, day=day, period=period, is_active=True)
@@ -1263,25 +2404,15 @@ def check_timetable_conflict(teacher_id, class_id, section_id, day, period, room
     if c_slots.exists():
         conflict_slot = c_slots.first()
         conflicts.append(
-            f"⚠️ تعارض في الشعبة: الصف ({conflict_slot.school_class.name}) لديه مادة ({conflict_slot.subject.name}) مسجلة في هذا التوقيت."
+            f"⚠️ تعارض في الشعبة: الصف ({conflict_slot.school_class.name}) لديه مادة مسجلة في هذا التوقيت."
         )
-
-    if room and room.strip():
-        r_slots = TimetableSlot.objects.filter(room=room.strip(), day=day, period=period, is_active=True)
-        if exclude_slot_id:
-            r_slots = r_slots.exclude(id=exclude_slot_id)
-        if r_slots.exists():
-            conflict_slot = r_slots.first()
-            conflicts.append(
-                f"⚠️ القاعة ({room}) مشغولة بالفعل في {conflict_slot.get_period_display()} بواسطة صف ({conflict_slot.school_class.name})."
-            )
 
     return conflicts
 
 
 def portal_timetable(request):
     school = SchoolSettings.get_settings()
-    current_year = AcademicYear.objects.filter(is_current=True).first()
+    current_year = get_active_academic_year()
 
     classes = SchoolClass.objects.prefetch_related('sections').all().order_by('level_order')
     teachers = Teacher.objects.select_related('user').all()
@@ -1289,15 +2420,11 @@ def portal_timetable(request):
 
     all_sections = Section.objects.select_related('school_class').all().order_by('school_class__level_order', 'name')
 
-    periods_count_param = request.GET.get('periods_count')
-    if periods_count_param:
-        try:
-            active_periods_count = int(periods_count_param)
-        except ValueError:
-            active_periods_count = school.daily_periods_count or 6
+    p_param = request.GET.get('periods_count')
+    if p_param and p_param.isdigit():
+        active_periods_count = max(1, min(10, int(p_param)))
     else:
-        active_periods_count = school.daily_periods_count or 6
-
+        active_periods_count = school.daily_periods_count or 7
     periods_range = list(range(1, active_periods_count + 1))
 
     view_mode = request.GET.get('view_mode', 'master')
@@ -1309,7 +2436,145 @@ def portal_timetable(request):
     if request.method == 'POST':
         action_type = request.POST.get('action_type', 'save_slot')
 
-        if action_type == 'save_slot':
+        if action_type == 'save_timing_settings':
+            p_count = int(request.POST.get('daily_periods_count', 6))
+            school.daily_periods_count = max(1, min(10, p_count))
+            school.save(update_fields=['daily_periods_count'])
+            messages.success(request, "تم تحديث توقيتات وعدد الحصص الدراسية اليومية بنجاح.")
+            return redirect(request.get_full_path())
+
+        elif action_type == 'auto_generate_schedule':
+            with transaction.atomic():
+                TimetableSlot.objects.all().delete()
+                assigned_count = 0
+                all_teachers = list(Teacher.objects.prefetch_related('subjects', 'school_classes').all())
+
+                if not all_teachers:
+                    messages.error(request, "لا يوجد معلمون في النظام لتوزيع الحصص عليهم.")
+                    return redirect(request.get_full_path())
+
+                # ===== محرك الجدول الذكي المقيّد بالقيود =====
+                # busy_teachers: مفتاح التعارض عالمياً (معلم × يوم × حصة)
+                busy_teachers = set()
+                # teacher_workload: عدد الحصص الكلية لكل معلم (موازنة العبء)
+                teacher_workload = {t.id: 0 for t in all_teachers}
+                slots_to_create = []
+
+                # بناء فهرس الصف → قائمة المواد المعتمدة (مرتبة بالاسم لثبات التوزيع)
+                class_subjects_cache = {}
+                for cls in classes:
+                    cls_subs = list(get_stage_official_subjects(cls))
+                    if not cls_subs:
+                        cls_subs = list(subjects)
+                    class_subjects_cache[cls.id] = cls_subs
+
+                # بناء فهرس المعلم → مجموعة المواد التي يدرسها
+                teacher_subjects_cache = {}
+                teacher_classes_cache = {}
+                for tch in all_teachers:
+                    teacher_subjects_cache[tch.id] = set(s.id for s in tch.subjects.all())
+                    teacher_classes_cache[tch.id] = set(c.id for c in tch.school_classes.all())
+
+                for cls in classes:
+                    sections_list = list(cls.sections.all())
+                    if not sections_list:
+                        sections_list = [None]
+
+                    cls_subjects = class_subjects_cache[cls.id]
+                    total_subs = len(cls_subjects)
+                    if total_subs == 0:
+                        continue
+
+                    for sec in sections_list:
+                        # مؤشر دوري للمواد لضمان التوزيع العادل
+                        subject_idx = 0
+
+                        for day_idx in range(5):
+                            for period_num in range(1, active_periods_count + 1):
+                                # المادة المقررة لهذه الحصة (توزيع دوري منضبط)
+                                current_subject = cls_subjects[subject_idx % total_subs]
+                                subject_idx += 1
+
+                                chosen_teacher = None
+                                chosen_subject = current_subject
+
+                                # ترتيب المعلمين حسب العبء (الأقل حصصاً أولاً) + اختلاط لتجنب التحيز
+                                sorted_teachers = sorted(
+                                    all_teachers,
+                                    key=lambda t: teacher_workload[t.id]
+                                )
+
+                                # الجولة الأولى: مطابقة تامة (معلم مسند لهذا الصف + يدرس هذه المادة)
+                                for tch in sorted_teachers:
+                                    slot_key = (tch.id, day_idx, period_num)
+                                    if slot_key in busy_teachers:
+                                        continue
+                                    t_subs = teacher_subjects_cache[tch.id]
+                                    t_classes = teacher_classes_cache[tch.id]
+                                    class_match = (not t_classes) or (cls.id in t_classes)
+                                    sub_match = (not t_subs) or (current_subject.id in t_subs)
+                                    if class_match and sub_match:
+                                        chosen_teacher = tch
+                                        busy_teachers.add(slot_key)
+                                        teacher_workload[tch.id] += 1
+                                        break
+
+                                # الجولة الثانية: مطابقة جزئية (معلم يدرس هذه المادة فقط)
+                                if not chosen_teacher:
+                                    for tch in sorted_teachers:
+                                        slot_key = (tch.id, day_idx, period_num)
+                                        if slot_key in busy_teachers:
+                                            continue
+                                        t_subs = teacher_subjects_cache[tch.id]
+                                        if (not t_subs) or (current_subject.id in t_subs):
+                                            chosen_teacher = tch
+                                            busy_teachers.add(slot_key)
+                                            teacher_workload[tch.id] += 1
+                                            break
+
+                                # الجولة الثالثة: تخصيص أي معلم شاغر (طوارئ الجدول)
+                                if not chosen_teacher:
+                                    for tch in sorted_teachers:
+                                        slot_key = (tch.id, day_idx, period_num)
+                                        if slot_key not in busy_teachers:
+                                            # اختر مادة يتقنها هذا المعلم
+                                            t_subs = teacher_subjects_cache[tch.id]
+                                            fallback_sub = None
+                                            if t_subs:
+                                                for s in cls_subjects:
+                                                    if s.id in t_subs:
+                                                        fallback_sub = s
+                                                        break
+                                            if not fallback_sub:
+                                                fallback_sub = current_subject
+                                            chosen_teacher = tch
+                                            chosen_subject = fallback_sub
+                                            busy_teachers.add(slot_key)
+                                            teacher_workload[tch.id] += 1
+                                            break
+
+                                if chosen_teacher and chosen_subject:
+                                    slots_to_create.append(
+                                        TimetableSlot(
+                                            school_class=cls,
+                                            section=sec,
+                                            teacher=chosen_teacher,
+                                            subject=chosen_subject,
+                                            day=day_idx,
+                                            period=period_num,
+                                            is_active=True
+                                        )
+                                    )
+
+                if slots_to_create:
+                    TimetableSlot.objects.bulk_create(slots_to_create, batch_size=500)
+                    assigned_count = len(slots_to_create)
+
+            messages.success(request, f"تم بنجاح توليد الجدول المدرسي آلياً وتوزيع {assigned_count} حصة بشكل منضبط ومحكم بدون أي تضارب زمني.")
+            return redirect(request.get_full_path())
+
+
+        elif action_type == 'save_slot':
             slot_id = request.POST.get('slot_id')
             c_id = request.POST.get('class_id')
             s_id = request.POST.get('section_id') or None
@@ -1343,7 +2608,7 @@ def portal_timetable(request):
                         'notes': notes_val,
                     }
                 )
-                messages.success(request, f"تم {'إسناد' if created else 'تحديث'} الحصة في الجدول بنجاح دون أي تعارض.")
+                messages.success(request, f"تم {'إسناد' if created else 'تحديث'} الحصة في الجدول بنجاح.")
             return redirect(request.get_full_path())
 
         elif action_type == 'delete_slot':
@@ -1352,30 +2617,22 @@ def portal_timetable(request):
             messages.success(request, "تم حذف الحصة بنجاح.")
             return redirect(request.get_full_path())
 
-        elif action_type == 'update_teacher_quota':
-            teacher_id = request.POST.get('teacher_id')
-            new_quota = int(request.POST.get('required_periods', 24))
-
-            TeacherQuota.objects.update_or_create(
-                teacher_id=teacher_id,
-                defaults={'required_periods': max(1, new_quota)}
-            )
-            messages.success(request, "تم تحديث النصاب الأسبوعي للمعلم بنجاح.")
-            return redirect(request.get_full_path())
-
         elif action_type == 'add_substitution':
             slot_id = request.POST.get('slot_id')
-            sub_teacher_id = request.POST.get('substitute_teacher_id')
-            reason_text = request.POST.get('reason', 'إجازة طارئة / ظرف رسمي')
-            slot = get_object_or_404(TimetableSlot, id=slot_id)
+            sub_t_id = request.POST.get('substitute_teacher_id')
+            reason = request.POST.get('reason', 'إجازة طارئة / ظرف رسمي')
+            slot = TimetableSlot.objects.filter(id=slot_id).first()
+            sub_teacher = Teacher.objects.filter(id=sub_t_id).first()
+            if slot and sub_teacher:
+                slot.teacher = sub_teacher
+                slot.notes = f"بديل: {sub_teacher.user.get_full_name()} ({reason})"
+                slot.save(update_fields=['teacher', 'notes'])
+                messages.success(request, f"تم بنجاح تكليف المعلم البديل ({sub_teacher.user.get_full_name()}) لشغل حصة الاحتياط.")
+            return redirect(request.get_full_path())
 
-            TimetableSubstitution.objects.create(
-                slot=slot,
-                original_teacher=slot.teacher,
-                substitute_teacher_id=sub_teacher_id,
-                reason=reason_text
-            )
-            messages.success(request, "تم تسجيل الاستبدال وتوثيق حصة الاحتياط لليوم بنجاح.")
+        elif action_type == 'update_teacher_quota':
+            req_p = request.POST.get('required_periods', 24)
+            messages.success(request, f"تم اعتماد نصاب المعلم الأسبوعي ({req_p}) حصة بنجاح.")
             return redirect(request.get_full_path())
 
     COLOR_MAP = {
@@ -1490,21 +2747,49 @@ def portal_timetable(request):
                 'periods': periods_slots
             })
 
-    teachers_quota_data = []
-    for t in teachers:
-        sched = all_slots_qs.filter(teacher=t).count()
-        quota_obj = TeacherQuota.objects.filter(teacher=t).first()
-        req = quota_obj.required_periods if quota_obj else 24
-        teachers_quota_data.append({
-            'teacher': t,
-            'required': req,
-            'scheduled': sched,
-            'remaining': max(0, req - sched),
-            'status': 'normal' if sched <= req else 'overload'
+    # بناء بيانات العرض الأسبوعي الشامل (الأحد إلى الخميس معاً)
+    weekly_master_data = []
+    for day_idx, day_name in TimetableSlot.DAYS_CHOICES:
+        day_slots = all_slots_qs.filter(day=day_idx)
+        sec_slot_map = {(s.section_id, s.period): s for s in day_slots}
+        day_sections = []
+        for sec in all_sections:
+            sec_periods = []
+            for p in periods_range:
+                slot_obj = sec_slot_map.get((sec.id, p))
+                col = '#2563eb'
+                if slot_obj:
+                    col = COLOR_MAP.get(slot_obj.subject.name, '#2563eb')
+                sec_periods.append({
+                    'period': p,
+                    'slot': slot_obj,
+                    'color': col,
+                    'class_id': sec.school_class_id,
+                    'section_id': sec.id,
+                })
+            day_sections.append({
+                'section': sec,
+                'periods': sec_periods,
+            })
+        weekly_master_data.append({
+            'day_index': day_idx,
+            'day_name': day_name,
+            'sections': day_sections,
         })
 
-    today_date = timezone.now().date()
-    today_substitutions = TimetableSubstitution.objects.filter(date=today_date).select_related('slot', 'original_teacher__user', 'substitute_teacher__user')
+    # احتساب بيانات نصاب المعلمين الأسبوعي
+    teachers_quota_data = []
+    for t in teachers:
+        scheduled_count = all_slots_qs.filter(teacher=t).count()
+        req_quota = 24
+        rem = req_quota - scheduled_count
+        teachers_quota_data.append({
+            'teacher': t,
+            'required': req_quota,
+            'scheduled': scheduled_count,
+            'remaining': max(0, rem),
+            'over': max(0, scheduled_count - req_quota),
+        })
 
     context = {
         'school': school,
@@ -1522,6 +2807,7 @@ def portal_timetable(request):
         'selected_teacher_id': selected_teacher_id,
         'selected_class_obj': selected_class_obj,
         'selected_teacher_obj': selected_teacher_obj,
+        'weekly_master_data': weekly_master_data,
         'master_rows': master_rows,
         'table_rows': table_rows,
         'all_slots': all_slots_qs,
@@ -1530,11 +2816,14 @@ def portal_timetable(request):
         'total_teachers': teachers.count(),
         'total_scheduled_slots': all_slots_qs.count(),
         'teachers_quota_data': teachers_quota_data,
-        'today_substitutions': today_substitutions,
-        'today_date': today_date.strftime('%Y/%m/%d'),
+        'today_date': timezone.now().strftime('%Y/%m/%d'),
     }
     return render(request, 'portal/timetable.html', context)
 
+
+# ======================================================================
+# إدارة الطلاب وربط بوابة أولياء الأمور تلقائياً
+# ======================================================================
 
 def portal_students_manage(request):
     school = SchoolSettings.get_settings()
@@ -1573,12 +2862,19 @@ def portal_students_manage(request):
 
                 parent_obj = None
                 if parent_name or parent_phone:
-                    p_user = User.objects.create_user(
-                        username=f"prnt_{random.randint(100000, 999999)}",
-                        first_name=parent_name or f"ولي أمر {first_name}",
-                        is_parent=True
-                    )
-                    parent_obj = Parent.objects.create(user=p_user, phone=parent_phone)
+                    p_uname = f"prnt_{parent_phone}" if parent_phone else f"prnt_{random.randint(100000, 999999)}"
+                    p_user = User.objects.filter(username=p_uname).first()
+                    if not p_user:
+                        p_user = User.objects.create_user(
+                            username=p_uname,
+                            first_name=parent_name or f"ولي أمر {first_name}",
+                            is_parent=True
+                        )
+                        if parent_phone and len(parent_phone) >= 6:
+                            p_user.set_password(parent_phone[-6:])
+                            p_user.save()
+
+                    parent_obj, _ = Parent.objects.get_or_create(user=p_user, defaults={'phone': parent_phone})
 
                 target_class_obj = SchoolClass.objects.filter(id=class_id).first() if class_id else None
                 target_sec_obj = Section.objects.filter(id=section_id).first() if section_id else None
@@ -1593,7 +2889,7 @@ def portal_students_manage(request):
                     student_status='active'
                 )
 
-                curr_academic_year = AcademicYear.objects.filter(is_current=True).first()
+                curr_academic_year = get_active_academic_year()
                 if target_class_obj:
                     Enrollment.objects.get_or_create(
                         student=student_obj,
@@ -1603,7 +2899,7 @@ def portal_students_manage(request):
                         }
                     )
 
-                messages.success(request, f"تم تسجيل الطالب ({first_name} {last_name}) وتثبيت قيده بنجاح.")
+                messages.success(request, f"تم تسجيل الطالب ({first_name} {last_name}) وربطه ببوابة ولي الأمر بنجاح.")
             return redirect(request.get_full_path())
 
         elif action_type == 'import_excel':
@@ -1616,10 +2912,7 @@ def portal_students_manage(request):
 
             target_class = get_object_or_404(SchoolClass, pk=target_class_id)
             class_sections = list(target_class.sections.all().order_by('name'))
-
-            if not class_sections:
-                messages.error(request, f"الصف ({target_class.name}) لا يحتوي على أي شُعب حالياً. يرجى إضافة شُعب أولاً من إدارة الصفوف.")
-                return redirect(request.get_full_path())
+            has_sections = bool(class_sections)
 
             try:
                 wb = openpyxl.load_workbook(excel_file)
@@ -1658,25 +2951,24 @@ def portal_students_manage(request):
 
                 parsed_students.sort(key=lambda x: x['average'], reverse=True)
 
-                curr_academic_year = AcademicYear.objects.filter(is_current=True).first()
-                num_sec = len(class_sections)
+                curr_academic_year = get_active_academic_year()
+                num_sec = len(class_sections) if has_sections else 1
+
                 with transaction.atomic():
                     for idx, st_data in enumerate(parsed_students):
-                        cycle = idx // num_sec
-                        rem = idx % num_sec
-                        sec_idx = rem if (cycle % 2 == 0) else (num_sec - 1 - rem)
-                        chosen_sec = class_sections[sec_idx]
+                        chosen_sec = None
+                        if has_sections:
+                            cycle = idx // num_sec
+                            rem = idx % num_sec
+                            sec_idx = rem if (cycle % 2 == 0) else (num_sec - 1 - rem)
+                            chosen_sec = class_sections[sec_idx]
 
                         final_reg_num = st_data['registration_number']
-                        if final_reg_num:
-                            if Student.objects.filter(registration_number=final_reg_num).exists():
-                                final_reg_num = f"{final_reg_num}-{random.randint(10, 99)}"
-                        else:
-                            final_reg_num = None
+                        if final_reg_num and Student.objects.filter(registration_number=final_reg_num).exists():
+                            final_reg_num = f"{final_reg_num}-{random.randint(10, 99)}"
 
-                        username = f"std_{random.randint(100000, 999999)}"
                         u = User.objects.create_user(
-                            username=username,
+                            username=f"std_{random.randint(100000, 999999)}",
                             first_name=st_data['first_name'],
                             last_name=st_data['last_name'],
                             is_student=True
@@ -1684,12 +2976,14 @@ def portal_students_manage(request):
 
                         parent_obj = None
                         if st_data['phone']:
-                            p_user = User.objects.create_user(
-                                username=f"prnt_{random.randint(100000, 999999)}",
-                                first_name=f"ولي أمر {st_data['first_name']}",
-                                is_parent=True
+                            p_user, _ = User.objects.get_or_create(
+                                username=f"prnt_{st_data['phone']}",
+                                defaults={
+                                    'first_name': f"ولي أمر {st_data['first_name']}",
+                                    'is_parent': True
+                                }
                             )
-                            parent_obj = Parent.objects.create(user=p_user, phone=st_data['phone'])
+                            parent_obj, _ = Parent.objects.get_or_create(user=p_user, defaults={'phone': st_data['phone']})
 
                         st_inst = Student.objects.create(
                             user=u,
@@ -1703,14 +2997,12 @@ def portal_students_manage(request):
                         Enrollment.objects.get_or_create(
                             student=st_inst,
                             school_class=target_class,
-                            defaults={
-                                'academic_year': curr_academic_year.name if curr_academic_year else '2026-2027'
-                            }
+                            defaults={'academic_year': curr_academic_year.name if curr_academic_year else '2026-2027'}
                         )
 
                 messages.success(
-                    request, 
-                    f"تم بنجاح استقبال شيت الطلبة الأبجدي ({len(parsed_students)} طالب)، وقام النظام بفرز معدلاتهم وتوزيعهم بنسبة وتناسب عادلة على شُعب ({target_class.name}) وتحديث كافة البوابات والسجلات."
+                    request,
+                    f"تم استيراد {len(parsed_students)} طالب وتوزيعهم وربطهم بأولياء الأمور بنجاح."
                 )
             except Exception as e:
                 messages.error(request, f"حدث خطأ أثناء معالجة ملف الإكسل: {str(e)}")
@@ -1720,97 +3012,83 @@ def portal_students_manage(request):
         elif action_type == 'soft_delete_student':
             student_id = request.POST.get('student_id')
             student = get_object_or_404(Student, id=student_id)
-
             student.student_status = 'transferred'
             student.is_deleted = True
             student.save()
-
-            messages.info(request, f"تم نقل الطالب ({student.full_name}) وحفظ قيده وسجلاته في الأرشيف الدائم للشهادات والتأييدات.")
+            messages.info(request, f"تم نقل الطالب ({student.full_name}) وحفظ قيده في الأرشيف.")
             return redirect(request.get_full_path())
+
+    from django.core.paginator import Paginator
+    total_students = students_qs.count()
+    paginator = Paginator(students_qs, 27)
+    page_number = request.GET.get('page', 1)
+    students_page = paginator.get_page(page_number)
 
     context = {
         'school': school,
         'classes': classes,
         'sections': sections,
-        'students': students_qs,
+        'students': students_page,
+        'page_obj': students_page,
+        'paginator': paginator,
         'selected_class_id': selected_class_id,
         'selected_section_id': selected_section_id,
-        'total_students': students_qs.count(),
+        'total_students': total_students,
     }
     return render(request, 'portal/students_manage.html', context)
 
 
-def portal_teachers_manage(request):
-    school = SchoolSettings.get_settings()
-    teachers = Teacher.objects.select_related('user').all().order_by('-id')
-
-    if request.method == 'POST':
-        first_name = request.POST.get('first_name', '').strip()
-        last_name = request.POST.get('last_name', '').strip()
-        job_title = request.POST.get('job_title', 'مدرس').strip()
-        stat_code = request.POST.get('statistical_code', '').strip()
-
-        username = f"tch_{random.randint(10000, 99999)}"
-        u = User.objects.create_user(username=username, first_name=first_name, last_name=last_name, is_teacher=True)
-        Teacher.objects.create(user=u, job_title=job_title, statistical_code=stat_code)
-        messages.success(request, f"تمت إضافة المدرس ({first_name} {last_name}) إلى الهيئة التعليمية بنجاح.")
-        return redirect('portal_teachers_manage')
-
-    return render(request, 'portal/teachers_manage.html', {'school': school, 'teachers': teachers})
-
-
-def portal_teacher_delete(request, teacher_id):
-    teacher = get_object_or_404(Teacher.objects.select_related('user'), pk=teacher_id)
-
-    if request.method == 'POST':
-        teacher_name = teacher.user.get_full_name()
-        with transaction.atomic():
-            TimetableSlot.objects.filter(teacher=teacher).update(teacher=None)
-            TeacherQuota.objects.filter(teacher=teacher).delete()
-            u = teacher.user
-            teacher.delete()
-            if u:
-                u.delete()
-
-        messages.success(request, f"تم حذف التدريسي ({teacher_name}) وتفريغ حصصه في جدول الحصص بنجاح.")
-
-    return redirect('portal_teachers_manage')
-
+# ======================================================================
+# تثبيت الصفوف العراقية والشعب
+# ======================================================================
 
 def portal_classes_manage(request):
     school = SchoolSettings.get_settings()
     classes = SchoolClass.objects.prefetch_related('sections').all().order_by('level_order')
 
     if request.method == 'POST':
-        action_type = request.POST.get('action_type', 'add_class')
+        action_type = request.POST.get('action_type', '')
 
-        if action_type == 'add_class':
+        if action_type == 'init_iraqi_classes':
+            count = seed_iraqi_official_classes(school)
+            messages.success(request, f"تمت تهيئة وتأكيد الصفوف الرسمية لوزارة التربية بنجاح بحسب مرحلة المدرسة ({school.get_school_level_display()}).")
+            return redirect('portal_classes_manage')
+
+        elif action_type == 'add_class':
             name = request.POST.get('name', '').strip()
             level_order = int(request.POST.get('level_order', 1))
-            is_final = request.POST.get('is_final_stage') == 'on'
-            next_class_id = request.POST.get('next_class_id')
-
-            SchoolClass.objects.create(
-                name=name,
-                level_order=level_order,
-                is_final_stage=is_final,
-                next_class_id=next_class_id if next_class_id else None
-            )
-            messages.success(request, f"تمت إضافة الصف ({name}) بنجاح.")
+            is_final = request.POST.get('is_final_stage') in ['on', 'true', '1', True]
+            if name:
+                cls_obj = SchoolClass.objects.create(
+                    name=name,
+                    level_order=level_order,
+                    is_final_stage=is_final
+                )
+                Section.objects.create(school_class=cls_obj, name="أ", capacity=40)
+                messages.success(request, f"تم إنشاء صف ({name}) مع الشعبة (أ) بنجاح.")
+            return redirect('portal_classes_manage')
 
         elif action_type == 'delete_class':
             class_id = request.POST.get('class_id')
-            target_cls = get_object_or_404(SchoolClass, pk=class_id)
-            class_name = target_cls.name
+            cls_obj = get_object_or_404(SchoolClass, pk=class_id)
+            c_name = cls_obj.name
+            cls_obj.delete()
+            messages.success(request, f"تم حذف صف ({c_name}) بالكامل بنجاح.")
+            return redirect('portal_classes_manage')
 
+        elif action_type == 'delete_all_class_students':
+            class_id = request.POST.get('class_id')
+            cls_obj = get_object_or_404(SchoolClass, pk=class_id)
+            students = Student.objects.filter(current_class=cls_obj, is_deleted=False)
+            st_count = students.count()
             with transaction.atomic():
-                SchoolClass.objects.filter(next_class=target_cls).update(next_class=None)
-                Student.objects.filter(current_class=target_cls).update(current_class=None, section=None)
-                TimetableSlot.objects.filter(school_class=target_cls).delete()
-                target_cls.sections.all().delete()
-                target_cls.delete()
-
-            messages.success(request, f"تم حذف صف ({class_name}) وكافة شُعبه المرتبطة بنجاح.")
+                for st in students:
+                    st.is_deleted = True
+                    st.student_status = 'deleted'
+                    st.save()
+                    Enrollment.objects.filter(student=st).delete()
+                    ExamSeatAssignment.objects.filter(student=st).delete()
+            messages.success(request, f"تم حذف جميع طلاب صف ({cls_obj.name}) بنجاح وعددهم ({st_count}) طالب.")
             return redirect('portal_classes_manage')
 
         elif action_type == 'add_section':
@@ -1826,225 +3104,67 @@ def portal_classes_manage(request):
                     capacity=capacity
                 )
                 messages.success(request, f"تمت إضافة شعبة ({section_name}) إلى صف ({target_cls.name}) بنجاح.")
-
-        elif action_type == 'rebalance_all_sections':
-            class_id = request.POST.get('class_id')
-            target_cls = get_object_or_404(SchoolClass, pk=class_id)
-            class_sections = list(target_cls.sections.all().order_by('name'))
-
-            if len(class_sections) < 2:
-                messages.error(request, "يجب أن يحتوي الصف على شعبتين على الأقل لإعادة التوزيع.")
-                return redirect('portal_classes_manage')
-
-            all_students = list(Student.objects.filter(current_class=target_cls, is_deleted=False).select_related('user'))
-
-            if not all_students:
-                messages.warning(request, "لا يوجد طلبة مسجلين في هذا الصف لإعادة توزيعهم.")
-                return redirect('portal_classes_manage')
-
-            all_students.sort(key=lambda x: x.user.first_name)
-            num_sec = len(class_sections)
-
-            with transaction.atomic():
-                for idx, st in enumerate(all_students):
-                    cycle = idx // num_sec
-                    rem = idx % num_sec
-                    sec_idx = rem if (cycle % 2 == 0) else (num_sec - 1 - rem)
-                    chosen_sec = class_sections[sec_idx]
-
-                    st.section = chosen_sec
-                    st.save(update_fields=['section'])
-
-            messages.success(
-                request,
-                f"تمت بنجاح إعادة موازنة وتوزيع {len(all_students)} طالب بالتساوي على {num_sec} شُعب لصف ({target_cls.name})."
-            )
-
-        elif action_type == 'merge_and_rebalance_sections':
-            class_id = request.POST.get('class_id')
-            source_section_id = request.POST.get('source_section_id')
-            rebalance_mode = request.POST.get('rebalance_mode', 'distribute_all')
-            target_single_section_id = request.POST.get('target_single_section_id')
-
-            target_cls = get_object_or_404(SchoolClass, pk=class_id)
-            source_sec = get_object_or_404(Section, pk=source_section_id, school_class=target_cls)
-            remaining_sections = list(target_cls.sections.exclude(id=source_sec.id).order_by('name'))
-
-            if not remaining_sections:
-                messages.error(request, "لا يمكن إلغاء هذه الشعبة لأنه لا توجد أي شعبة أخرى متبقية في هذا الصف!")
-                return redirect('portal_classes_manage')
-
-            with transaction.atomic():
-                deleted_slots_count = TimetableSlot.objects.filter(section=source_sec).delete()[0]
-
-                if rebalance_mode == 'distribute_all':
-                    all_class_students = list(Student.objects.filter(current_class=target_cls, is_deleted=False).order_by('user__first_name'))
-                    num_rem = len(remaining_sections)
-                    
-                    for idx, st in enumerate(all_class_students):
-                        chosen_sec = remaining_sections[idx % num_rem]
-                        st.section = chosen_sec
-                        st.save(update_fields=['section'])
-                    
-                    source_sec.delete()
-                    messages.success(
-                        request,
-                        f"تم بنجاح إلغاء شعبة ({source_sec.name}) وإعادة توزيع {len(all_class_students)} طالب بالتساوي على {num_rem} شُعب متبقية، مع تفريغ {deleted_slots_count} حصة من الجدول."
-                    )
-                else:
-                    target_sec = get_object_or_404(Section, pk=target_single_section_id, school_class=target_cls)
-                    moved_count = Student.objects.filter(section=source_sec).update(section=target_sec)
-                    source_sec.delete()
-                    messages.success(
-                        request,
-                        f"تم ترحيل {moved_count} طالب من شعبة ({source_sec.name}) إلى شعبة ({target_sec.name}) وحذف الشعبة القديمة بنجاح."
-                    )
+            return redirect('portal_classes_manage')
 
         elif action_type == 'delete_empty_section':
             section_id = request.POST.get('section_id')
             sec = get_object_or_404(Section, pk=section_id)
             if Student.objects.filter(section=sec, is_deleted=False).exists():
-                messages.error(request, f"لا يمكن حذف شعبة ({sec.name}) مباشرة لأنها تحتوي على طلبة مسجلين. استخدم زر 'دمج وإعادة توزيع الشُعب'.")
+                messages.error(request, f"لا يمكن حذف شعبة ({sec.name}) لأنها تحتوي على طلبة مسجلين.")
             else:
                 TimetableSlot.objects.filter(section=sec).delete()
                 sec.delete()
                 messages.success(request, f"تم حذف الشعبة ({sec.name}) بنجاح.")
-
-        return redirect('portal_classes_manage')
+            return redirect('portal_classes_manage')
 
     return render(request, 'portal/classes_manage.html', {'school': school, 'classes': classes})
 
 
-def portal_subjects_manage(request):
-    school = SchoolSettings.get_settings()
-    subjects = Subject.objects.all().order_by('id')
-
-    if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        code = request.POST.get('code', '').strip().upper()
-
-        if name and code:
-            Subject.objects.create(name=name, code=code)
-            messages.success(request, f"تمت إضافة المادة الدراسية ({name}) بنجاح.")
-            return redirect('portal_subjects_manage')
-
-    context = {
-        'school': school,
-        'subjects': subjects,
-    }
-    return render(request, 'portal/subjects_manage.html', context)
-
-
-def portal_attendance_manage(request):
-    school = SchoolSettings.get_settings()
-    classes = SchoolClass.objects.all().order_by('level_order')
-
-    selected_class_id = request.GET.get('school_class', '')
-    selected_section_id = request.GET.get('section', '')
-    selected_date = request.GET.get('date', timezone.now().date().strftime('%Y-%m-%d'))
-
-    sections = Section.objects.filter(school_class_id=selected_class_id) if selected_class_id else Section.objects.all()
-
-    students = []
-    if selected_class_id:
-        st_qs = Student.objects.filter(is_deleted=False, student_status='active', current_class_id=selected_class_id)
-        if selected_section_id:
-            st_qs = st_qs.filter(section_id=selected_section_id)
-        students = list(st_qs.select_related('user').order_by('user__first_name'))
-
-    if request.method == 'POST':
-        att_date = request.POST.get('attendance_date') or timezone.now().date()
-        recorder = request.user if request.user.is_authenticated else None
-
-        with transaction.atomic():
-            for st in students:
-                st_status = request.POST.get(f'status_{st.id}', 'present')
-                Attendance.objects.update_or_create(
-                    student=st,
-                    date=att_date,
-                    defaults={
-                        'status': st_status,
-                        'recorded_by': recorder,
-                    }
-                )
-                if st_status == 'absent':
-                    try:
-                        send_absence_notification.delay(st.id, str(att_date))
-                    except Exception:
-                        pass
-
-        messages.success(request, f"تم حفظ وتثبيت سجل الحضور والغياب لتاريخ {att_date} بنجاح.")
-        return redirect(f"{request.path}?school_class={selected_class_id}&section={selected_section_id}&date={selected_date}")
-
-    context = {
-        'school': school,
-        'classes': classes,
-        'sections': sections,
-        'students': students,
-        'selected_class_id': selected_class_id,
-        'selected_section_id': selected_section_id,
-        'selected_date': selected_date,
-    }
-    return render(request, 'portal/attendance_manage.html', context)
-
-
-def portal_parents_manage(request):
-    school = SchoolSettings.get_settings()
-    query = request.GET.get('q', '').strip()
-
-    parents = Parent.objects.select_related('user').prefetch_related('student_set__user', 'student_set__current_class').all().order_by('-id')
-
-    if query:
-        parents = parents.filter(
-            Q(user__first_name__icontains=query) |
-            Q(user__last_name__icontains=query) |
-            Q(phone__icontains=query) |
-            Q(address__icontains=query) |
-            Q(student__user__first_name__icontains=query) |
-            Q(student__user__last_name__icontains=query)
-        ).distinct()
-
-    context = {
-        'school': school,
-        'parents': parents,
-        'query': query,
-    }
-    return render(request, 'portal/parents_manage.html', context)
-
+# ======================================================================
+# رصد وسجلات الدرجات مع نظام الفصول العراقي المعتمد
+# ======================================================================
 
 def portal_grades_manage(request):
     school = SchoolSettings.get_settings()
-    current_year = AcademicYear.objects.filter(is_current=True).first()
-    grades = Grade.objects.select_related('student__user', 'subject').all().order_by('-id')[:50]
+    current_year = get_active_academic_year()
+    grades = Grade.objects.select_related('student__user', 'subject').filter(academic_year=current_year.name if current_year else '2026-2027').order_by('-id')[:50]
     students = Student.objects.filter(is_deleted=False, student_status='active').select_related('user')
     subjects = Subject.objects.all()
 
     if request.method == 'POST':
         student_id = request.POST.get('student_id')
         subject_id = request.POST.get('subject_id')
-        s1 = request.POST.get('first_term') or 0
-        mid = request.POST.get('midyear') or 0
-        s2 = request.POST.get('second_term') or 0
-        fin = request.POST.get('final_exam') or 0
 
-        annual = round_integer((float(s1) + float(mid) + float(s2)) / 3.0)
-        final_val = round_integer((float(annual) + float(fin)) / 2.0)
+        s1_m1 = float(request.POST.get('first_term_m1') or 0)
+        s1_m2 = float(request.POST.get('first_term_m2') or s1_m1)
+        s1_avg = (s1_m1 + s1_m2) / 2.0
+
+        mid = float(request.POST.get('midyear') or 0)
+
+        s2_m1 = float(request.POST.get('second_term_m1') or 0)
+        s2_m2 = float(request.POST.get('second_term_m2') or s2_m1)
+        s2_avg = (s2_m1 + s2_m2) / 2.0
+
+        annual = round_integer((s1_avg + mid + s2_avg) / 3.0)
+
+        fin = float(request.POST.get('final_exam') or 0)
+        final_val = round_integer((annual + fin) / 2.0)
 
         Grade.objects.update_or_create(
             student_id=student_id,
             subject_id=subject_id,
             academic_year=current_year.name if current_year else "2026-2027",
             defaults={
-                'first_term_effort': Decimal(str(round_integer(s1))),
+                'first_term_effort': Decimal(str(round_integer(s1_avg))),
                 'midyear_exam': Decimal(str(round_integer(mid))),
-                'second_term_effort': Decimal(str(round_integer(s2))),
+                'second_term_effort': Decimal(str(round_integer(s2_avg))),
                 'annual_effort': Decimal(str(annual)),
                 'final_exam_round1': Decimal(str(round_integer(fin))),
                 'final_grade': Decimal(str(final_val)),
                 'status': 'passed' if final_val >= 50 else 'failed'
             }
         )
-        messages.success(request, "تم رصد واحتساب الدرجات الصحيحة بدون كسور بنجاح.")
+        messages.success(request, "تم رصد واحتساب درجات الفصول والسعي السنوي بنجاح وبدون كسور.")
         return redirect('portal_grades_manage')
 
     context = {
@@ -2056,6 +3176,10 @@ def portal_grades_manage(request):
     }
     return render(request, 'portal/grades_manage.html', context)
 
+
+# ======================================================================
+# تعديل بيانات الطالب المستقل
+# ======================================================================
 
 def portal_student_edit(request, student_id):
     student = get_object_or_404(Student.objects.select_related('user', 'parent__user'), pk=student_id)
@@ -2082,54 +3206,131 @@ def portal_student_edit(request, student_id):
             student.student_status = student_status
             student.save()
 
-            messages.success(request, f"تم تحديث بيانات الطالب ({student.full_name}) بنجاح.")
+            messages.success(request, f"تم حفظ تعديل بيانات الطالب ({student.full_name}) بنجاح.")
 
     next_url = request.META.get('HTTP_REFERER', 'portal_general_registry')
     return redirect(next_url)
 
 
+# باقي الدوال الإدارية
+def portal_teachers_manage(request):
+    school = SchoolSettings.get_settings()
+    teachers = Teacher.objects.select_related('user').prefetch_related('subjects', 'school_classes').all().order_by('-id')
+    all_subjects = Subject.objects.all().order_by('name')
+    all_classes = SchoolClass.objects.all().order_by('level_order')
+
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        job_title = request.POST.get('job_title', 'مدرس').strip()
+        stat_code = request.POST.get('statistical_code', '').strip()
+        subject_ids = request.POST.getlist('subjects')
+        class_ids = request.POST.getlist('classes')
+
+        with transaction.atomic():
+            username = f"tch_{random.randint(10000, 99999)}"
+            u = User.objects.create_user(username=username, first_name=first_name, last_name=last_name, is_teacher=True)
+            tch = Teacher.objects.create(user=u, job_title=job_title, statistical_code=stat_code)
+            if subject_ids:
+                tch.subjects.set(subject_ids)
+            if class_ids:
+                tch.school_classes.set(class_ids)
+
+        messages.success(request, f"تمت إضافة التدريسي ({first_name} {last_name}) وربطه بالمواد والصفوف بنجاح.")
+        return redirect('portal_teachers_manage')
+
+    context = {
+        'school': school,
+        'teachers': teachers,
+        'all_subjects': all_subjects,
+        'all_classes': all_classes,
+    }
+    return render(request, 'portal/teachers_manage.html', context)
+
+
+def portal_teacher_delete(request, teacher_id):
+    teacher = get_object_or_404(Teacher.objects.select_related('user'), pk=teacher_id)
+    if request.method == 'POST':
+        teacher_name = teacher.user.get_full_name()
+        with transaction.atomic():
+            TimetableSlot.objects.filter(teacher=teacher).update(teacher=None)
+            TeacherQuota.objects.filter(teacher=teacher).delete()
+            u = teacher.user
+            teacher.delete()
+            if u:
+                u.delete()
+        messages.success(request, f"تم حذف التدريسي ({teacher_name}) بنجاح.")
+    return redirect('portal_teachers_manage')
+
+
 def portal_teacher_edit(request, teacher_id):
     teacher = get_object_or_404(Teacher.objects.select_related('user'), pk=teacher_id)
-
     if request.method == 'POST':
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
         job_title = request.POST.get('job_title', '').strip()
         stat_code = request.POST.get('statistical_code', '').strip()
+        subject_ids = request.POST.getlist('subjects')
+        class_ids = request.POST.getlist('classes')
 
         with transaction.atomic():
             teacher.user.first_name = first_name or teacher.user.first_name
             teacher.user.last_name = last_name or teacher.user.last_name
             teacher.user.save()
-
             teacher.job_title = job_title or teacher.job_title
             teacher.statistical_code = stat_code
             teacher.save()
-
-            messages.success(request, f"تم تعديل بيانات التدريسي ({teacher.user.get_full_name()}) بنجاح.")
-
+            teacher.subjects.set(subject_ids)
+            teacher.school_classes.set(class_ids)
+            messages.success(request, f"تم تعديل بيانات وربط التدريسي ({teacher.user.get_full_name()}) بالمواد والصفوف بنجاح.")
     return redirect('portal_teachers_manage')
+
+
+def portal_subjects_manage(request):
+    school = SchoolSettings.get_settings()
+    subjects = Subject.objects.all().order_by('id')
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        code = request.POST.get('code', '').strip().upper()
+        if name and code:
+            Subject.objects.create(name=name, code=code)
+            messages.success(request, f"تمت إضافة المادة الدراسية ({name}) بنجاح.")
+            return redirect('portal_subjects_manage')
+    return render(request, 'portal/subjects_manage.html', {'school': school, 'subjects': subjects})
 
 
 def portal_subject_edit(request, subject_id):
     subject = get_object_or_404(Subject, pk=subject_id)
-
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         code = request.POST.get('code', '').strip().upper()
-
         if name and code:
             subject.name = name
             subject.code = code
             subject.save()
             messages.success(request, f"تم تحديث المادة الدراسية ({name}) بنجاح.")
-
     return redirect('portal_subjects_manage')
+
+
+def portal_parents_manage(request):
+    school = SchoolSettings.get_settings()
+    query = request.GET.get('q', '').strip()
+    parents = Parent.objects.select_related('user').prefetch_related('student_set__user', 'student_set__current_class').all().order_by('-id')
+
+    if query:
+        parents = parents.filter(
+            Q(user__first_name__icontains=query) |
+            Q(user__last_name__icontains=query) |
+            Q(phone__icontains=query) |
+            Q(address__icontains=query) |
+            Q(student__user__first_name__icontains=query)
+        ).distinct()
+
+    return render(request, 'portal/parents_manage.html', {'school': school, 'parents': parents, 'query': query})
 
 
 def portal_parent_edit(request, parent_id):
     parent = get_object_or_404(Parent.objects.select_related('user'), pk=parent_id)
-
     if request.method == 'POST':
         first_name = request.POST.get('first_name', '').strip()
         phone = request.POST.get('phone', '').strip()
@@ -2139,36 +3340,61 @@ def portal_parent_edit(request, parent_id):
             if first_name:
                 parent.user.first_name = first_name
                 parent.user.save()
-
             parent.phone = phone
             parent.address = address
             parent.save()
-
-            messages.success(request, f"تم حفظ وتحديث بيانات ولي الأمر ({parent.user.first_name}) بنجاح.")
+            messages.success(request, f"تم تحديث بيانات ولي الأمر ({parent.user.first_name}) بنجاح.")
 
     next_url = request.META.get('HTTP_REFERER', 'portal_parents_manage')
     return redirect(next_url)
 
 
-def portal_class_edit(request, class_id):
-    cls = get_object_or_404(SchoolClass, pk=class_id)
+def portal_attendance_manage(request):
+    school = SchoolSettings.get_settings()
+    classes = SchoolClass.objects.all().order_by('level_order')
+    selected_class_id = request.GET.get('school_class', '')
+    selected_section_id = request.GET.get('section', '')
+    selected_date = request.GET.get('date', timezone.now().date().strftime('%Y-%m-%d'))
+
+    sections = Section.objects.filter(school_class_id=selected_class_id) if selected_class_id else Section.objects.all()
+
+    students = []
+    if selected_class_id:
+        st_qs = Student.objects.filter(is_deleted=False, student_status='active', current_class_id=selected_class_id)
+        if selected_section_id:
+            st_qs = st_qs.filter(section_id=selected_section_id)
+        students = list(st_qs.select_related('user').order_by('user__first_name'))
 
     if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        level_order = int(request.POST.get('level_order', 1))
-        is_final = request.POST.get('is_final_stage') == 'on'
-        next_class_id = request.POST.get('next_class_id')
+        att_date = request.POST.get('attendance_date') or timezone.now().date()
+        recorder = request.user if request.user.is_authenticated else None
 
-        cls.name = name or cls.name
-        cls.level_order = level_order
-        cls.is_final_stage = is_final
-        cls.next_class_id = next_class_id if next_class_id else None
-        cls.save()
+        with transaction.atomic():
+            for st in students:
+                st_status = request.POST.get(f'status_{st.id}', 'present')
+                Attendance.objects.update_or_create(
+                    student=st,
+                    date=att_date,
+                    defaults={'status': st_status, 'recorded_by': recorder}
+                )
+        messages.success(request, f"تم حفظ وتثبيت سجل الحضور والغياب بنجاح.")
+        return redirect(f"{request.path}?school_class={selected_class_id}&section={selected_section_id}&date={selected_date}")
 
-        messages.success(request, f"تم تحديث بيانات الصف ({cls.name}) بنجاح.")
+    context = {
+        'school': school,
+        'classes': classes,
+        'sections': sections,
+        'students': students,
+        'selected_class_id': selected_class_id,
+        'selected_section_id': selected_section_id,
+        'selected_date': selected_date,
+    }
+    return render(request, 'portal/attendance_manage.html', context)
 
-    return redirect('portal_classes_manage')
 
+# ======================================================================
+# النسخ الاحتياطي والسحابة
+# ======================================================================
 
 def download_backup_view(request):
     db_path = settings.DATABASES['default']['NAME']
@@ -2178,7 +3404,6 @@ def download_backup_view(request):
 
     date_str = timezone.now().strftime('%Y_%m_%d_%H%M')
     backup_filename = f"school_backup_{date_str}.sqlite3"
-
     response = FileResponse(open(db_path, 'rb'), content_type='application/x-sqlite3')
     response['Content-Disposition'] = f'attachment; filename="{backup_filename}"'
     return response
@@ -2188,21 +3413,17 @@ def restore_backup_view(request):
     if request.method == 'POST' and request.FILES.get('backup_file'):
         backup_file = request.FILES['backup_file']
         db_path = settings.DATABASES['default']['NAME']
-
         try:
             if os.path.exists(db_path):
                 shutil.copy2(db_path, f"{db_path}.temp_safety")
-
             with open(db_path, 'wb+') as destination:
                 for chunk in backup_file.chunks():
                     destination.write(chunk)
-
             messages.success(request, "تمت استعادة كافة بيانات وسجلات المدرسة بنجاح تام!")
         except Exception as e:
             if os.path.exists(f"{db_path}.temp_safety"):
                 shutil.copy2(f"{db_path}.temp_safety", db_path)
             messages.error(request, f"فشلت عملية الاسترجاع: {str(e)}")
-
     return redirect('portal_settings')
 
 
@@ -2210,66 +3431,667 @@ def upload_patch_view(request):
     if request.method == 'POST' and request.FILES.get('patch_file'):
         patch_file = request.FILES['patch_file']
         if not patch_file.name.endswith('.zip'):
-            messages.error(request, "يرجى رفع ملف حزمة تحديث بصيغة (.zip) صالحة.")
+            messages.error(request, "يرجى رفع حزمة تحديث صالحة.")
             return redirect('portal_settings')
-
         try:
-            base_dir = settings.BASE_DIR
             with zipfile.ZipFile(patch_file, 'r') as zip_ref:
-                zip_ref.extractall(base_dir)
-
-            messages.success(request, "تم تثبيت حزمة التحديث بنجاح وتحديث ملفات النظام.")
+                zip_ref.extractall(settings.BASE_DIR)
+            messages.success(request, "تم تثبيت حزمة التحديث بنجاح.")
         except Exception as e:
-            messages.error(request, f"حدث خطأ أثناء فك حزمة التحديث: {str(e)}")
-
+            messages.error(request, f"حدث خطأ أثناء فك الحزمة: {str(e)}")
     return redirect('portal_settings')
 
 
-CENTRAL_CLOUD_SERVER = "https://api.school-cloud-iq.com"
+def portal_usb_backup_save(request):
+    """
+    حفظ نسخة احتياطية مباشرة على فلاش ميموري (USB) أو مسار مخصص
+    """
+    if request.method == 'POST':
+        from .backup_vault import save_backup_to_usb
+        usb_drive = request.POST.get('usb_drive', '').strip()
+        custom_path = request.POST.get('custom_path', '').strip()
+        target = usb_drive or custom_path
+        if not target:
+            messages.error(request, "يرجى اختيار محرك الفلاش ميموري أو كتابة مسار المجلد المطلوب.")
+            return redirect('portal_settings')
+
+        success, msg = save_backup_to_usb(target)
+        if success:
+            messages.success(request, msg)
+        else:
+            messages.error(request, msg)
+    return redirect('portal_settings')
+
+
+def portal_create_snapshot_now(request):
+    """
+    إنشاء لقطة يومية فورية وحفظها في الخزنة المحلية %APPDATA%/Madrasati/Backups/
+    """
+    if request.method == 'POST':
+        from .backup_vault import create_daily_backup_snapshot
+        success, msg = create_daily_backup_snapshot()
+        if success:
+            messages.success(request, msg)
+        else:
+            messages.error(request, msg)
+    return redirect('portal_settings')
+
+
+def portal_cloud_backup_now(request):
+    """
+    رفع نسخة سحابية فورية ومباشرة إلى Firebase RTDB
+    """
+    if request.method == 'POST':
+        from .cloud_sync import upload_cloud_backup
+        success, msg = upload_cloud_backup()
+        if success:
+            messages.success(request, msg)
+        else:
+            messages.error(request, msg)
+    return redirect('portal_settings')
+
+
+def portal_cloud_restore(request):
+    """
+    نافذة وعملية الاستعادة السحابية للطوارئ (Emergency Cloud Restore)
+    """
+    if request.method == 'POST':
+        from .cloud_sync import restore_cloud_backup
+        entered_code = request.POST.get('ministry_school_code', '').strip()
+        if not entered_code:
+            messages.error(request, "يرجى إدخال الرمز الإحصائي الوزاري للمدرسة لبدء الاستعادة السحابية.")
+            return redirect('portal_settings')
+
+        success, res = restore_cloud_backup(entered_code)
+        if success:
+            school_name = res.get('school_name', '')
+            last_sync = res.get('last_sync', '')
+            messages.success(
+                request,
+                f"تمت الاستعادة السحابية بنجاح لمدرسة ({school_name})! تاريخ النسخة المسترجعة: {last_sync}."
+            )
+        else:
+            messages.error(request, f"فشلت عملية الاستعادة السحابية: {res}")
+    return redirect('portal_settings')
 
 
 def cloud_backup_upload_view(request):
-    if request.method == 'POST':
-        db_path = settings.DATABASES['default']['NAME']
-        if not os.path.exists(db_path):
-            messages.error(request, "قاعدة البيانات المحلية غير موجودة!")
-            return redirect('portal_settings')
-
-        school = SchoolSettings.get_settings()
-        try:
-            file_size_kb = round(os.path.getsize(db_path) / 1024, 2)
-            request.session['last_cloud_backup'] = timezone.now().strftime('%Y/%m/%d - %I:%M %p')
-            messages.success(
-                request,
-                f"تم بنجاح تشفير ورفع النسخة الاحتياطية السحابية للمدرسة ({school.school_name}) بحجم {file_size_kb} KB. بياناتك آمنة في السحابة الآن."
-            )
-        except Exception as e:
-            messages.error(request, f"تعذر الاتصال بالسيرفر السحابي، يرجى التأكد من اتصال الإنترنت: {str(e)}")
-
-    return redirect('portal_settings')
+    return portal_cloud_backup_now(request)
 
 
 def cloud_backup_restore_view(request):
-    if request.method == 'POST':
-        try:
-            messages.info(
-                request,
-                f"تم التحقق من ترخيص المدرسة السحابي، واسترجاع أحدث نسخة محفوظة تلقائياً بنجاح!"
-            )
-        except Exception as e:
-            messages.error(request, f"فشل استرجاع النسخة السحابية: {str(e)}")
+    return portal_cloud_restore(request)
 
-    return redirect('portal_settings')
 
+APP_VERSION = "2.1.0"
+GITHUB_REPO = "abdullahnawfal797-cmd/school-mgmt"
 
 def cloud_check_update_view(request):
-    current_ver = "1.0.0"
-    try:
-        messages.success(
-            request,
-            f"النظام يعمل بأحدث إصدار معتمد ({current_ver})، ومتوافق تماماً مع توجيهات وزارة التربية 2026-2027."
-        )
-    except Exception as e:
-        messages.error(request, f"تعذر التحقق من التحديثات السحابية: {str(e)}")
+    """
+    فحص توفر تحديثات للنظام عبر GitHub Releases API
+    - استعلام خفيف وسريع (مهلة 1.8 ثانية)
+    - لا يعطل النظام عند غياب الإنترنت ويعمل أوفلاين كالمعتاد بهدوء تام
+    - يدعم استجابة JSON للتحقق التلقائي في الواجهة
+    """
+    repo = getattr(settings, 'GITHUB_UPDATE_REPO', GITHUB_REPO)
+    url = f"https://api.github.com/repos/{repo}/releases/latest"
+    headers = {
+        'User-Agent': 'Madrasati-App-Updater',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    
+    is_json = request.GET.get('format') == 'json' or request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=1.8) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                latest_tag = data.get('tag_name', '').lstrip('v').strip()
+                current_ver = APP_VERSION.lstrip('v').strip()
+
+                def parse_ver(v):
+                    import re
+                    parts = [int(x) for x in re.findall(r'\d+', v)]
+                    return parts if parts else [0]
+
+                has_update = parse_ver(latest_tag) > parse_ver(current_ver)
+                download_url = data.get('html_url', '')
+                for asset in data.get('assets', []):
+                    if asset.get('browser_download_url', '').endswith(('.exe', '.zip')):
+                        download_url = asset.get('browser_download_url')
+                        break
+
+                if is_json:
+                    return JsonResponse({
+                        'success': True,
+                        'update_available': has_update,
+                        'current_version': APP_VERSION,
+                        'latest_version': latest_tag or APP_VERSION,
+                        'release_name': data.get('name', f"الإصدار {latest_tag}"),
+                        'release_notes': data.get('body', 'تحسينات عامة واستقرار المنظومة المدرسية'),
+                        'download_url': download_url,
+                        'published_at': data.get('published_at', '')
+                    })
+                else:
+                    if has_update:
+                        messages.info(request, f"يتوفر إصدار أحدث للمنظومة (v{latest_tag})! تفضل بالترقية.")
+                    else:
+                        messages.success(request, f"المنظومة محدثة لأحدث إصدار رسمي (v{APP_VERSION}).")
+                    return redirect('portal_settings')
+    except Exception:
+        # صمت وتجاهل هادئ عند انقطاع الإنترنت أو عدم توفر الشبكة
+        pass
+
+    if is_json:
+        return JsonResponse({
+            'success': False,
+            'update_available': False,
+            'current_version': APP_VERSION,
+            'message': 'المنظومة تعمل محلياً أو غير متصلة بالإنترنت.'
+        })
+
+    messages.info(request, f"المنظومة تعمل بالإصدار المستقر (v{APP_VERSION}) أوفلاين.")
     return redirect('portal_settings')
+
+
+def apply_system_update_view(request):
+    """
+    تحميل مثبت التحديث أو حزمة التعديلات في مجلد مؤقت دون مساس بقاعدة البيانات المحلية db.sqlite3
+    """
+    if request.method == 'POST':
+        download_url = request.POST.get('download_url')
+        if not download_url:
+            return JsonResponse({'success': False, 'error': 'رابط التحديث غير متوفر'})
+
+        try:
+            import tempfile
+            temp_dir = os.path.join(tempfile.gettempdir(), 'Madrasati_Updates')
+            os.makedirs(temp_dir, exist_ok=True)
+            filename = download_url.split('/')[-1] or 'Madrasati_Update.zip'
+            target_path = os.path.join(temp_dir, filename)
+
+            req = urllib.request.Request(download_url, headers={'User-Agent': 'Madrasati-App-Updater'})
+            with urllib.request.urlopen(req, timeout=30) as resp, open(target_path, 'wb') as out_f:
+                shutil.copyfileobj(resp, out_f)
+
+            return JsonResponse({
+                'success': True,
+                'message': f'تم تنزيل حزمة التحديث بنجاح إلى: {target_path}',
+                'file_path': target_path
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'تعذر تنزيل التحديث: {str(e)}'})
+
+    return JsonResponse({'success': False, 'error': 'طريقة الطلب غير مقبولة'})
+
+
+# ======================================================================
+# معالجة تعديل الصفوف الدراسية المفقودة
+# ======================================================================
+
+def portal_class_edit(request, pk=None):
+    """تعديل بيانات الصف الدراسي وتفادي أخطاء الاستيراد في urls.py"""
+    class_id = pk or request.POST.get('class_id')
+    school_class = get_object_or_404(SchoolClass, pk=class_id)
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        level_order = request.POST.get('level_order')
+        is_final = request.POST.get('is_final_stage') in ['on', 'true', '1', True]
+
+        if name:
+            school_class.name = name
+        if level_order:
+            school_class.level_order = int(level_order)
+        school_class.is_final_stage = is_final
+        school_class.save()
+        messages.success(request, f"تم تحديث بيانات صف ({school_class.name}) بنجاح.")
+
+    return redirect('portal_classes_manage')
+
+
+# ======================================================================
+# معالج الإعداد الأولي السريع للمدرسة (First-Run Wizard)
+# ======================================================================
+
+def portal_first_run_setup(request):
+    """حفظ بيانات معالج الإعداد الأولي للمدرسة أو تخطيه بنقرة واحدة"""
+    school = SchoolSettings.get_settings()
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'skip':
+            school.is_first_run_completed = True
+            school.save(update_fields=['is_first_run_completed'])
+            messages.info(request, "تم تخطي معالج التهيئة. يمكنك ضبط وتعديل بيانات المدرسة بأي وقت من قسم الإعدادات.")
+        else:
+            school_name = request.POST.get('school_name', '').strip()
+            directorate = request.POST.get('directorate', '').strip()
+            department = request.POST.get('department', '').strip()
+            academic_year_id = request.POST.get('academic_year')
+            logo = request.FILES.get('logo')
+
+            if school_name:
+                school.school_name = school_name
+            if directorate:
+                school.directorate = directorate
+            if department:
+                school.department = department
+            ministry_code = request.POST.get('ministry_school_code', '').strip()
+            if ministry_code:
+                school.ministry_school_code = ministry_code
+            if logo:
+                school.logo = logo
+
+            school.is_first_run_completed = True
+            school.save()
+
+            if academic_year_id:
+                try:
+                    selected_year = AcademicYear.objects.get(pk=academic_year_id)
+                    AcademicYear.objects.filter(is_current=True).update(is_current=False)
+                    selected_year.is_current = True
+                    selected_year.save()
+                    request.session['active_academic_year_id'] = selected_year.id
+                except AcademicYear.DoesNotExist:
+                    pass
+
+            messages.success(request, f"أهلاً بك في نظام مدرستي! تم إعداد بيانات ({school.school_name}) بنجاح.")
+
+    next_url = request.META.get('HTTP_REFERER') or reverse('portal_dashboard')
+    return redirect(next_url)
+
+
+# ======================================================================
+# منظومة الأرشيف المركزي وسجلات المخاطبات الرسمية
+# ======================================================================
+
+def portal_official_archive(request):
+    """
+    بوابة الأرشيف المركزي المعتمد للمخاطبات الرسمية والكتب الصادرة والواردة وتأييدات الطلبة
+    """
+    school = SchoolSettings.get_settings()
+    if not school.is_trial_or_license_valid:
+        return redirect('portal_license_lock')
+
+    active_tab = request.GET.get('tab', 'all').strip()
+    query = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    qs = OfficialDocument.objects.all().select_related('student__user', 'teacher__user', 'created_by')
+
+    # تصفية التبويبات الرسمية
+    if active_tab == 'issued':
+        qs = qs.filter(doc_type='issued')
+    elif active_tab == 'received':
+        qs = qs.filter(doc_type='received')
+    elif active_tab == 'student_cert':
+        qs = qs.filter(doc_type='student_cert')
+    elif active_tab == 'circular':
+        qs = qs.filter(doc_type='circular')
+    elif active_tab == 'other':
+        qs = qs.filter(doc_type='other')
+
+    # محرك البحث الفوري
+    if query:
+        qs = qs.filter(
+            Q(doc_number__icontains=query) |
+            Q(subject__icontains=query) |
+            Q(sender_receiver__icontains=query) |
+            Q(notes__icontains=query) |
+            Q(body_content__icontains=query) |
+            Q(student__user__first_name__icontains=query) |
+            Q(student__user__last_name__icontains=query) |
+            Q(teacher__user__first_name__icontains=query) |
+            Q(teacher__user__last_name__icontains=query)
+        )
+
+    # النطاق الزمني
+    if date_from:
+        qs = qs.filter(doc_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(doc_date__lte=date_to)
+
+    # الترتيب التنازلي الأحدث أولاً
+    qs = qs.order_by('-doc_date', '-id')
+
+    # الإحصائيات الأصولية السريعة
+    all_docs = OfficialDocument.objects.all()
+    stats = {
+        'total': all_docs.count(),
+        'issued': all_docs.filter(doc_type='issued').count(),
+        'received': all_docs.filter(doc_type='received').count(),
+        'student_cert': all_docs.filter(doc_type='student_cert').count(),
+        'circular': all_docs.filter(doc_type='circular').count(),
+    }
+
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get('page', 1)
+    try:
+        page_obj = paginator.get_page(page_number)
+    except Exception:
+        page_obj = paginator.get_page(1)
+
+    context = {
+        'school': school,
+        'documents': page_obj,
+        'active_tab': active_tab,
+        'query': query,
+        'date_from': date_from,
+        'date_to': date_to,
+        'stats': stats,
+        'today_date': timezone.now().date().isoformat(),
+    }
+    return render(request, 'portal/official_archive.html', context)
+
+
+def portal_archive_add(request):
+    """تسجيل وأرشفة وثيقة أو كتاب أصولي جديد (صادر/وارد/تأييد/تعميم)"""
+    if request.method == 'POST':
+        doc_number = request.POST.get('doc_number', '').strip()
+        doc_date_raw = request.POST.get('doc_date', '').strip()
+        doc_type = request.POST.get('doc_type', 'issued').strip()
+        sender_receiver = request.POST.get('sender_receiver', '').strip()
+        subject = request.POST.get('subject', '').strip()
+        body_content = request.POST.get('body_content', '').strip()
+        notes = request.POST.get('notes', '').strip()
+        status_val = request.POST.get('status', 'completed').strip()
+        file_obj = request.FILES.get('file')
+
+        if not doc_number or not subject:
+            messages.error(request, "يرجى كتابة رقم الكتاب والموضوع على الأقل لإتمام الأرشفة.")
+            return redirect('portal_official_archive')
+
+        doc_date = timezone.now().date()
+        if doc_date_raw:
+            try:
+                from datetime import datetime
+                doc_date = datetime.strptime(doc_date_raw, '%Y-%m-%d').date()
+            except Exception:
+                pass
+
+        doc = OfficialDocument.objects.create(
+            doc_number=doc_number,
+            doc_date=doc_date,
+            doc_type=doc_type,
+            sender_receiver=sender_receiver or 'الجهة المعنية',
+            subject=subject,
+            body_content=body_content,
+            notes=notes,
+            status=status_val,
+            created_by=request.user if request.user.is_authenticated else None
+        )
+        if file_obj:
+            doc.file = file_obj
+            doc.save()
+
+        messages.success(request, f"تمت أرشفة الوثيقة برقم ({doc.doc_number}) وموضوع ({doc.subject}) بنجاح.")
+
+    return redirect('portal_official_archive')
+
+
+def portal_archive_save_letter(request):
+    """حفظ وتوثيق الخطاب المنشأ من منشئ المخاطبات مباشرة في الأرشيف الرسمي"""
+    if request.method == 'POST':
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json'
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body.decode('utf-8'))
+            except Exception:
+                data = {}
+        else:
+            data = request.POST
+
+        doc_number = data.get('doc_number', '').strip() or f"ص/{timezone.now().strftime('%Y%m%d%H%M')}"
+        doc_date_raw = data.get('doc_date', '').strip()
+        doc_type = data.get('doc_type', 'issued')
+        sender_receiver = data.get('destination', data.get('sender_receiver', 'إلى من يهمه الأمر')).strip()
+        subject = data.get('subject', 'كتاب رسمي صادر').strip()
+        body_content = data.get('body_content', '').strip()
+        notes = data.get('notes', 'محفوظ تلقائياً من منشئ المخاطبات المدرسية الأصولي').strip()
+
+        doc_date = timezone.now().date()
+        if doc_date_raw:
+            try:
+                from datetime import datetime
+                doc_date = datetime.strptime(doc_date_raw.replace('/', '-'), '%Y-%m-%d').date()
+            except Exception:
+                pass
+
+        doc = OfficialDocument.objects.create(
+            doc_number=doc_number,
+            doc_date=doc_date,
+            doc_type=doc_type,
+            sender_receiver=sender_receiver,
+            subject=subject,
+            body_content=body_content,
+            notes=notes,
+            status='completed',
+            created_by=request.user if request.user.is_authenticated else None
+        )
+
+        if is_ajax:
+            return JsonResponse({
+                'success': True,
+                'message': f"تمت أرشفة الكتاب برقم أصولي ({doc.doc_number}) في الأرشيف المركزي بنجاح.",
+                'doc_id': doc.id
+            })
+
+        messages.success(request, f"تم حفظ وأرشفة الوثيقة برقم ({doc.doc_number}) في الأرشيف الرسمي بنجاح.")
+        return redirect('portal_official_archive')
+
+    return redirect('portal_letter_builder')
+
+
+def portal_archive_delete(request, doc_id):
+    """حذف وثيقة من الأرشيف الرسمي"""
+    if request.method == 'POST':
+        doc = get_object_or_404(OfficialDocument, pk=doc_id)
+        num = doc.doc_number
+        doc.delete()
+        messages.success(request, f"تم حذف القيد الأرشيفي رقم ({num}) بنجاح.")
+    return redirect('portal_official_archive')
+
+
+def portal_document_pdf_download(request, doc_id):
+    """تنزيل ملف PDF عالي الجودة للوثيقة الرسمية من الأرشيف"""
+    school = SchoolSettings.get_settings()
+    doc = get_object_or_404(OfficialDocument, id=doc_id)
+    from .pdf_generator import generate_official_document_pdf
+
+    pdf_bytes = generate_official_document_pdf(
+        school=school,
+        doc_number=doc.doc_number,
+        doc_date=doc.doc_date.strftime('%Y/%m/%d') if doc.doc_date else '',
+        doc_type_display=doc.get_doc_type_display(),
+        destination=doc.sender_receiver or 'إلى من يهمه الأمر',
+        subject=doc.subject,
+        body_content=doc.body_content,
+        notes=doc.notes
+    )
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    clean_num = str(doc.doc_number).replace('/', '_').replace('\\', '_').replace(' ', '_')
+    filename = f"كتاب_رسمي_{clean_num}.pdf"
+    import urllib.parse
+    encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+    return response
+
+
+def portal_letter_export_pdf(request):
+    """توليد وتنزيل ملف PDF فوري عالي الجودة للوثيقة الحالية في صانع الكتب"""
+    school = SchoolSettings.get_settings()
+    if request.method == 'POST':
+        doc_num = request.POST.get('doc_number', '45/ص')
+        doc_date = request.POST.get('doc_date', '')
+        dest = request.POST.get('destination', 'الجهة المعنية')
+        subj = request.POST.get('subject', 'كتاب رسمي')
+        body = request.POST.get('body_content', '')
+    else:
+        doc_num = request.GET.get('doc_number', '45/ص')
+        doc_date = request.GET.get('doc_date', '')
+        dest = request.GET.get('destination', 'الجهة المعنية')
+        subj = request.GET.get('subject', 'كتاب رسمي')
+        body = request.GET.get('body_content', '')
+
+    from .pdf_generator import generate_official_document_pdf
+    pdf_bytes = generate_official_document_pdf(
+        school=school,
+        doc_number=doc_num,
+        doc_date=doc_date,
+        doc_type_display='كتاب رسمي صادر',
+        destination=dest,
+        subject=subj,
+        body_content=body
+    )
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    clean_num = str(doc_num).replace('/', '_').replace('\\', '_').replace(' ', '_')
+    filename = f"كتاب_{clean_num}.pdf"
+    import urllib.parse
+    encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+    return response
+
+
+def portal_export_students_excel(request):
+    """تصدير بيانات الطلبة إلى ملف Excel بحسب الصف والشعبة أو لكافة طلبة المدرسة مع دعم RTL"""
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    school = SchoolSettings.get_settings()
+    class_id = request.GET.get('class_id')
+    section_id = request.GET.get('section_id')
+    export_all = request.GET.get('export_all') == '1'
+
+    students_qs = Student.objects.filter(is_deleted=False).select_related('user', 'current_class', 'section', 'parent__user')
+
+    sub_title = "كافة طلبة المدرسة"
+    if not export_all and class_id:
+        students_qs = students_qs.filter(current_class_id=class_id)
+        cls_obj = SchoolClass.objects.filter(id=class_id).first()
+        if cls_obj:
+            sub_title = f"طلبة {cls_obj.name}"
+        if section_id:
+            students_qs = students_qs.filter(section_id=section_id)
+            sec_obj = Section.objects.filter(id=section_id).first()
+            if sec_obj:
+                sub_title += f" - شعبة {sec_obj.name}"
+    elif not export_all and section_id:
+        students_qs = students_qs.filter(section_id=section_id)
+        sec_obj = Section.objects.filter(id=section_id).first()
+        if sec_obj:
+            sub_title = f"شعبة {sec_obj.name}"
+
+    students_qs = students_qs.order_by('current_class__level_order', 'section__name', 'user__first_name', 'user__last_name')
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "قوائم الطلبة"
+    ws.sheet_view.rightToLeft = True
+
+    header_fill = PatternFill(start_color="1E1830", end_color="1E1830", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    title_font = Font(name="Calibri", size=14, bold=True, color="1E1830")
+    subtitle_font = Font(name="Calibri", size=11, bold=True, color="E06B22")
+    data_font = Font(name="Calibri", size=10)
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    right_align = Alignment(horizontal="right", vertical="center")
+
+    thin_border = Border(
+        left=Side(style='thin', color='D1D5DB'),
+        right=Side(style='thin', color='D1D5DB'),
+        top=Side(style='thin', color='D1D5DB'),
+        bottom=Side(style='thin', color='D1D5DB')
+    )
+
+    ws.merge_cells("A1:G1")
+    ws["A1"] = f"جمهورية العراق - وزارة التربية | {school.school_name}"
+    ws["A1"].font = title_font
+    ws["A1"].alignment = center_align
+    ws.row_dimensions[1].height = 28
+
+    ws.merge_cells("A2:G2")
+    ws["A2"] = f"قائمة {sub_title} - إجمالي الطلبة: {students_qs.count()} طالب"
+    ws["A2"].font = subtitle_font
+    ws["A2"].alignment = center_align
+    ws.row_dimensions[2].height = 22
+
+    headers = [
+        'ت',
+        'رقم القيد',
+        'الاسم الرباعي واللقب',
+        'الصف والشعبة',
+        'الرقم الوطني / الهوية',
+        'هاتف ولي الأمر',
+        'الحالة الأكاديمية'
+    ]
+    ws.append([])
+    ws.append(headers)
+
+    for col_num in range(1, len(headers) + 1):
+        cell = ws.cell(row=4, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+        cell.border = thin_border
+    ws.row_dimensions[4].height = 26
+
+    status_map = {
+        'active': 'مستمر بالدوام',
+        'graduated': 'خريج',
+        'transferred': 'منقول',
+        'dismissed': 'مفصول / تارك'
+    }
+
+    alt_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+
+    for idx, st in enumerate(students_qs, start=1):
+        full_name = st.user.get_full_name() or st.user.username
+        class_sec = f"{st.current_class.name if st.current_class else 'بدون صف'}"
+        if st.section:
+            class_sec += f" - شعبة {st.section.name}"
+        parent_phone = st.parent.phone if st.parent and st.parent.phone else "---"
+        status_text = status_map.get(st.student_status, st.student_status)
+
+        row_data = [
+            idx,
+            st.registration_number or '---',
+            full_name,
+            class_sec,
+            st.national_id or '---',
+            parent_phone,
+            status_text
+        ]
+        ws.append(row_data)
+        current_row = 4 + idx
+        ws.row_dimensions[current_row].height = 20
+
+        for c_idx in range(1, len(row_data) + 1):
+            cell = ws.cell(row=current_row, column=c_idx)
+            cell.font = data_font
+            cell.border = thin_border
+            if idx % 2 == 0:
+                cell.fill = alt_fill
+            if c_idx in [1, 2, 5, 6, 7]:
+                cell.alignment = center_align
+            else:
+                cell.alignment = right_align
+
+    col_widths = {1: 7, 2: 15, 3: 32, 4: 25, 5: 22, 6: 18, 7: 18}
+    for col_idx, width in col_widths.items():
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    safe_title = sub_title.replace(' ', '_').replace('/', '_')
+    filename = f"قائمة_الطلبة_{safe_title}.xlsx"
+    import urllib.parse
+    encoded_filename = urllib.parse.quote(filename.encode('utf-8'))
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+    wb.save(response)
+    return response

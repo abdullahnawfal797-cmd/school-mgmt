@@ -1,160 +1,32 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}السجلات المدرسية وقوائم الشفوي{% endblock %}
 
+
 {% block content %}
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&display=swap">
+<!-- خطوط عربية محلية مدمجة أوفلاين -->
 
 <style>
-    .records-container,
-    .records-container * {
-        font-family: 'Simplified Arabic', 'Traditional Arabic', 'Amiri', 'Arial', sans-serif !important;
-        font-weight: bold !important;
-        color: #000000 !important;
-    }
-
-    .official-border,
-    .official-border table,
-    .official-border th,
-    .official-border td,
-    .official-border div,
-    .official-border span {
-        font-size: 16px !important;
-    }
-
-    .official-border .fs-5 {
-        font-size: 20px !important;
-    }
-
-    .official-border .vertical-cell .v-text-box {
-        font-size: 15px !important;
-        line-height: 1.15 !important;
-    }
-
-    .oral-sheet-border,
-    .oral-sheet-border table,
-    .oral-sheet-border th,
-    .oral-sheet-border td,
-    .oral-sheet-border div,
-    .oral-sheet-border span,
-    .admin-grade-border,
-    .admin-grade-border table,
-    .admin-grade-border th,
-    .admin-grade-border td,
-    .admin-grade-border div,
-    .admin-grade-border span {
-        font-size: 12.5px !important;
-    }
-
-    .oral-sheet-border .vertical-cell .v-text-box,
-    .oral-sheet-border .v-th-sub .v-text-box,
-    .admin-grade-border .vertical-cell .v-text-box {
-        font-size: 11.5px !important;
-        line-height: 1.15 !important;
-    }
-
-    .sheet-page-wrapper {
-        background: #ffffff;
-        width: 210mm;
-        min-height: 297mm;
-        margin: 0 auto 30px auto;
-        padding: 6mm 8mm;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        box-sizing: border-box;
-    }
-
-    .oral-sheet-border,
-    .admin-grade-border {
-        border: 2px solid #000000;
-        padding: 6px 8px;
-        min-height: 282mm;
-        box-sizing: border-box;
-    }
-
-    .official-border {
-        border: 3px double #000000;
-        padding: 10px 14px;
-        min-height: 282mm;
-        box-sizing: border-box;
-    }
-
-    .seq-box {
-        border: 2px solid #000000;
-        border-radius: 6px;
-        padding: 2px 10px;
-        display: inline-block;
-    }
-
-    .border-bottom-dots {
-        border-bottom: 2px dotted #000;
-        display: inline-block;
-    }
-
-    .table-oral,
-    .table-official,
-    .table-admin-grades {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: center;
-        border: 2px solid #000;
-        table-layout: fixed;
-    }
-
-    .table-oral th,
-    .table-oral td,
-    .table-official th,
-    .table-official td,
-    .table-admin-grades th,
-    .table-admin-grades td {
-        border: 1.5px solid #000000;
-        padding: 2px 1px;
-        vertical-align: middle;
-    }
-
-    tr.header-row-fixed {
-        height: 165px !important;
-    }
-
-    .vertical-cell,
-    .v-th-sub {
-        height: 165px !important;
-        max-height: 165px !important;
-        vertical-align: middle !important;
-        padding: 0 !important;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .v-text-box {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
-        white-space: nowrap;
-        display: inline-block;
-        letter-spacing: 0.3px;
-        margin: auto;
-    }
-
-    .sub-mark {
-        margin-top: 4px;
-        font-family: monospace;
-    }
-
-    .footer-stats-box {
-        border-top: 2px solid #000;
-        padding-top: 6px;
-        margin-top: 8px;
-    }
+    /* ==========================================================================
+       المعايير الرسمية المعتمدة لطباعة السجلات المدرسية والإدارية (A4 Portrait)
+       وفق الضوابط والخطوط العراقية لوزارة التربية
+       ========================================================================== */
 
     @media print {
         @page {
             size: A4 portrait;
-            margin: 0;
+            margin: 10mm 8mm 10mm 8mm;
         }
 
         body {
-            background: #fff !important;
+            background: #ffffff !important;
+            color: #000000 !important;
             margin: 0 !important;
             padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+            font-weight: bold !important;
         }
 
         body * {
@@ -170,22 +42,276 @@
             position: absolute;
             left: 0;
             top: 0;
-            width: 100%;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
         }
 
+        .print-page-hidden {
+            display: none !important;
+        }
+
+        .print-page,
         .sheet-page-wrapper {
             margin: 0 !important;
-            padding: 5mm 6mm !important;
+            padding: 0 !important;
             box-shadow: none !important;
+            border: none !important;
+            filter: none !important;
+            -webkit-filter: none !important;
+            contain: size layout style !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
             page-break-after: always !important;
             break-after: page !important;
             width: 100% !important;
-            height: 100% !important;
+            max-width: 100% !important;
+            height: 277mm !important;
+            max-height: 277mm !important;
+            box-sizing: border-box !important;
+            background: #ffffff !important;
+            overflow: hidden !important;
         }
 
-        .d-print-none {
+        /* ضبط صارم لارتفاع السطر 8.8mm لملء صفحة A4 بالكامل */
+        .table-oral tbody tr,
+        .table-admin-grades tbody tr,
+        .print-page tbody tr,
+        .sheet-page-wrapper tbody tr {
+            height: 8.8mm !important;
+            min-height: 8.8mm !important;
+            max-height: 8.8mm !important;
+            line-height: 8.8mm !important;
+        }
+
+        .table-oral tbody tr td,
+        .table-admin-grades tbody tr td,
+        .print-page tbody tr td,
+        .sheet-page-wrapper tbody tr td {
+            height: 8.8mm !important;
+            padding: 0 4px !important;
+            vertical-align: middle !important;
+            font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+            font-size: 14pt !important;
+            font-weight: bold !important;
+        }
+
+        .official-border {
+            height: 275mm !important;
+            max-height: 275mm !important;
+            border: 3px double #000000 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            box-sizing: border-box !important;
+            background-color: #FFFFFF !important;
+            padding: 6px 10px !important;
+        }
+
+        .table-official {
+            width: 100% !important;
+            flex-grow: 1 !important;
+        }
+
+        .table-official tr.sub-row {
+            height: 42px !important;
+            min-height: 42px !important;
+        }
+
+        .table-official tr.result-row {
+            height: 38px !important;
+            min-height: 38px !important;
+        }
+
+        .middle-record-signatures {
+            margin-top: auto !important;
+            border-top: 1.5px solid #000000 !important;
+        }
+
+        .d-print-none,
+        .no-print,
+        .btn-back,
+        .btn-back-clean {
             display: none !important;
         }
+    }
+
+    /* الخط المعتمد والتغليق الإلزامي (Bold) لكافة النصوص */
+    .records-container,
+    .records-container * {
+        font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+        font-weight: bold !important;
+        color: #000000 !important;
+    }
+
+    /* ترويسة السجلات الرسمية والإدارية بحجم 16pt Bold عريض */
+    .sheet-official-header,
+    .sheet-official-header *,
+    .admin-grade-border .header-title-box,
+    .admin-grade-border .header-title-box *,
+    .oral-sheet-border .header-title-box,
+    .oral-sheet-border .header-title-box *,
+    .admin-grade-border h5,
+    .oral-sheet-border h5 {
+        font-size: 16pt !important;
+        font-weight: bold !important;
+        line-height: 1.3 !important;
+    }
+
+    /* السجل الوسطي: كامل النص والترويسة بحجم 16pt Bold عريض */
+    .official-border,
+    .official-border table,
+    .official-border th,
+    .official-border td,
+    .official-border div,
+    .official-border span {
+        font-size: 16pt !important;
+        font-weight: bold !important;
+    }
+
+    .official-border .fs-5,
+    .official-border h5 {
+        font-size: 18pt !important;
+        font-weight: bold !important;
+    }
+
+    .official-border .vertical-cell .v-text-box {
+        font-size: 14pt !important;
+        line-height: 1.15 !important;
+        font-weight: bold !important;
+    }
+
+    /* خلايا وأسماء الطلبة في السجلات العامة والإدارية بحجم 14pt Bold عريض */
+    .table-oral td,
+    .table-oral th,
+    .table-admin-grades td,
+    .table-admin-grades th {
+        font-size: 14pt !important;
+        font-weight: bold !important;
+    }
+
+    .table-oral tbody tr,
+    .table-admin-grades tbody tr {
+        height: 8.8mm !important;
+        min-height: 8.8mm !important;
+        max-height: 8.8mm !important;
+    }
+
+    .oral-sheet-border .vertical-cell .v-text-box,
+    .oral-sheet-border .v-th-sub .v-text-box,
+    .admin-grade-border .vertical-cell .v-text-box {
+        font-size: 11pt !important;
+        line-height: 1.1 !important;
+        font-weight: bold !important;
+    }
+
+    .print-page,
+    .sheet-page-wrapper {
+        background: #ffffff;
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto 30px auto;
+        padding: 8mm 8mm;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+        page-break-after: always;
+        break-after: page;
+    }
+
+    .oral-sheet-border,
+    .admin-grade-border {
+        border: 2px solid #000000;
+        padding: 6px 8px;
+        box-sizing: border-box;
+        width: 100%;
+        background-color: #ffffff;
+    }
+
+    .official-border {
+        border: 3px double #000000;
+        padding: 8px 12px;
+        min-height: 280mm;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+
+    .middle-record-signatures {
+        margin-top: auto !important;
+        padding-top: 10px !important;
+        padding-bottom: 4px !important;
+        border-top: 1.5px solid #000000 !important;
+        color: #000000 !important;
+    }
+
+    .seq-box {
+        border: 2px solid #000000;
+        border-radius: 6px;
+        padding: 2px 10px;
+        display: inline-block;
+        font-weight: bold;
+    }
+
+    .border-bottom-dots {
+        border-bottom: 1.5px dotted #000000;
+        display: inline-block;
+        padding-bottom: 2px;
+    }
+
+    .table-oral,
+    .table-admin-grades {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: center;
+        margin-bottom: 6px;
+    }
+
+    .table-oral th,
+    .table-oral td,
+    .table-admin-grades th,
+    .table-admin-grades td {
+        border: 1.5px solid #000000;
+        vertical-align: middle;
+        padding: 0 4px;
+        line-height: 1.2;
+    }
+
+    .table-oral thead th,
+    .table-admin-grades thead th {
+        background-color: #f2f2f2;
+    }
+
+    .vertical-cell {
+        vertical-align: middle !important;
+        text-align: center !important;
+        padding: 2px !important;
+        width: 28px;
+    }
+
+    .v-text-box {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        display: inline-block;
+        margin: 0 auto;
+        font-size: 11pt;
+        font-weight: bold;
+        letter-spacing: -0.5px;
+    }
+
+    .footer-stats-box {
+        border: 1.5px solid #000000;
+        padding: 6px 12px;
+        margin-top: 4px;
+        background: #ffffff;
+    }
+
+    .empty-row td {
+        color: transparent !important;
     }
 </style>
 
@@ -195,9 +321,29 @@
         <i class="bi bi-journal-bookmark-fill me-2"></i>منظومة السجلات والقوائم المدرسية الرسمية
     </h5>
     <div class="d-flex gap-2">
+        {% if record_type == 'middle_record' and selected_class_id %}
+        <a href="{% url 'portal_records_export_pdf' %}?class_id={{ selected_class_id }}" id="topExportPdfBtn" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm" target="_blank" title="تصدير السجل بالكامل إلى ملف PDF فوري ومعالج من السيرفر مباشرة دون تعليق المتصفح">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i> تصدير السجل إلى PDF فوري
+        </a>
+        <button type="button" onclick="printFilteredMiddleRecord()" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+            <i class="bi bi-printer-fill me-1"></i> طباعة السجل
+        </button>
+        {% else %}
+        <button type="button" onclick="window.print()" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i> تحميل نسخة PDF
+        </button>
         <button type="button" onclick="window.print()" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
             <i class="bi bi-printer-fill me-1"></i> طباعة القائمة
         </button>
+        {% endif %}
+        {% if selected_class_id %}
+        <a href="{% url 'cert_master_sheet' class_id=selected_class_id %}" class="btn btn-outline-primary rounded-pill px-3 fw-bold shadow-sm" target="_blank" title="عرض وطباعة شيت الدرجات العام المعتمد (27 طالباً في الصفحة A4 بالعرض)">
+            <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i> شيت الدرجات العام (A4 بالعرض)
+        </a>
+        <a href="{% url 'portal_student_result_cards' %}?class_id={{ selected_class_id }}" class="btn btn-outline-success rounded-pill px-3 fw-bold shadow-sm" target="_blank" title="طباعة كارتات نتائج الطلبة (البطاقات المدرسية)">
+            <i class="bi bi-person-badge-fill me-1"></i> كارتات النتائج
+        </a>
+        {% endif %}
         <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
             <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
         </a>
@@ -219,10 +365,10 @@
                     <option value="single_sports" {% if record_type == 'single_sports' %}selected{% endif %}>⚽ قائمة التربية الرياضية (حضور 2 + لياقة 2 + نشاطات 2 + عملي 4)</option>
                     <option value="single_math" {% if record_type == 'single_math' %}selected{% endif %}>🔢 قائمة الرياضيات الشفوية (أتعلم 2 + أتأكد 2 + أتحدث 2 + أحل 2 + أفكر 2)</option>
                     <option value="single_science_oral" {% if record_type == 'single_science_oral' %}selected{% endif %}>🧪 قائمة العلوم الشفوية (صورة 2 + مفردات 2 + عدد 2 + سلامة 2 + مقارنة 2)</option>
-                    <option value="english_p1_p2" {% if record_type == 'english_p1_p2' %}selected{% endif %}>🇬🇧 قائمة الإنكليزي (الأول والثاني الابتدائي - Total 10M)</option>
-                    <option value="english_p3" {% if record_type == 'english_p3' %}selected{% endif %}>🇬🇧 قائمة الإنكليزي (الثالث الابتدائي - Total 10M)</option>
-                    <option value="english_p4" {% if record_type == 'english_p4' %}selected{% endif %}>🇬🇧 قائمة الإنكليزي (الرابع الابتدائي - الشفوي 10 والتحريري 10 ÷ 2)</option>
-                    <option value="english_p5_p6" {% if record_type == 'english_p5_p6' %}selected{% endif %}>🇬🇧 قائمة الإنكليزي (الخامس والسادس الابتدائي - شفوي 40 وتحريري 60)</option>
+                    <option value="english_p1_p2" {% if record_type == 'english_p1_p2' %}selected{% endif %}>🇬🇧 قائمة درجات الإنكليزي (الأول والثاني الابتدائي - المجموع الكلي 10 درجات)</option>
+                    <option value="english_p3" {% if record_type == 'english_p3' %}selected{% endif %}>🇬🇧 قائمة درجات الإنكليزي (الثالث الابتدائي - المجموع الكلي 10 درجات)</option>
+                    <option value="english_p4" {% if record_type == 'english_p4' %}selected{% endif %}>🇬🇧 قائمة درجات الإنكليزي (الرابع الابتدائي - الشفوي 10 والتحريري 10 ÷ 2)</option>
+                    <option value="english_p5_p6" {% if record_type == 'english_p5_p6' %}selected{% endif %}>🇬🇧 قائمة درجات الإنكليزي (الخامس والسادس الابتدائي - شفوي 40 وتحريري 60)</option>
                     <option value="english_arabic_labels" {% if record_type == 'english_arabic_labels' %}selected{% endif %}>🇬🇧 قائمة الإنكليزي المعربة (إصغاء، تحدث، قراءة، كتابة، مشاركة 10)</option>
                 </optgroup>
                 <optgroup label="📁 السجلات الإدارية العامة المعتمدة">
@@ -251,10 +397,10 @@
 
 <!-- شريط إعدادات وتخصيص قوائم الشفوي المرنة -->
 {% if record_type == 'oral_exam_builder' and selected_class %}
-<div class="card p-3 mb-4 bg-white border-0 shadow-sm d-print-none" dir="rtl">
-    <div class="d-flex align-items-center mb-3 text-primary border-bottom pb-2">
+<div class="card card-custom p-3 mb-4 border-0 shadow-sm d-print-none" dir="rtl">
+    <div class="d-flex align-items-center mb-3 text-warning border-bottom pb-2">
         <i class="bi bi-sliders2 fs-5 me-2"></i>
-        <h6 class="fw-bold mb-0">لوحة تحكم وتخصيص درجات وحقول القائمة الشفوية:</h6>
+        <h6 class="fw-bold mb-0 text-white">لوحة تحكم وتخصيص درجات وحقول القائمة الشفوية:</h6>
     </div>
 
     <div class="row g-2 align-items-end">
@@ -330,22 +476,91 @@
 </div>
 {% endif %}
 
-<!-- مساحة عرض وطباعة السجلات A4 -->
-<div class="records-container" dir="rtl">
-
     {% if not selected_class %}
-    <div class="card p-5 text-center text-muted bg-white border d-print-none" dir="rtl">
-        <i class="bi bi-arrow-up-circle fs-1 text-primary mb-2"></i>
-        <h6>يرجى اختيار الصف الدراسي من الأعلى للبدء بالعرض والطباعة.</h6>
+    <div class="card card-custom p-5 text-center text-muted border-0 shadow-sm d-print-none my-4" dir="rtl">
+        <i class="bi bi-arrow-up-circle fs-1 text-warning mb-2"></i>
+        <h6 class="text-white">يرجى اختيار الصف الدراسي من الأعلى للبدء بالعرض والطباعة.</h6>
     </div>
     {% else %}
+    {% if record_type == 'middle_record' %}
+    <!-- شريط الفلترة الذكية والتحكم بالطباعة للسجل الوسطي لتفادي تجمد المتصفح -->
+    <div class="card card-custom p-3 mb-4 border-0 shadow-sm d-print-none" dir="rtl" style="background: linear-gradient(135deg, rgba(30, 22, 60, 0.95), rgba(45, 32, 90, 0.95)); border: 1px solid rgba(255, 255, 255, 0.15) !important;">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-sliders text-warning fs-4"></i>
+                <div>
+                    <h6 class="fw-bold text-white mb-0">لوحة التحكم الذكية بالطباعة وتفادي التعليق:</h6>
+                    <small class="text-white-50">اختر طباعة طالب محدد، أو طلاب شعبة معينة، أو نطاق صفحات لتفادي تجمد المتصفح في الصفحات الكبيرة.</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2 fs-6">
+                    المعروض للطباعة: <strong id="visiblePagesCount">0</strong> صفحة
+                </span>
+                <a href="{% url 'portal_records_export_pdf' %}?class_id={{ selected_class_id }}" id="btnExportPdfDirect" target="_blank" class="btn btn-sm btn-danger rounded-pill fw-bold px-3 shadow-sm" title="توليد ملف PDF متكامل فورياً من السيرفر مباشرة دون استخدام واجهة المتصفح">
+                    <i class="bi bi-file-earmark-pdf-fill me-1"></i> تصدير السجل بالكامل إلى ملف PDF فوري
+                </a>
+                <button type="button" onclick="printFilteredMiddleRecord()" class="btn btn-sm btn-success rounded-pill fw-bold px-3 shadow-sm">
+                    <i class="bi bi-printer-fill me-1"></i> طباعة الصفحات المحددة
+                </button>
+            </div>
+        </div>
 
-    <!-- ==================================================================== -->
+        <div class="row g-2 mt-2 pt-2 border-top border-secondary border-opacity-25 align-items-end">
+            <!-- 1. فلترة الشعبة -->
+            <div class="col-12 col-md-3">
+                <label class="form-label small text-white-50 mb-1 fw-bold">1. طلاب شعبة محددة:</label>
+                <select id="filterSectionSelect" class="form-select form-select-sm rounded-pill bg-dark text-white border-secondary" onchange="applyMiddleRecordFilter()">
+                    <option value="ALL">جميع الشعب (كامل الصف)</option>
+                    {% for sec_item in sections_data %}
+                    <option value="sec_{{ sec_item.section.id }}">{{ sec_item.section.name }} ({{ sec_item.students_count }} طالب)</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 2. طالب محدد -->
+            <div class="col-12 col-md-4">
+                <label class="form-label small text-white-50 mb-1 fw-bold">2. أو سجل طالب واحد فقط:</label>
+                <select id="filterStudentSelect" class="form-select form-select-sm rounded-pill bg-dark text-white border-secondary" onchange="applyMiddleRecordFilter()">
+                    <option value="ALL">-- اختيار طالب لطباعة سجله بمفرده --</option>
+                    {% for st in all_students %}
+                    <option value="st_{{ st.id }}">[{{ st.clean_reg_number|default:st.registration_number|default:forloop.counter }}] {{ st.full_name|default:st.user.username }} (شعبة {{ st.section.name|default:"أ" }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 3. نطاق صفحات -->
+            <div class="col-12 col-md-3">
+                <label class="form-label small text-white-50 mb-1 fw-bold">3. أو نطاق صفحات (من إلى):</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-secondary border-secondary text-white">من</span>
+                    <input type="number" id="filterPageFrom" class="form-control bg-dark text-white border-secondary text-center font-monospace" min="1" placeholder="1">
+                    <span class="input-group-text bg-secondary border-secondary text-white">إلى</span>
+                    <input type="number" id="filterPageTo" class="form-control bg-dark text-white border-secondary text-center font-monospace" min="1" placeholder="15">
+                    <button type="button" class="btn btn-primary" onclick="applyMiddleRecordFilter()">تطبيق</button>
+                </div>
+            </div>
+
+            <!-- 4. إعادة ضبط -->
+            <div class="col-12 col-md-2 text-end">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill w-100" onclick="resetMiddleRecordFilter()">
+                    <i class="bi bi-arrow-clockwise me-1"></i> إظهار الكل
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- مساحة عرض وطباعة السجلات A4 -->
+    <div class="records-container" dir="rtl">
+
+        <!-- ==================================================================== -->
     <!-- 1. القائمة الجامعة لدرجات الامتحان النهائي لكافة المواد                 -->
     <!-- ==================================================================== -->
     {% if record_type == 'master_exam_sheet' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -361,7 +576,7 @@
                 </div>
                 <div class="col-4 text-end">
                     <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -369,8 +584,7 @@
                 <thead>
                     <tr style="height: 110px;">
                         <th style="width: 4%;">ت</th>
-                        <th style="width: 8%;">القيد</th>
-                        <th style="width: 22%;">اسم التلميذ</th>
+                        <th style="width: 30%;">اسم التلميذ</th>
                         <th class="vertical-cell" style="width: 6%;"><div class="v-text-box">الإسلامية</div></th>
                         <th class="vertical-cell" style="width: 6%;"><div class="v-text-box">العربية</div></th>
                         <th class="vertical-cell" style="width: 6%;"><div class="v-text-box">الرياضيات</div></th>
@@ -391,35 +605,36 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="font-monospace">{{ st.registration_number|default:"" }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                         <td class="p-0">
                             <div class="d-flex h-100">
-                                <div style="width: 50%; height: 27px;" class="border-start border-dark"></div>
-                                <div style="width: 50%; height: 27px;"></div>
+                                <div style="width: 50%; height: 8.8mm;" class="border-start border-dark"></div>
+                                <div style="width: 50%; height: 8.8mm;"></div>
                             </div>
                         </td>
                         <td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                         <td class="p-0">
                             <div class="d-flex h-100">
-                                <div style="width: 50%; height: 27px;" class="border-start border-dark"></div>
-                                <div style="width: 50%; height: 27px;"></div>
+                                <div style="width: 50%; height: 8.8mm;" class="border-start border-dark"></div>
+                                <div style="width: 50%; height: 8.8mm;"></div>
                             </div>
                         </td>
                         <td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -442,13 +657,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 2. قائمة مادة العلوم (نظام الجدول المزدوج 1-20 و 21-33)                 -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'dual_science_sheet' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -461,82 +675,42 @@
                     <div>للعام الدراسي {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>المادة: العلوم | التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>المادة: العلوم | التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
             <table class="table-admin-grades mb-2">
                 <thead>
                     <tr>
-                        <th style="width: 4%;">ت</th>
-                        <th style="width: 7%;">القيد</th>
-                        <th style="width: 25%;">اسم التلميذ</th>
-                        <th style="width: 14%;">
-                            <div>الدرجة</div>
-                            <div class="d-flex border-top border-dark mt-1">
-                                <div style="width: 45%;" class="border-start border-dark">رقماً</div>
-                                <div style="width: 55%;">كتابة</div>
-                            </div>
-                        </th>
-                        <th style="width: 4%;">ت</th>
-                        <th style="width: 7%;">القيد</th>
-                        <th style="width: 25%;">اسم التلميذ</th>
-                        <th style="width: 14%;">
-                            <div>الدرجة</div>
-                            <div class="d-flex border-top border-dark mt-1">
-                                <div style="width: 45%;" class="border-start border-dark">رقماً</div>
-                                <div style="width: 55%;">كتابة</div>
-                            </div>
-                        </th>
+                        <th style="width: 5%;">ت</th>
+                        <th style="width: 35%;">اسم التلميذ الرباعي واللقب</th>
+                        <th style="width: 15%;">درجة الامتحان (رقماً)</th>
+                        <th style="width: 25%;">درجة الامتحان (كتابةً)</th>
+                        <th style="width: 20%;">الملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for i in "x"|rjust:"20" %}
-                    {% with left_idx=forloop.counter right_idx=forloop.counter|add:20 %}
-                    <tr style="height: 25px;">
-                        <td class="font-monospace">{{ left_idx }}</td>
-                        <td>
-                            {% for st in sec_item.students %}
-                                {% if forloop.counter == left_idx %}{{ st.registration_number|default:"" }}{% endif %}
-                            {% endfor %}
-                        </td>
-                        <td class="text-start ps-1">
-                            {% for st in sec_item.students %}
-                                {% if forloop.counter == left_idx %}{{ st.user.get_full_name }}{% endif %}
-                            {% endfor %}
-                        </td>
-                        <td class="p-0">
-                            <div class="d-flex h-100">
-                                <div style="width: 45%; height: 25px;" class="border-start border-dark"></div>
-                                <div style="width: 55%; height: 25px;"></div>
-                            </div>
-                        </td>
-                        <td class="font-monospace">{% if right_idx <= 33 %}{{ right_idx }}{% endif %}</td>
-                        <td>
-                            {% if right_idx <= 33 %}
-                            {% for st in sec_item.students %}
-                                {% if forloop.counter == right_idx %}{{ st.registration_number|default:"" }}{% endif %}
-                            {% endfor %}
-                            {% endif %}
-                        </td>
-                        <td class="text-start ps-1">
-                            {% if right_idx <= 33 %}
-                            {% for st in sec_item.students %}
-                                {% if forloop.counter == right_idx %}{{ st.user.get_full_name }}{% endif %}
-                            {% endfor %}
-                            {% endif %}
-                        </td>
-                        <td class="p-0">
-                            {% if right_idx <= 33 %}
-                            <div class="d-flex h-100">
-                                <div style="width: 45%; height: 25px;" class="border-start border-dark"></div>
-                                <div style="width: 55%; height: 25px;"></div>
-                            </div>
-                            {% endif %}
-                        </td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
                     </tr>
-                    {% endwith %}
+                    {% endfor %}
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -557,13 +731,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 3. قائمة الفنية والنشيد (جدول مزدوج: فنية 7 + نشيد 3)                    -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'dual_art_sheet' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -576,54 +749,45 @@
                     <div>للعام الدراسي {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>المادة: فنية / نشيد | التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>المادة: التربية الفنية والنشيد | التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
             <table class="table-admin-grades mb-2">
                 <thead>
                     <tr>
-                        <th style="width: 4%;">ت</th>
-                        <th style="width: 7%;">القيد</th>
-                        <th style="width: 23%;">اسم التلميذ</th>
-                        <th style="width: 8%;">فنية (7)</th>
-                        <th style="width: 8%;">نشيد (3)</th>
-                        <th style="width: 8%;">المجموع</th>
-                        <th style="width: 4%;">ت</th>
-                        <th style="width: 7%;">القيد</th>
-                        <th style="width: 23%;">اسم التلميذ</th>
-                        <th style="width: 8%;">فنية (7)</th>
-                        <th style="width: 8%;">نشيد (3)</th>
-                        <th style="width: 8%;">المجموع</th>
+                        <th style="width: 5%;">ت</th>
+                        <th style="width: 35%;">اسم التلميذ الرباعي واللقب</th>
+                        <th style="width: 15%;">التربية الفنية (7)</th>
+                        <th style="width: 15%;">النشيد والموسيقى (3)</th>
+                        <th style="width: 15%;">المجموع النهائي (10)</th>
+                        <th style="width: 15%;">الملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for i in "x"|rjust:"20" %}
-                    {% with left_idx=forloop.counter right_idx=forloop.counter|add:20 %}
-                    <tr style="height: 25px;">
-                        <td class="font-monospace">{{ left_idx }}</td>
-                        <td>
-                            {% for st in sec_item.students %}{% if forloop.counter == left_idx %}{{ st.registration_number|default:"" }}{% endif %}{% endfor %}
-                        </td>
-                        <td class="text-start ps-1">
-                            {% for st in sec_item.students %}{% if forloop.counter == left_idx %}{{ st.user.get_full_name }}{% endif %}{% endfor %}
-                        </td>
-                        <td></td><td></td><td></td>
-                        <td class="font-monospace">{% if right_idx <= 33 %}{{ right_idx }}{% endif %}</td>
-                        <td>
-                            {% if right_idx <= 33 %}
-                            {% for st in sec_item.students %}{% if forloop.counter == right_idx %}{{ st.registration_number|default:"" }}{% endif %}{% endfor %}
-                            {% endif %}
-                        </td>
-                        <td class="text-start ps-1">
-                            {% if right_idx <= 33 %}
-                            {% for st in sec_item.students %}{% if forloop.counter == right_idx %}{{ st.user.get_full_name }}{% endif %}{% endfor %}
-                            {% endif %}
-                        </td>
-                        <td></td><td></td><td></td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
                     </tr>
-                    {% endwith %}
+                    {% endfor %}
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -644,13 +808,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 4. قائمة مادة التربية الإسلامية المفردة                                -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'single_islamic' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -663,8 +826,8 @@
                     <div>المادة: التربية الإسلامية | {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -672,8 +835,7 @@
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 4%;">ت</th>
-                        <th rowspan="2" style="width: 8%;">رقم القيد</th>
-                        <th rowspan="2" style="width: 25%;">اسم التلميذ</th>
+                        <th rowspan="2" style="width: 33%;">اسم التلميذ</th>
                         <th colspan="3" style="width: 21%;">القرآن الكريم (5)</th>
                         <th rowspan="2" style="width: 8%;">حديث شريف (2)</th>
                         <th rowspan="2" style="width: 8%;">عقيدة وعبادات (1)</th>
@@ -690,23 +852,26 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="font-monospace">{{ st.registration_number|default:"" }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                         <td style="width: 7%;"></td>
                         <td style="width: 7%;"></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                        <td style="width: 7%;"></td>
+                        <td style="width: 7%;"></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -727,13 +892,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 5. قائمة مادة اللغة العربية المفردة                                   -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'single_arabic' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -746,8 +910,8 @@
                     <div>المادة: العربية | {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -774,20 +938,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -808,13 +974,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 6. قائمة التربية الرياضية المفردة                                     -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'single_sports' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -827,8 +992,8 @@
                     <div>المادة: الرياضة | {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -836,8 +1001,7 @@
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 4%;">ت</th>
-                        <th rowspan="2" style="width: 7%;">رقم القيد</th>
-                        <th rowspan="2" style="width: 24%;">اسم التلميذ</th>
+                        <th rowspan="2" style="width: 31%;">اسم التلميذ</th>
                         <th rowspan="2" style="width: 7%;">الحضور (2)</th>
                         <th rowspan="2" style="width: 7%;">اللياقة (2)</th>
                         <th colspan="2" style="width: 14%;">النشاطات الرياضية (2)</th>
@@ -855,21 +1019,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="font-monospace">{{ st.registration_number|default:"" }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -890,13 +1055,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 7. قائمة الرياضيات الشفوية المفردة                                    -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'single_math' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -909,8 +1073,8 @@
                     <div>المادة: الرياضيات | {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -918,8 +1082,7 @@
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 4%;">ت</th>
-                        <th rowspan="2" style="width: 8%;">رقم القيد</th>
-                        <th rowspan="2" style="width: 28%;">اسم التلميذ</th>
+                        <th rowspan="2" style="width: 36%;">اسم التلميذ</th>
                         <th rowspan="2" style="width: 8%;">أتعلم (2)</th>
                         <th rowspan="2" style="width: 8%;">أتأكد (2)</th>
                         <th rowspan="2" style="width: 8%;">أتحدث (2)</th>
@@ -933,21 +1096,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="font-monospace">{{ st.registration_number|default:"" }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -968,13 +1132,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 8. قائمة مادة العلوم الشفوية المفردة                                  -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'single_science_oral' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -987,8 +1150,8 @@
                     <div>المادة: العلوم (الشفوي) | {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -996,8 +1159,7 @@
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 4%;">ت</th>
-                        <th rowspan="2" style="width: 8%;">رقم القيد</th>
-                        <th rowspan="2" style="width: 28%;">اسم التلميذ</th>
+                        <th rowspan="2" style="width: 36%;">اسم التلميذ</th>
                         <th rowspan="2" style="width: 8%;">انظر الصورة (2)</th>
                         <th rowspan="2" style="width: 8%;">معاني المفردات (2)</th>
                         <th rowspan="2" style="width: 8%;">عدد لواحد (2)</th>
@@ -1011,21 +1173,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="font-monospace">{{ st.registration_number|default:"" }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1046,13 +1209,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 9. قوائم اللغة الإنكليزية الرسمية                                     -->
-    <!-- ==================================================================== -->
     {% elif record_type == 'english_p1_p2' or record_type == 'english_p3' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="oral-sheet-border">
             <div class="text-center mb-2">
                 <div>بسم الله الرحمن الرحيم</div>
@@ -1060,7 +1222,7 @@
                 <div>للعام الدراسي ( {{ current_year.name|default:"2025 / 2026" }} )</div>
                 <div class="d-flex justify-content-between px-3 mt-1 fw-bold">
                     <div>الصف: {{ selected_class.name }} {% if sec_item.section %}- الشعبة: {{ sec_item.section.name }}{% endif %}</div>
-                    <div>المادة: اللغة الإنكليزية</div>
+                    <div>المادة: اللغة الإنكليزية | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                     <div>إدارة المدرسة</div>
                 </div>
             </div>
@@ -1068,32 +1230,34 @@
             <table class="table-oral mb-2">
                 <thead>
                     <tr class="header-row-fixed">
-                        <th style="width: 4%;">N.</th>
-                        <th style="width: 32%;">Pupil s Name</th>
-                        <th class="vertical-cell"><div class="v-text-box">Listening 2 M</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">Speaking 2 M</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">{% if record_type == 'english_p3' %}Reading 2 M{% else %}Pre - Reading 2 M{% endif %}</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">{% if record_type == 'english_p3' %}writing 2 M{% else %}Pre - writing 2 M{% endif %}</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">Participation 2 M</div></th>
-                        <th class="vertical-cell" style="width: 10%;"><div class="v-text-box">Total 10 M</div></th>
-                        <th style="width: 12%;">NOTE</th>
+                        <th style="width: 4%;">ت</th>
+                        <th style="width: 32%;">اسم التلميذ الرباعي واللقب</th>
+                        <th class="vertical-cell"><div class="v-text-box">الإصغاء (2 درجات)</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">المحادثة الشفوية (2 درجات)</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">{% if record_type == 'english_p3' %}القراءة (2 درجات){% else %}التهيئة للقراءة (2 درجات){% endif %}</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">{% if record_type == 'english_p3' %}الكتابة (2 درجات){% else %}التهيئة للكتابة (2 درجات){% endif %}</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">المشاركة والنشاط (2 درجات)</div></th>
+                        <th class="vertical-cell" style="width: 10%;"><div class="v-text-box">المجموع الكلي (10 درجات)</div></th>
+                        <th style="width: 12%;">الملاحظات</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1113,10 +1277,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    {% elif record_type == 'english_p4' %}
+        {% elif record_type == 'english_p4' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="oral-sheet-border">
             <div class="text-center mb-2">
                 <div>بسم الله الرحمن الرحيم</div>
@@ -1124,7 +1290,7 @@
                 <div>للعام الدراسي ( {{ current_year.name|default:"2025 / 2026" }} )</div>
                 <div class="d-flex justify-content-between px-3 mt-1 fw-bold">
                     <div>الصف: {{ selected_class.name }} {% if sec_item.section %}- الشعبة: {{ sec_item.section.name }}{% endif %}</div>
-                    <div>المادة: اللغة الإنكليزية</div>
+                    <div>المادة: اللغة الإنكليزية | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                     <div>إدارة المدرسة</div>
                 </div>
             </div>
@@ -1132,38 +1298,41 @@
             <table class="table-oral mb-2">
                 <thead>
                     <tr>
-                        <th rowspan="2" style="width: 4%;">N.</th>
-                        <th rowspan="2" style="width: 6%;">Card N.</th>
-                        <th rowspan="2" style="width: 28%;">The name</th>
-                        <th colspan="3" style="width: 22%;">Oral test 10</th>
-                        <th rowspan="2" class="vertical-cell" style="width: 10%;"><div class="v-text-box">Writing test/ 10</div></th>
-                        <th colspan="2" style="width: 16%;">Total Marks 20 ÷ 2 =</th>
-                        <th rowspan="2" style="width: 14%;">Notes</th>
+                        <th rowspan="2" style="width: 4%;">ت</th>
+                        <th rowspan="2" style="width: 7%;">رقم البطاقة</th>
+                        <th rowspan="2" style="width: 28%;">اسم التلميذ الرباعي</th>
+                        <th colspan="3" style="width: 22%;">الامتحان الشفوي (10 درجات)</th>
+                        <th rowspan="2" class="vertical-cell" style="width: 10%;"><div class="v-text-box">الامتحان التحريري (10 درجات)</div></th>
+                        <th colspan="2" style="width: 16%;">المعدل النهائي (20 ÷ 2 = 10)</th>
+                        <th rowspan="2" style="width: 13%;">الملاحظات</th>
                     </tr>
                     <tr>
-                        <th style="font-size: 10px !important;">Speaking / 5</th>
-                        <th style="font-size: 10px !important;">Reading / 5</th>
-                        <th style="font-size: 10px !important;">Total</th>
-                        <th>Number</th>
-                        <th>Writing</th>
+                        <th style="font-size: 11px !important;">المحادثة / 5</th>
+                        <th style="font-size: 11px !important;">القراءة / 5</th>
+                        <th style="font-size: 11px !important;">المجموع</th>
+                        <th>رقماً</th>
+                        <th>كتابةً</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
                         <td></td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1183,10 +1352,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    {% elif record_type == 'english_p5_p6' %}
+        {% elif record_type == 'english_p5_p6' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="oral-sheet-border">
             <div class="text-center mb-2">
                 <div>بسم الله الرحمن الرحيم</div>
@@ -1194,7 +1365,7 @@
                 <div>للعام الدراسي ( {{ current_year.name|default:"2025 / 2026" }} )</div>
                 <div class="d-flex justify-content-between px-3 mt-1 fw-bold">
                     <div>الصف: {{ selected_class.name }} {% if sec_item.section %}- الشعبة: {{ sec_item.section.name }}{% endif %}</div>
-                    <div>المادة: اللغة الإنكليزية</div>
+                    <div>المادة: اللغة الإنكليزية | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                     <div>إدارة المدرسة</div>
                 </div>
             </div>
@@ -1202,38 +1373,41 @@
             <table class="table-oral mb-2">
                 <thead>
                     <tr>
-                        <th rowspan="2" style="width: 4%;">N.</th>
-                        <th rowspan="2" style="width: 7%;">Card number</th>
-                        <th rowspan="2" style="width: 27%;">Pupil s Name</th>
-                        <th colspan="4" style="width: 28%;">Oral Test</th>
-                        <th rowspan="2" class="vertical-cell" style="width: 10%;"><div class="v-text-box">Written TEST 60</div></th>
-                        <th colspan="2" style="width: 16%;">Total 100</th>
+                        <th rowspan="2" style="width: 4%;">ت</th>
+                        <th rowspan="2" style="width: 7%;">رقم البطاقة</th>
+                        <th rowspan="2" style="width: 27%;">اسم التلميذ الرباعي</th>
+                        <th colspan="4" style="width: 28%;">الامتحان الشفوي (40 درجة)</th>
+                        <th rowspan="2" class="vertical-cell" style="width: 10%;"><div class="v-text-box">الامتحان التحريري (60 درجة)</div></th>
+                        <th colspan="2" style="width: 16%;">المجموع النهائي من (100)</th>
                     </tr>
                     <tr>
-                        <th style="font-size: 10px !important;">Listening 10</th>
-                        <th style="font-size: 10px !important;">Speaking 20</th>
-                        <th style="font-size: 10px !important;">Reading aloud 10</th>
-                        <th style="font-size: 10px !important;">Total 40</th>
-                        <th>Number</th>
-                        <th>Writing</th>
+                        <th style="font-size: 10px !important;">الإصغاء (10)</th>
+                        <th style="font-size: 10px !important;">المحادثة (20)</th>
+                        <th style="font-size: 10px !important;">القراءة الجهرية (10)</th>
+                        <th style="font-size: 10px !important;">مجموع الشفوي (40)</th>
+                        <th>رقماً</th>
+                        <th>كتابةً</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
                         <td></td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1253,10 +1427,12 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    {% elif record_type == 'english_arabic_labels' %}
+        {% elif record_type == 'english_arabic_labels' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="row align-items-center mb-2">
                 <div class="col-4 text-start">
@@ -1269,8 +1445,8 @@
                     <div>المادة: اللغة الإنكليزية (E) | {{ current_year.name|default:"2025 – 2026" }}</div>
                 </div>
                 <div class="col-4 text-end">
-                    <div>الصف: {{ selected_class.name }}</div>
-                    <div>التاريخ: {{ today_date }}</div>
+                    <div>الصف: {{ selected_class.name }} {% if sec_item.section %} / {{ sec_item.section.name }}{% endif %}</div>
+                    <div>التاريخ: {{ today_date }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 </div>
             </div>
 
@@ -1278,8 +1454,7 @@
                 <thead>
                     <tr>
                         <th rowspan="2" style="width: 4%;">ت</th>
-                        <th rowspan="2" style="width: 8%;">رقم القيد</th>
-                        <th rowspan="2" style="width: 28%;">اسم التلميذ</th>
+                        <th rowspan="2" style="width: 36%;">اسم التلميذ</th>
                         <th rowspan="2" style="width: 8%;">الإصغاء (2)</th>
                         <th rowspan="2" style="width: 8%;">التحدث (2)</th>
                         <th rowspan="2" style="width: 8%;">القراءة (2)</th>
@@ -1293,21 +1468,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="font-monospace">{{ st.registration_number|default:"" }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for r in admin_rows_range %}
-                    {% if r > sec_item.students_count and r <= 25 %}
-                    <tr style="height: 27px;">
-                        <td class="font-monospace">{{ r }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1328,17 +1504,17 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
-    <!-- ==================================================================== -->
-    <!-- 10. النماذج السابقة المحفوظة بالكامل دون أي مساس بها                   -->
-    <!-- ==================================================================== -->
-    {% elif record_type == 'oral_exam_builder' %}
+        {% elif record_type == 'oral_exam_builder' %}
     {% for sec_item in sections_data %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="oral-sheet-border">
             <div class="text-center mb-2">
                 <h5 class="fw-bold mb-1">قائمة الامتحانات الشفوية لمادة: <span id="out_oral_sub">التربية الإسلامية</span></h5>
                 <div class="fw-bold">للعام الدراسي: <span class="font-monospace">{{ current_year.name|default:"2026-2027" }}</span></div>
+                <div class="small fw-bold">صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
                 <div class="fw-bold" id="out_oral_term">امتحان نصف السنة الشفوي</div>
             </div>
 
@@ -1386,10 +1562,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 28px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="text-start ps-2 text-dark">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2 text-dark" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td class="dynamic-td-col-1"></td>
                         <td class="dynamic-td-col-2"></td>
                         <td class="dynamic-td-col-3"></td>
@@ -1397,18 +1574,19 @@
                         <td class="dynamic-td-col-5 d-none"></td>
                         <td class="p-0">
                             <div class="d-flex h-100">
-                                <div style="width: 40%; height: 28px;" class="border-start border-dark"></div>
-                                <div style="width: 60%; height: 28px;"></div>
+                                <div style="width: 40%; height: 8.8mm;" class="border-start border-dark"></div>
+                                <div style="width: 60%; height: 8.8mm;"></div>
                             </div>
                         </td>
                         <td></td>
                     </tr>
                     {% endfor %}
-                    {% for row_num in admin_rows_range %}
-                    {% if row_num > sec_item.students_count and row_num <= 25 %}
-                    <tr style="height: 28px;">
-                        <td class="font-monospace">{{ row_num }}</td>
-                        <td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
                         <td class="dynamic-td-col-1"></td>
                         <td class="dynamic-td-col-2"></td>
                         <td class="dynamic-td-col-3"></td>
@@ -1416,13 +1594,12 @@
                         <td class="dynamic-td-col-5 d-none"></td>
                         <td class="p-0">
                             <div class="d-flex h-100">
-                                <div style="width: 40%; height: 28px;" class="border-start border-dark"></div>
-                                <div style="width: 60%; height: 28px;"></div>
+                                <div style="width: 40%; height: 8.8mm;" class="border-start border-dark"></div>
+                                <div style="width: 60%; height: 8.8mm;"></div>
                             </div>
                         </td>
                         <td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1434,18 +1611,19 @@
         </div>
     </div>
     {% endfor %}
+    {% endfor %}
 
     {% elif record_type == 'middle_record' %}
     {% for sec_item in sections_data %}
     {% for st in sec_item.students %}
-    <div class="sheet-page-wrapper">
+    <div class="sheet-page-wrapper middle-record-page" data-section-id="sec_{{ sec_item.section.id }}" data-student-id="st_{{ st.id }}" data-page-type="student">
         <div class="official-border">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <div class="text-start">
                     <div>إدارة {{ school.school_name|default:"المدرسة" }}</div>
                 </div>
                 <div class="text-center">
-                    <div class="fs-5 mb-1">سجل الدرجات الوسطي</div>
+                    <div class="fs-5 mb-1 fw-bold">سجل الدرجات الوسطي</div>
                     <div>للعام الدراسي ( {{ current_year.name|default:"2026-2027" }} )</div>
                 </div>
                 <div class="text-end" style="min-width: 140px;">
@@ -1453,24 +1631,24 @@
                 </div>
             </div>
 
-            <div class="row g-2 mb-3 align-items-center">
+            <div class="row g-2 mb-2 align-items-center">
                 <div class="col-7">
-                    <span>اسم الطالب: </span>
-                    <span class="border-bottom-dots px-2">{{ st.user.get_full_name }}</span>
+                    <span class="fw-bold">اسم الطالب: </span>
+                    <span class="border-bottom-dots px-2">{{ st.full_name|default:st.user.username }}</span>
                 </div>
                 <div class="col-5">
-                    <span>الصف: </span>
+                    <span class="fw-bold">الصف: </span>
                     <span class="border-bottom-dots px-2">{{ selected_class.name }}</span>
-                    <span class="ms-2">الشعبة: </span>
+                    <span class="ms-2 fw-bold">الشعبة: </span>
                     <span class="border-bottom-dots px-2">{{ sec_item.section.name|default:"أ" }}</span>
                 </div>
                 <div class="col-12 mt-1">
-                    <span>رقمه في القيد العام: </span>
-                    <span class="border-bottom-dots font-monospace px-2">{{ st.registration_number|default:".........." }}</span>
+                    <span class="fw-bold">رقمه في القيد العام: </span>
+                    <span class="border-bottom-dots font-monospace px-2">{{ st.clean_reg_number|default:st.registration_number|default:".........." }}</span>
                 </div>
             </div>
 
-            <table class="table-official mb-3">
+            <table class="table-official">
                 <thead>
                     <tr class="header-row-fixed">
                         <th style="width: 25%;">المواد</th>
@@ -1487,55 +1665,55 @@
                 </thead>
                 <tbody>
                     {% for sub in subjects_list %}
-                    <tr style="height: 30px;">
-                        <td class="text-start ps-2">{{ sub }}</td>
+                    <tr class="sub-row">
+                        <td class="text-start ps-2 fw-bold">{{ sub }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    <tr style="height: 34px;">
-                        <td class="text-center bg-light">نتيجة الدور الأول</td>
+                    <tr class="result-row">
+                        <td class="text-center bg-light fw-bold">نتيجة الدور الأول</td>
                         <td colspan="9"></td>
                     </tr>
-                    <tr style="height: 34px;">
-                        <td class="text-center bg-light">نتيجة الدور الثاني</td>
+                    <tr class="result-row">
+                        <td class="text-center bg-light fw-bold">نتيجة الدور الثاني</td>
                         <td colspan="9"></td>
                     </tr>
                 </tbody>
             </table>
 
-            <div class="d-flex justify-content-between align-items-center mt-4 pt-2 px-3">
-                <div>عضو اللجنة الامتحانية</div>
-                <div>مدقق السجل</div>
-                <div>مدير المدرسة والختم الرسمي</div>
+            <div class="middle-record-signatures d-flex justify-content-between align-items-center px-3">
+                <div class="fw-bold">عضو اللجنة الامتحانية: <span class="border-bottom-dots px-3">........................</span></div>
+                <div class="fw-bold">مدقق السجل: <span class="border-bottom-dots px-3">........................</span></div>
+                <div class="fw-bold">مدير المدرسة والختم: <span class="border-bottom-dots px-3">{{ school.director_name|default:"........................" }}</span></div>
             </div>
         </div>
     </div>
     {% endfor %}
 
     {% for p in empty_pages_range %}
-    <div class="sheet-page-wrapper">
+    <div class="sheet-page-wrapper middle-record-page middle-record-spare" data-is-spare="1" data-section-id="sec_{{ sec_item.section.id }}">
         <div class="official-border">
             <div class="d-flex justify-content-between align-items-start mb-2">
                 <div class="text-start">
                     <div>إدارة {{ school.school_name|default:"المدرسة" }}</div>
                 </div>
                 <div class="text-center">
-                    <div class="fs-5 mb-1">سجل الدرجات الوسطي</div>
+                    <div class="fs-5 mb-1 fw-bold">سجل الدرجات الوسطي</div>
                     <div>للعام الدراسي ( {{ current_year.name|default:"2026-2027" }} )</div>
                 </div>
                 <div class="text-end" style="min-width: 140px;">
                     <div class="seq-box">صفحة احتياطية ({{ forloop.counter }})</div>
                 </div>
             </div>
-            <div class="row g-2 mb-3 align-items-center">
-                <div class="col-7"><span>اسم الطالب: </span><span class="border-bottom-dots px-4">................................................</span></div>
+            <div class="row g-2 mb-2 align-items-center">
+                <div class="col-7"><span class="fw-bold">اسم الطالب: </span><span class="border-bottom-dots px-4">................................................</span></div>
                 <div class="col-5">
-                    <span>الصف: </span><span class="border-bottom-dots px-2">{{ selected_class.name }}</span>
-                    <span class="ms-2">الشعبة: </span><span class="border-bottom-dots px-2">{{ sec_item.section.name|default:"أ" }}</span>
+                    <span class="fw-bold">الصف: </span><span class="border-bottom-dots px-2">{{ selected_class.name }}</span>
+                    <span class="ms-2 fw-bold">الشعبة: </span><span class="border-bottom-dots px-2">{{ sec_item.section.name|default:"أ" }}</span>
                 </div>
-                <div class="col-12 mt-1"><span>رقمه في القيد العام: </span><span class="border-bottom-dots px-4">....................</span></div>
+                <div class="col-12 mt-1"><span class="fw-bold">رقمه في القيد العام: </span><span class="border-bottom-dots font-monospace px-4">....................</span></div>
             </div>
-            <table class="table-official mb-3">
+            <table class="table-official">
                 <thead>
                     <tr class="header-row-fixed">
                         <th style="width: 25%;">المواد</th>
@@ -1552,35 +1730,36 @@
                 </thead>
                 <tbody>
                     {% for sub in subjects_list %}
-                    <tr style="height: 30px;">
-                        <td class="text-start ps-2">{{ sub }}</td>
+                    <tr class="sub-row">
+                        <td class="text-start ps-2 fw-bold">{{ sub }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    <tr style="height: 34px;">
-                        <td class="text-center bg-light">نتيجة الدور الأول</td>
+                    <tr class="result-row">
+                        <td class="text-center bg-light fw-bold">نتيجة الدور الأول</td>
                         <td colspan="9"></td>
                     </tr>
-                    <tr style="height: 34px;">
-                        <td class="text-center bg-light">نتيجة الدور الثاني</td>
+                    <tr class="result-row">
+                        <td class="text-center bg-light fw-bold">نتيجة الدور الثاني</td>
                         <td colspan="9"></td>
                     </tr>
                 </tbody>
             </table>
-            <div class="d-flex justify-content-between align-items-center mt-4 pt-2 px-3">
-                <div>عضو اللجنة الامتحانية</div>
-                <div>مدقق السجل</div>
-                <div>مدير المدرسة والختم الرسمي</div>
+            <div class="middle-record-signatures d-flex justify-content-between align-items-center px-3">
+                <div class="fw-bold">عضو اللجنة الامتحانية: <span class="border-bottom-dots px-3">........................</span></div>
+                <div class="fw-bold">مدقق السجل: <span class="border-bottom-dots px-3">........................</span></div>
+                <div class="fw-bold">مدير المدرسة والختم: <span class="border-bottom-dots px-3">{{ school.director_name|default:"........................" }}</span></div>
             </div>
         </div>
     </div>
     {% endfor %}
     {% endfor %}
 
-    {% elif record_type == 'admin_grade_sheet' %}
+        {% elif record_type == 'admin_grade_sheet' %}
     {% for sec_item in sections_data %}
     {% for sub in subjects_list %}
-    <div class="sheet-page-wrapper">
+    {% for page in sec_item.pages %}
+    <div class="print-page sheet-page-wrapper" style="page-break-after: always; break-after: page; height: 100%; box-sizing: border-box;">
         <div class="admin-grade-border">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
@@ -1591,7 +1770,7 @@
                     <h5 class="fw-bold mb-0">سجل درجات الطلاب</h5>
                     <span>للصف: ( {{ selected_class.name }} - شعبة {{ sec_item.section.name|default:"أ" }} )</span>
                 </div>
-                <div class="text-end">العام الدراسي: {{ current_year.name|default:"2026-2027" }}</div>
+                <div class="text-end">العام الدراسي: {{ current_year.name|default:"2026-2027" }} | صفحة ({{ page.page_number }} من {{ sec_item.total_pages }})</div>
             </div>
 
             {% if selected_class.is_final_stage or "ثالث" in selected_class.name or "سادس" in selected_class.name %}
@@ -1612,20 +1791,22 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 28px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
                         <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for row_num in admin_rows_range %}
-                    {% if row_num > sec_item.students_count %}
-                    <tr style="height: 28px;">
-                        <td class="font-monospace">{{ row_num }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -1637,52 +1818,51 @@
                         <th style="width: 18%;">اسم الطالب</th>
                         <th class="vertical-cell"><div class="v-text-box">امتحان الشهر الأول</div></th>
                         <th class="vertical-cell"><div class="v-text-box">امتحان الشهر الثاني</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">سعي الفصل الأول</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">امتحان نصف السنة</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">معدل الفصل الأول ÷ 2</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">درجة امتحان نصف السنة</div></th>
                         <th class="vertical-cell"><div class="v-text-box">امتحان الشهر الأول</div></th>
                         <th class="vertical-cell"><div class="v-text-box">امتحان الشهر الثاني</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">سعي الفصل الثاني</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">السعي السنوي</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">الامتحان النهائي د1</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">الدرجة النهائية د1</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">امتحان الدور الثاني</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">الدرجة النهائية د2</div></th>
-                        <th class="vertical-cell"><div class="v-text-box">النتيجة النهائية</div></th>
-                        <th style="width: 8%;">الملاحظات</th>
+                        <th class="vertical-cell"><div class="v-text-box">معدل الفصل الثاني ÷ 2</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">معدل السعي السنوي ÷ 3</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">الامتحان النهائي</div></th>
+                        <th class="vertical-cell"><div class="v-text-box">المعدل النهائي العام</div></th>
+                        <th style="width: 8%;">النتيجة</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for st in sec_item.students %}
-                    <tr style="height: 28px;">
-                        <td class="font-monospace">{{ forloop.counter }}</td>
-                        <td class="text-start ps-2">{{ st.user.get_full_name }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    <!-- 1. عرض الطلاب الفعليين -->
+                    {% for st in page.students %}
+                    <tr style="height: 8.8mm;">
+                        <td class="font-monospace">{{ forloop.counter|add:page.start_no|add:"-1" }}</td>
+                        <td class="text-start ps-2" style="font-family: 'Simplified Arabic'; font-size: 14pt; font-weight: bold;">{{ st.name|default:st.full_name|default:st.user.username }}</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
                     {% endfor %}
-                    {% for row_num in admin_rows_range %}
-                    {% if row_num > sec_item.students_count %}
-                    <tr style="height: 28px;">
-                        <td class="font-monospace">{{ row_num }}</td>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+
+                    <!-- 2. إكمال الفراغ تلقائياً حتى السطر 27 بالضبط -->
+                    {% for _ in page.empty_rows %}
+                    <tr style="height: 8.8mm;" class="empty-row">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                     </tr>
-                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
             {% endif %}
 
-            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 px-4">
-                <div>مدرس المادة: <span class="border-bottom-dots px-4">......................................</span></div>
-                <div>مدير المدرسة: <span class="border-bottom-dots px-3">{{ school.director_name|default:"......................................" }}</span></div>
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-dark">
+                <div>مدرس المادة: .......................................</div>
+                <div>مدير المدرسة: {{ school.director_name|default:"......................................." }}</div>
             </div>
         </div>
     </div>
     {% endfor %}
     {% endfor %}
+    {% endfor %}
     {% endif %}
-
+    </div>
     {% endif %}
-</div>
 
 <script>
     function switchOralPattern() {
@@ -1751,11 +1931,97 @@
         if (outScoreEl) outScoreEl.innerText = calculatedTotal;
     }
 
+    // ======================================================================
+    // دوال الفلترة والطباعة الذكية للسجل الوسطي لتفادي تجمد المتصفح
+    // ======================================================================
+    function applyMiddleRecordFilter() {
+        const secSelect = document.getElementById('filterSectionSelect');
+        const stSelect = document.getElementById('filterStudentSelect');
+        const fromInput = document.getElementById('filterPageFrom');
+        const toInput = document.getElementById('filterPageTo');
+
+        if (!secSelect) return;
+
+        const secVal = secSelect.value;
+        const stVal = stSelect ? stSelect.value : 'ALL';
+        const fromVal = fromInput && fromInput.value ? parseInt(fromInput.value) : null;
+        const toVal = toInput && toInput.value ? parseInt(toInput.value) : null;
+
+        const pages = document.querySelectorAll('.middle-record-page');
+        let visibleCount = 0;
+
+        pages.forEach((page, idx) => {
+            const pageNum = idx + 1;
+            const pageSec = page.getAttribute('data-section-id');
+            const pageSt = page.getAttribute('data-student-id');
+            const isSpare = page.getAttribute('data-is-spare') === '1';
+
+            let show = true;
+
+            if (stVal && stVal !== 'ALL') {
+                show = (pageSt === stVal);
+            } else if (secVal && secVal !== 'ALL') {
+                show = (pageSec === secVal);
+            } else if (fromVal !== null || toVal !== null) {
+                const f = fromVal !== null ? fromVal : 1;
+                const t = toVal !== null ? toVal : pages.length;
+                show = (pageNum >= f && pageNum <= t);
+            }
+
+            if (show) {
+                page.classList.remove('print-page-hidden');
+                page.style.display = '';
+                visibleCount++;
+            } else {
+                page.classList.add('print-page-hidden');
+                page.style.display = 'none';
+            }
+        });
+
+        const badgeEl = document.getElementById('visiblePagesCount');
+        if (badgeEl) badgeEl.innerText = visibleCount;
+
+        // تحديث رابط التصدير المباشر ليعكس الفلترة المختارة
+        const directPdfBtn = document.getElementById('btnExportPdfDirect');
+        const topPdfBtn = document.getElementById('topExportPdfBtn');
+        let exportUrl = "{% url 'portal_records_export_pdf' %}?class_id={{ selected_class_id }}";
+        if (stVal && stVal !== 'ALL') {
+            exportUrl += `&student_id=${stVal.replace('st_', '')}`;
+        } else if (secVal && secVal !== 'ALL') {
+            exportUrl += `&section_id=${secVal.replace('sec_', '')}`;
+        } else if (fromVal !== null || toVal !== null) {
+            exportUrl += `&page_from=${fromVal || 1}&page_to=${toVal || ''}`;
+        }
+
+        if (directPdfBtn) directPdfBtn.href = exportUrl;
+        if (topPdfBtn) topPdfBtn.href = exportUrl;
+    }
+
+    function resetMiddleRecordFilter() {
+        if (document.getElementById('filterSectionSelect')) document.getElementById('filterSectionSelect').value = 'ALL';
+        if (document.getElementById('filterStudentSelect')) document.getElementById('filterStudentSelect').value = 'ALL';
+        if (document.getElementById('filterPageFrom')) document.getElementById('filterPageFrom').value = '';
+        if (document.getElementById('filterPageTo')) document.getElementById('filterPageTo').value = '';
+        applyMiddleRecordFilter();
+    }
+
+    function printFilteredMiddleRecord() {
+        // فحص عدد الصفحات لتنبيه المستخدم إن كان العدد ضخماً
+        const visibleCount = parseInt(document.getElementById('visiblePagesCount') ? document.getElementById('visiblePagesCount').innerText : '0');
+        if (visibleCount > 50) {
+            const proceed = confirm(`تنبيه: أنت على وشك إرسال (${visibleCount}) صفحة إلى نافذة الطباعة دفعة واحدة، مما قد يسبب بطئاً في المتصفح.\n\nهل تفضل المتابعة بالطباعة، أم استخدام زر "تصدير السجل إلى PDF فوري"؟\n\nاضغط "موافق" لمتابعة الطباعة العادية، أو "إلغاء" لاستخدام زر التصدير.`);
+            if (!proceed) return;
+        }
+        window.print();
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         if (document.getElementById('oral_pattern_select')) {
             switchOralPattern();
         }
+        if (document.querySelector('.middle-record-page')) {
+            applyMiddleRecordFilter();
+        }
     });
 </script>
 {% endblock %}
-

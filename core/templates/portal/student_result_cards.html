@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كارت النتيجة والبطاقة المدرسية - {{ selected_class.name|default:"النتائج المدرسية" }}</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-dark: #0f172a;
+            --accent: #d97706;
+            --border-dark: #000000;
+            --border-light: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+            direction: rtl;
+            padding: 15px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* شريط التحكم والتصفية العلوي - لا يظهر في الطباعة */
+        .no-print-toolbar {
+            max-width: 1100px;
+            margin: 0 auto 20px auto;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 14px 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toolbar-select {
+            padding: 6px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            background-color: #f8fafc;
+            color: #1e293b;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .toolbar-select:focus {
+            border-color: var(--primary);
+            background-color: #ffffff;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Cairo', sans-serif;
+            border-radius: 24px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: #1e3a8a;
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3);
+        }
+
+        .btn-primary:hover {
+            background-color: #0f172a;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: #f8fafc;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e2e8f0;
+            color: #0f172a;
+        }
+
+        /* حاوية الصفحات للطباعة والعرض */
+        .cards-container {
+            max-width: 210mm;
+            margin: 0 auto;
+        }
+
+        /* صفحة A4 واحدة */
+        .result-page-a4 {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 30px auto;
+            background: #ffffff;
+            padding: 7mm 8mm;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-after: always;
+            break-after: page;
+        }
+
+        .result-page-a4:last-child {
+            page-break-after: auto;
+            break-after: auto;
+        }
+
+        /* بطاقة الطالب الواحدة */
+        .student-result-card {
+            border: 2px solid #0f172a;
+            border-radius: 6px;
+            padding: 5mm 6mm 4mm 6mm;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* وضع بطاقتين في الصفحة */
+        .layout-2up .student-result-card {
+            min-height: 135mm;
+            max-height: 138mm;
+        }
+
+        /* وضع بطاقة واحدة في الصفحة */
+        .layout-1up .student-result-card {
+            min-height: 275mm;
+            padding: 8mm 10mm;
+        }
+
+        /* خط القص الفاصل بين البطاقتين */
+        .cut-divider {
+            text-align: center;
+            margin: 4mm 0;
+            position: relative;
+            height: 16px;
+            line-height: 16px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .cut-divider::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            border-top: 1.5px dashed #94a3b8;
+            z-index: 1;
+        }
+
+        .cut-divider span {
+            position: relative;
+            z-index: 2;
+            background: #ffffff;
+            padding: 0 10px;
+        }
+
+        /* ترويسة الكارت الوزارية والمدرسية */
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px double #0f172a;
+            padding-bottom: 3mm;
+            margin-bottom: 2.5mm;
+        }
+
+        .header-col {
+            flex: 1;
+        }
+
+        .header-col.right {
+            text-align: right;
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
+        .header-col.center {
+            text-align: center;
+            flex: 1.4;
+        }
+
+        .header-col.left {
+            text-align: left;
+            font-size: 10px;
+            line-height: 1.35;
+            direction: ltr;
+        }
+
+        .card-title-badge {
+            display: inline-block;
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 2px 14px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .card-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .logo-img {
+            max-height: 38px;
+            max-width: 48px;
+            object-fit: contain;
+            display: inline-block;
+            vertical-align: middle;
+            margin: 0 4px;
+        }
+
+        /* شريط معلومات الطالب */
+        .student-info-bar {
+            display: grid;
+            grid-template-columns: 2fr 1.2fr 1fr 1fr;
+            background-color: #f8fafc;
+            border: 1px solid #0f172a;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 10.5px;
+            margin-bottom: 2.5mm;
+            gap: 4px;
+        }
+
+        .info-cell {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .info-cell strong {
+            color: #0f172a;
+            font-weight: 800;
+        }
+
+        .info-label {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        /* جدول المواد بالأعمدة الثمانية المعتمدة */
+        .card-grades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 2.5mm;
+        }
+
+        .card-grades-table th {
+            background-color: #1e293b;
+            color: #ffffff;
+            font-weight: 800;
+            padding: 3.5px 2px;
+            border: 1px solid #0f172a;
+            font-size: 9.5px;
+        }
+
+        .card-grades-table td {
+            border: 1px solid #0f172a;
+            padding: 2.5px 2px;
+            font-weight: 600;
+            color: #0f172a;
+            height: 18px;
+        }
+
+        .layout-1up .card-grades-table th {
+            padding: 6px 4px;
+            font-size: 11px;
+        }
+
+        .layout-1up .card-grades-table td {
+            padding: 5px 4px;
+            font-size: 11px;
+            height: 26px;
+        }
+
+        .col-subject {
+            text-align: right;
+            padding-right: 6px !important;
+            font-weight: 800 !important;
+            width: 22%;
+        }
+
+        .col-eval {
+            width: 9.5%;
+        }
+
+        .col-final {
+            width: 11%;
+            font-weight: 800 !important;
+            background-color: #f1f5f9;
+        }
+
+        .col-notes {
+            width: 15%;
+            font-size: 9.5px;
+            font-weight: 700;
+        }
+
+        .grade-failed {
+            color: #dc2626 !important;
+            font-weight: 900 !important;
+        }
+
+        .grade-passed {
+            color: #0f172a;
+        }
+
+        .badge-note-pass {
+            color: #15803d;
+            font-weight: 700;
+        }
+
+        .badge-note-fail {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+
+        .badge-note-decision {
+            color: #b45309;
+            font-weight: 700;
+        }
+
+        /* صندوق خلاصة النتيجة */
+        .card-summary-box {
+            display: grid;
+            grid-template-columns: 1.1fr 1.1fr 1.1fr 2.2fr;
+            border: 1.5px solid #0f172a;
+            background-color: #f8fafc;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 10.5px;
+            margin-bottom: 3mm;
+            text-align: center;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .layout-1up .card-summary-box {
+            padding: 8px 12px;
+            font-size: 13px;
+            margin-bottom: 6mm;
+        }
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .summary-item-title {
+            font-size: 9px;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .layout-1up .summary-item-title {
+            font-size: 11px;
+        }
+
+        .summary-item-val {
+            font-size: 12px;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .layout-1up .summary-item-val {
+            font-size: 15px;
+        }
+
+        .val-pass {
+            color: #15803d;
+        }
+
+        .val-sup {
+            color: #b45309;
+        }
+
+        .val-fail {
+            color: #dc2626;
+        }
+
+        /* صندوق التوقيعات الرسمية */
+        .card-signatures {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            text-align: center;
+            padding-top: 1mm;
+            font-size: 10px;
+            font-weight: 700;
+            color: #0f172a;
+            align-items: flex-end;
+        }
+
+        .layout-1up .card-signatures {
+            font-size: 12px;
+            padding-top: 5mm;
+        }
+
+        .sig-box {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .sig-stamp-placeholder {
+            border: 1px dashed #64748b;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: #64748b;
+            line-height: 1.1;
+        }
+
+        .layout-1up .sig-stamp-placeholder {
+            width: 75px;
+            height: 75px;
+            font-size: 10px;
+        }
+
+        .sig-dots {
+            margin-top: 10px;
+            color: #94a3b8;
+            font-size: 9px;
+        }
+
+        .card-footer-note {
+            font-size: 8px;
+            color: #64748b;
+            text-align: center;
+            margin-top: 2mm;
+            border-top: 1px dotted #cbd5e1;
+            padding-top: 1mm;
+        }
+
+        /* تنسيقات الطباعة الصارمة */
+        @media print {
+            body {
+                background: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .no-print-toolbar {
+                display: none !important;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 5mm 6mm;
+            }
+
+            .cards-container {
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+
+            .result-page-a4 {
+                width: 100% !important;
+                min-height: auto !important;
+                height: 285mm !important;
+                max-height: 285mm !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 4mm 2mm !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                border: none !important;
+            }
+
+            .result-page-a4:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+
+            .student-result-card {
+                border: 1.5px solid #000000 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .card-grades-table th {
+                background-color: #1e293b !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .card-title-badge {
+                background: #0f172a !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .cut-divider::before {
+                border-top: 1px dashed #64748b !important;
+            }
+        }
+    </style>
+</head>
+<body class="layout-{{ print_layout }}">
+
+    <!-- شريط الأدوات والتحكم العلوي -->
+    <div class="no-print-toolbar">
+        <div class="toolbar-group">
+            <a href="{% url 'portal_grades_manage' %}" class="btn btn-secondary" title="الرجوع إلى صفحة رصد الدرجات">
+                <i class="bi bi-arrow-right"></i> ↩ رجوع للدرجات
+            </a>
+            <a href="{% url 'portal_dashboard' %}" class="btn btn-secondary" title="العودة إلى القائمة الرئيسية">
+                <i class="bi bi-house-door-fill"></i> الرئيسية
+            </a>
+            <span class="toolbar-title ms-2">
+                🎓 كارت النتيجة المدرسية
+            </span>
+
+            <form method="get" id="filterForm" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <!-- اختيار الصف -->
+                <select name="class_id" class="toolbar-select" onchange="this.form.student_id.value=''; this.form.submit();">
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:"s" %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <!-- اختيار الشعبة -->
+                {% if sections %}
+                <select name="section_id" class="toolbar-select" onchange="this.form.student_id.value=''; this.form.submit();">
+                    <option value="">جميع الشُعب</option>
+                    {% for s in sections %}
+                    <option value="{{ s.id }}" {% if selected_section_id == s.id|stringformat:"s" %}selected{% endif %}>
+                        شعبة {{ s.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+
+                <!-- اختيار طالب محدد أو الكل -->
+                <select name="student_id" class="toolbar-select" onchange="this.form.submit();">
+                    <option value="">👥 كافة طلبة الصف / الشعبة (طباعة جماعية)</option>
+                    {% for st in class_students_list %}
+                    <option value="{{ st.id }}" {% if selected_student_id == st.id|stringformat:"s" %}selected{% endif %}>
+                        {{ st.user.get_full_name }} {% if st.section %}(شعبة {{ st.section.name }}){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <!-- نسق الطباعة -->
+                <select name="layout" class="toolbar-select" onchange="this.form.submit();">
+                    <option value="2up" {% if print_layout == '2up' %}selected{% endif %}>📄 كارتان في الصفحة (A4 موفر للورق)</option>
+                    <option value="1up" {% if print_layout == '1up' %}selected{% endif %}>📑 كارت كامل لكل صفحة (A4 منفرد)</option>
+                </select>
+            </form>
+        </div>
+
+        <div class="toolbar-group">
+            <span style="font-size: 13px; color: #64748b; font-weight: 600;">
+                إجمالي الكروت: <strong>{{ total_cards }}</strong>
+            </span>
+            <button onclick="window.print();" class="btn btn-primary">
+                🖨️ طباعة النتائج الآن
+            </button>
+            <a href="{% url 'portal_grades_manage' %}" class="btn btn-secondary">
+                ↩ إدارة الدرجات
+            </a>
+        </div>
+    </div>
+
+    <!-- حاوية البطاقات -->
+    <div class="cards-container">
+        {% if print_layout == '1up' %}
+            <!-- وضع كارت واحد لكل صفحة -->
+            {% for card in cards_data %}
+            <div class="result-page-a4">
+                <div class="student-result-card">
+                    <!-- الترويسة الوزارية والمدرسية -->
+                    <div class="card-header">
+                        <div class="header-col right">
+                            <div>جمهورية العراق - وزارة التربية</div>
+                            <div>المديرية العامة للتربية: <strong>{{ school.directorate|default:"التربية والتعليم" }}</strong></div>
+                            <div>مدرسة: <strong>{{ school.school_name }}</strong></div>
+                        </div>
+
+                        <div class="header-col center">
+                            {% if school.logo %}
+                            <img src="{{ school.logo.url }}" alt="شعار المدرسة" class="logo-img">
+                            {% endif %}
+                            <div><span class="card-title-badge">بطاقة درجات الطالب الرسمية</span></div>
+                            <div class="card-subtitle">كارت نتيجة العام الدراسي {{ current_year }}</div>
+                        </div>
+
+                        <div class="header-col left">
+                            <div>العام الدراسي: <strong>{{ current_year }}</strong></div>
+                            <div>تاريخ الإصدار: <strong>{{ today_date }}</strong></div>
+                            <div>الدور: <strong>الأول / الثاني</strong></div>
+                            <div>الحالة: <strong>رسمي معتمد</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- شريط معلومات الطالب -->
+                    <div class="student-info-bar">
+                        <div class="info-cell">
+                            <span class="info-label">اسم الطالب الرباعي:</span>
+                            <strong>{{ card.student.user.get_full_name }}</strong>
+                        </div>
+                        <div class="info-cell">
+                            <span class="info-label">الصف والشعبة:</span>
+                            <strong>{{ card.student.current_class.name }} - شعبة ({{ card.student.section.name|default:"أ" }})</strong>
+                        </div>
+                        <div class="info-cell">
+                            <span class="info-label">رقم القيد/الامتحاني:</span>
+                            <strong>{{ card.student.registration_number|default:"---" }}</strong>
+                        </div>
+                        <div class="info-cell">
+                            <span class="info-label">الرقم الوطني:</span>
+                            <strong>{{ card.student.national_id|default:"---" }}</strong>
+                        </div>
+                    </div>
+
+                    <!-- جدول الدرجات بالأعمدة الثمانية المعتمدة -->
+                    <table class="card-grades-table">
+                        <thead>
+                            <tr>
+                                <th class="col-subject">1. المادة الدراسية</th>
+                                <th class="col-eval">2. الفصل الأول</th>
+                                <th class="col-eval">3. نصف السنة</th>
+                                <th class="col-eval">4. الفصل الثاني</th>
+                                <th class="col-eval">5. السعي السنوي</th>
+                                <th class="col-eval">6. الامتحان النهائي</th>
+                                <th class="col-final">7. الدرجة النهائية</th>
+                                <th class="col-notes">8. الملاحظات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in card.subjects_rows %}
+                            <tr>
+                                <td class="col-subject">{{ row.subject }}</td>
+                                <td>{{ row.first_term }}</td>
+                                <td>{{ row.midyear }}</td>
+                                <td>{{ row.second_term }}</td>
+                                <td style="background-color: #f8fafc; font-weight: 700;">{{ row.annual_effort }}</td>
+                                <td>{{ row.final_exam }}</td>
+                                <td class="col-final {% if row.is_failed %}grade-failed{% else %}grade-passed{% endif %}">
+                                    {{ row.final_grade }}
+                                </td>
+                                <td class="col-notes">
+                                    {% if "قرار" in row.notes %}
+                                        <span class="badge-note-decision">{{ row.notes }}</span>
+                                    {% elif "ناجح" in row.notes %}
+                                        <span class="badge-note-pass">{{ row.notes }}</span>
+                                    {% elif "مكمل" in row.notes or "راسب" in row.notes %}
+                                        <span class="badge-note-fail">{{ row.notes }}</span>
+                                    {% else %}
+                                        <span>{{ row.notes }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" style="padding: 15px; color: #64748b;">لا توجد درجات مسجلة لهذا الطالب حتى الآن.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <!-- خلاصة النتيجة -->
+                    <div class="card-summary-box">
+                        <div class="summary-item">
+                            <span class="summary-item-title">المجموع الكلي</span>
+                            <span class="summary-item-val">{{ card.total_sum }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-item-title">المعدل العام</span>
+                            <span class="summary-item-val">{{ card.avg }}%</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-item-title">درجات القرار الممنوحة</span>
+                            <span class="summary-item-val">{{ card.total_decision }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-item-title">القرار والنتيجة النهائية</span>
+                            <span class="summary-item-val {% if 'ناجح' in card.final_result %}val-pass{% elif 'مكمل' in card.final_result %}val-sup{% else %}val-fail{% endif %}">
+                                {{ card.final_result }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- التوقيعات الرسمية -->
+                    <div class="card-signatures">
+                        <div class="sig-box">
+                            <div>مدقق الدرجات / مدرس المادة</div>
+                            <div class="sig-dots">التوقيع: .....................</div>
+                        </div>
+                        <div class="sig-box">
+                            <div class="sig-stamp-placeholder">
+                                الختم الرسمي<br>للمدرسة
+                            </div>
+                        </div>
+                        <div class="sig-box">
+                            <div>مدير المدرسة / رئيس اللجنة الامتحانية</div>
+                            <div class="sig-dots">التوقيع: .....................</div>
+                        </div>
+                    </div>
+
+                    <!-- هامش توضيحي -->
+                    <div class="card-footer-note">
+                        * وثيقة مدرسية رسمية صادرة بموجب السجلات الأصولية المعتمدة لوزارة التربية، تعتبر لاغية في حال وجود أي حك أو شطب أو تحبير.
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align: center; padding: 50px; background: white; border-radius: 12px; margin-top: 20px;">
+                <h3>لا يوجد طلبة مسجلين في هذا الصف لعرض نتائجهم.</h3>
+            </div>
+            {% endfor %}
+
+        {% else %}
+            <!-- وضع بطاقتين في الصفحة A4 مع خط القص الفاصل -->
+            {% for pair in cards_pairs %}
+            <div class="result-page-a4">
+                {% for card in pair %}
+                <div class="student-result-card">
+                    <!-- الترويسة الوزارية والمدرسية -->
+                    <div class="card-header">
+                        <div class="header-col right">
+                            <div>جمهورية العراق - وزارة التربية</div>
+                            <div>المديرية العامة: <strong>{{ school.directorate|default:"التربية والتعليم" }}</strong></div>
+                            <div>مدرسة: <strong>{{ school.school_name }}</strong></div>
+                        </div>
+
+                        <div class="header-col center">
+                            {% if school.logo %}
+                            <img src="{{ school.logo.url }}" alt="شعار المدرسة" class="logo-img">
+                            {% endif %}
+                            <div><span class="card-title-badge">بطاقة درجات الطالب الرسمية</span></div>
+                            <div class="card-subtitle">كارت نتيجة العام الدراسي {{ current_year }}</div>
+                        </div>
+
+                        <div class="header-col left">
+                            <div>العام الدراسي: <strong>{{ current_year }}</strong></div>
+                            <div>تاريخ الإصدار: <strong>{{ today_date }}</strong></div>
+                            <div>الدور: <strong>الأول / الثاني</strong></div>
+                            <div>الحالة: <strong>رسمي معتمد</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- شريط معلومات الطالب -->
+                    <div class="student-info-bar">
+                        <div class="info-cell">
+                            <span class="info-label">اسم الطالب الرباعي:</span>
+                            <strong>{{ card.student.user.get_full_name }}</strong>
+                        </div>
+                        <div class="info-cell">
+                            <span class="info-label">الصف والشعبة:</span>
+                            <strong>{{ card.student.current_class.name }} - شعبة ({{ card.student.section.name|default:"أ" }})</strong>
+                        </div>
+                        <div class="info-cell">
+                            <span class="info-label">رقم القيد/الامتحاني:</span>
+                            <strong>{{ card.student.registration_number|default:"---" }}</strong>
+                        </div>
+                        <div class="info-cell">
+                            <span class="info-label">الرقم الوطني:</span>
+                            <strong>{{ card.student.national_id|default:"---" }}</strong>
+                        </div>
+                    </div>
+
+                    <!-- جدول الدرجات بالأعمدة الثمانية المعتمدة -->
+                    <table class="card-grades-table">
+                        <thead>
+                            <tr>
+                                <th class="col-subject">1. المادة الدراسية</th>
+                                <th class="col-eval">2. الفصل الأول</th>
+                                <th class="col-eval">3. نصف السنة</th>
+                                <th class="col-eval">4. الفصل الثاني</th>
+                                <th class="col-eval">5. السعي السنوي</th>
+                                <th class="col-eval">6. الامتحان النهائي</th>
+                                <th class="col-final">7. الدرجة النهائية</th>
+                                <th class="col-notes">8. الملاحظات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in card.subjects_rows %}
+                            <tr>
+                                <td class="col-subject">{{ row.subject }}</td>
+                                <td>{{ row.first_term }}</td>
+                                <td>{{ row.midyear }}</td>
+                                <td>{{ row.second_term }}</td>
+                                <td style="background-color: #f8fafc; font-weight: 700;">{{ row.annual_effort }}</td>
+                                <td>{{ row.final_exam }}</td>
+                                <td class="col-final {% if row.is_failed %}grade-failed{% else %}grade-passed{% endif %}">
+                                    {{ row.final_grade }}
+                                </td>
+                                <td class="col-notes">
+                                    {% if "قرار" in row.notes %}
+                                        <span class="badge-note-decision">{{ row.notes }}</span>
+                                    {% elif "ناجح" in row.notes %}
+                                        <span class="badge-note-pass">{{ row.notes }}</span>
+                                    {% elif "مكمل" in row.notes or "راسب" in row.notes %}
+                                        <span class="badge-note-fail">{{ row.notes }}</span>
+                                    {% else %}
+                                        <span>{{ row.notes }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" style="padding: 10px; color: #64748b;">لا توجد درجات مسجلة لهذا الطالب حتى الآن.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <!-- خلاصة النتيجة -->
+                    <div class="card-summary-box">
+                        <div class="summary-item">
+                            <span class="summary-item-title">المجموع الكلي</span>
+                            <span class="summary-item-val">{{ card.total_sum }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-item-title">المعدل العام</span>
+                            <span class="summary-item-val">{{ card.avg }}%</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-item-title">درجات القرار الممنوحة</span>
+                            <span class="summary-item-val">{{ card.total_decision }}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-item-title">القرار والنتيجة النهائية</span>
+                            <span class="summary-item-val {% if 'ناجح' in card.final_result %}val-pass{% elif 'مكمل' in card.final_result %}val-sup{% else %}val-fail{% endif %}">
+                                {{ card.final_result }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- التوقيعات الرسمية -->
+                    <div class="card-signatures">
+                        <div class="sig-box">
+                            <div>مدقق الدرجات / مدرس المادة</div>
+                            <div class="sig-dots">التوقيع: .....................</div>
+                        </div>
+                        <div class="sig-box">
+                            <div class="sig-stamp-placeholder">
+                                الختم الرسمي<br>للمدرسة
+                            </div>
+                        </div>
+                        <div class="sig-box">
+                            <div>مدير المدرسة / رئيس اللجنة الامتحانية</div>
+                            <div class="sig-dots">التوقيع: .....................</div>
+                        </div>
+                    </div>
+
+                    <!-- هامش توضيحي -->
+                    <div class="card-footer-note">
+                        * وثيقة مدرسية رسمية صادرة بموجب السجلات الأصولية المعتمدة لوزارة التربية، تعتبر لاغية في حال وجود أي حك أو شطب أو تحبير.
+                    </div>
+                </div>
+
+                {% if forloop.first and not forloop.last %}
+                <!-- خط القص الفاصل عند وجود كارت ثانٍ في نفس الصفحة -->
+                <div class="cut-divider">
+                    <span>✂ ------------------------- خط القص الفاصل ------------------------- ✂</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% empty %}
+            <div style="text-align: center; padding: 50px; background: white; border-radius: 12px; margin-top: 20px;">
+                <h3>لا يوجد طلبة مسجلين في هذا الصف لعرض نتائجهم.</h3>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+</body>
+</html>

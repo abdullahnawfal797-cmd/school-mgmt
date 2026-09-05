@@ -1,6 +1,6 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
-{% block title %}إدارة الكادر التدريسي{% endblock %}
+{% block title %}إدارة الكادر التدريسي وجدول الحصص{% endblock %}
 
 {% block content %}
 <div class="row g-4 mb-4" dir="rtl">
@@ -8,7 +8,7 @@
     <div class="col-12 col-lg-5">
         <div class="card card-custom p-4 border-start border-success border-4 shadow-sm h-100">
             <h5 class="fw-bold text-success mb-3">
-                <i class="bi bi-person-plus-fill me-2"></i>إضافة تدريسي جديد
+                <i class="bi bi-person-plus-fill me-2"></i>إضافة تدريسي جديد وربطه بالمواد والصفوف
             </h5>
             <form method="POST">
                 {% csrf_token %}
@@ -22,18 +22,63 @@
                         <input type="text" name="last_name" class="form-control" placeholder="مثال: حسن الجبوري">
                     </div>
                 </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">العنوان الوظيفي:</label>
+                        <input type="text" name="job_title" class="form-control" value="مدرس"
+                            placeholder="مثال: مدرس أول / معاون">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">الرمز الإحصائي الوزاري:</label>
+                        <input type="text" name="statistical_code" class="form-control font-monospace"
+                            placeholder="مثال: T-9082">
+                    </div>
+                </div>
+
+                <!-- تحديد المواد التي يدرسها -->
                 <div class="mb-3">
-                    <label class="form-label small fw-bold">العنوان الوظيفي:</label>
-                    <input type="text" name="job_title" class="form-control" value="مدرس"
-                        placeholder="مثال: مدرس أول / معاون / معلم جامعي">
+                    <label class="form-label small fw-bold text-info">
+                        <i class="bi bi-book-half me-1"></i>المواد الدراسية المسندة (اختصاص التدريسي):
+                    </label>
+                    <div class="p-2 rounded border" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                        <div class="row g-1">
+                            {% for sub in all_subjects %}
+                            <div class="col-6">
+                                <div class="form-check form-check-inline m-0">
+                                    <input class="form-check-input" type="checkbox" name="subjects" value="{{ sub.id }}" id="add_sub_{{ sub.id }}">
+                                    <label class="form-check-label small" for="add_sub_{{ sub.id }}">{{ sub.name }}</label>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <small class="text-muted">لا توجد مواد دراسية مسجلة.</small>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
+
+                <!-- تحديد الصفوف والمراحل الدراسية المسندة -->
                 <div class="mb-4">
-                    <label class="form-label small fw-bold">الرمز الإحصائي الوزاري:</label>
-                    <input type="text" name="statistical_code" class="form-control font-monospace"
-                        placeholder="مثال: T-9082">
+                    <label class="form-label small fw-bold text-warning">
+                        <i class="bi bi-mortarboard-fill me-1"></i>الصفوف والمراحل الدراسية المسندة:
+                    </label>
+                    <div class="p-2 rounded border" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                        <div class="row g-1">
+                            {% for cls in all_classes %}
+                            <div class="col-6">
+                                <div class="form-check form-check-inline m-0">
+                                    <input class="form-check-input" type="checkbox" name="classes" value="{{ cls.id }}" id="add_cls_{{ cls.id }}">
+                                    <label class="form-check-label small" for="add_cls_{{ cls.id }}">{{ cls.name }}</label>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <small class="text-muted">لا توجد صفوف دراسية مسجلة.</small>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-success rounded-pill w-100 fw-bold py-2">
-                    <i class="bi bi-plus-circle me-1"></i> حفظ وتعيين التدريسي
+
+                <button type="submit" class="btn btn-success rounded-pill w-100 fw-bold py-2 shadow-sm">
+                    <i class="bi bi-plus-circle me-1"></i> حفظ وتعيين التدريسي وتثبيت اختصاصه
                 </button>
             </form>
         </div>
@@ -42,61 +87,94 @@
     <!-- جدول عرض وتعديل الكادر التدريسي -->
     <div class="col-12 col-lg-7">
         <div class="card card-custom p-4 shadow-sm h-100">
-            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2 flex-wrap gap-2">
                 <h5 class="fw-bold text-dark mb-0">
                     <i class="bi bi-person-workspace text-success me-2"></i>الهيئة التعليمية والتدريسية
                 </h5>
-                <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
-                    <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'portal_timetable' %}" class="btn btn-info btn-sm rounded-pill px-3 shadow-sm fw-bold">
+                        <i class="bi bi-calendar3 me-1"></i> جدول الحصص العام
+                    </a>
+                    <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
+                    </a>
+                </div>
             </div>
 
             <div class="table-responsive">
-                <table class="table table-bordered table-hover align-middle mb-0 text-center">
-                    <thead class="table-light">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13px;">
+                    <thead>
                         <tr>
-                            <th style="width: 8%;">ت</th>
-                            <th style="width: 35%;">اسم التدريسي</th>
-                            <th style="width: 22%;">العنوان الوظيفي</th>
-                            <th style="width: 15%;">الرمز الإحصائي</th>
-                            <th style="width: 20%;">الإجراءات</th>
+                            <th style="width: 5%;">ت</th>
+                            <th style="width: 25%;">اسم التدريسي</th>
+                            <th style="width: 15%;">العنوان</th>
+                            <th style="width: 30%;">المواد والصفوف المسندة</th>
+                            <th style="width: 10%;">الرمز</th>
+                            <th style="width: 15%;">الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for t in teachers %}
                         <tr>
                             <td class="fw-bold">{{ forloop.counter }}</td>
-                            <td class="fw-bold text-start pe-3">
+                            <td class="fw-bold text-start pe-2">
                                 <i class="bi bi-person text-success me-1"></i>
                                 {{ t.user.get_full_name|default:t.user.username }}
                             </td>
                             <td>
-                                <span class="badge bg-light text-dark border">{{ t.job_title }}</span>
+                                <span class="badge" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">{{ t.job_title }}</span>
                             </td>
-                            <td class="font-monospace text-muted">{{ t.statistical_code|default:"---" }}</td>
+                            <td class="text-start ps-2">
+                                <!-- شارات المواد -->
+                                <div class="mb-1">
+                                    {% for s in t.subjects.all %}
+                                    <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-25 px-2 py-1 small me-1 mb-1">{{ s.name }}</span>
+                                    {% empty %}
+                                    <span class="text-muted small">بدون مادة مسندة</span>
+                                    {% endfor %}
+                                </div>
+                                <!-- شارات الصفوف -->
+                                <div>
+                                    {% for c in t.school_classes.all %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning border-opacity-25 px-2 py-1 small me-1 mb-1">{{ c.name }}</span>
+                                    {% empty %}
+                                    <span class="text-muted small" style="font-size: 11px;">بدون صف مسند</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="font-monospace text-muted small">{{ t.statistical_code|default:"---" }}</td>
                             <td>
-                                <div class="d-flex justify-content-center gap-1">
-                                    <!-- زر فتح نافذة التعديل المستقرة -->
-                                    <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-2 py-1"
-                                            onclick="openEditTeacherModal('{{ t.id }}', '{{ t.user.first_name|escapejs }}', '{{ t.user.last_name|escapejs }}', '{{ t.job_title|escapejs }}', '{{ t.statistical_code|default:''|escapejs }}')"
-                                            title="تعديل بيانات المدرس">
-                                        <i class="bi bi-pencil-square"></i> تعديل
-                                    </button>
+                                <div class="d-flex flex-column gap-1 align-items-center">
+                                    <!-- رابط جدول الحصص الأسبوعي لهذا المعلم -->
+                                    <a href="{% url 'portal_timetable' %}?view_mode=teacher&teacher_id={{ t.id }}" 
+                                       class="btn btn-xs btn-outline-info rounded-pill px-2 py-1 w-100 fw-bold" 
+                                       title="عرض وطباعة جدول الحصص الأسبوعي لهذا المعلم">
+                                        <i class="bi bi-calendar3 me-1"></i> الجدول
+                                    </a>
 
-                                    <!-- زر الحذف المباشر -->
-                                    <form method="POST" action="{% url 'portal_teacher_delete' t.id %}" class="d-inline"
-                                          onsubmit="return confirm('تحذير: هل أنت متأكد من حذف التدريسي ({{ t.user.get_full_name }})؟ سيتم تفريغ حصصه من جدول الحصص المدرسي تلقائياً.');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="حذف التدريسي">
-                                            <i class="bi bi-trash"></i> حذف
+                                    <div class="d-flex justify-content-center gap-1 w-100">
+                                        <!-- زر فتح نافذة التعديل المستقرة -->
+                                        <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2 py-1 flex-grow-1"
+                                                onclick="openEditTeacherModal('{{ t.id }}', '{{ t.user.first_name|escapejs }}', '{{ t.user.last_name|escapejs }}', '{{ t.job_title|escapejs }}', '{{ t.statistical_code|default:''|escapejs }}', [{% for s in t.subjects.all %}'{{ s.id }}',{% endfor %}], [{% for c in t.school_classes.all %}'{{ c.id }}',{% endfor %}])"
+                                                title="تعديل بيانات واختصاص المدرس">
+                                            <i class="bi bi-pencil-square"></i>
                                         </button>
-                                    </form>
+
+                                        <!-- زر الحذف المباشر -->
+                                        <form method="POST" action="{% url 'portal_teacher_delete' t.id %}" class="d-inline flex-grow-1"
+                                              onsubmit="return confirm('تحذير: هل أنت متأكد من حذف التدريسي ({{ t.user.get_full_name }})؟ سيتم تفريغ حصصه من جدول الحصص المدرسي تلقائياً.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-1 w-100" title="حذف التدريسي">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-muted py-4">لم يتم تسجيل أي تدريسيين حتى الآن.</td>
+                            <td colspan="6" class="text-muted py-4">لم يتم تسجيل أي تدريسيين حتى الآن.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -114,9 +192,9 @@
 <div class="modal fade" id="editTeacherModal" tabindex="-1" aria-hidden="true" dir="rtl">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header bg-light">
-                <h6 class="modal-title fw-bold text-dark">
-                    <i class="bi bi-pencil-square text-warning me-2"></i>تعديل بيانات التدريسي
+            <div class="modal-header border-bottom" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <h6 class="modal-title fw-bold text-white">
+                    <i class="bi bi-pencil-square text-warning me-2"></i>تعديل بيانات التدريسي وربطه بالمواد والصفوف
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -133,18 +211,58 @@
                             <input type="text" name="last_name" id="modal_last_name" class="form-control">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">العنوان الوظيفي:</label>
-                        <input type="text" name="job_title" id="modal_job_title" class="form-control" required>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">العنوان الوظيفي:</label>
+                            <input type="text" name="job_title" id="modal_job_title" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">الرمز الإحصائي:</label>
+                            <input type="text" name="statistical_code" id="modal_stat_code" class="form-control font-monospace">
+                        </div>
                     </div>
+
+                    <!-- تعديل المواد المسندة -->
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">الرمز الإحصائي:</label>
-                        <input type="text" name="statistical_code" id="modal_stat_code" class="form-control font-monospace">
+                        <label class="form-label small fw-bold text-info">
+                            <i class="bi bi-book-half me-1"></i>المواد الدراسية المسندة:
+                        </label>
+                        <div class="p-2 rounded border" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                            <div class="row g-1">
+                                {% for sub in all_subjects %}
+                                <div class="col-6">
+                                    <div class="form-check form-check-inline m-0">
+                                        <input class="form-check-input modal-sub-check" type="checkbox" name="subjects" value="{{ sub.id }}" id="edit_sub_{{ sub.id }}">
+                                        <label class="form-check-label small" for="edit_sub_{{ sub.id }}">{{ sub.name }}</label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- تعديل الصفوف المسندة -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-warning">
+                            <i class="bi bi-mortarboard-fill me-1"></i>الصفوف والمراحل الدراسية المسندة:
+                        </label>
+                        <div class="p-2 rounded border" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                            <div class="row g-1">
+                                {% for cls in all_classes %}
+                                <div class="col-6">
+                                    <div class="form-check form-check-inline m-0">
+                                        <input class="form-check-input modal-cls-check" type="checkbox" name="classes" value="{{ cls.id }}" id="edit_cls_{{ cls.id }}">
+                                        <label class="form-check-label small" for="edit_cls_{{ cls.id }}">{{ cls.name }}</label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                     <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning btn-sm rounded-pill px-4 fw-bold">حفظ التعديل</button>
+                    <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm">حفظ التعديل والربط</button>
                 </div>
             </form>
         </div>
@@ -154,7 +272,7 @@
 <script>
 let teacherModalInstance = null;
 
-function openEditTeacherModal(id, firstName, lastName, jobTitle, statCode) {
+function openEditTeacherModal(id, firstName, lastName, jobTitle, statCode, subjectIds, classIds) {
     const form = document.getElementById('editTeacherForm');
     form.action = `/portal/teachers/edit/${id}/`;
 
@@ -162,6 +280,16 @@ function openEditTeacherModal(id, firstName, lastName, jobTitle, statCode) {
     document.getElementById('modal_last_name').value = lastName;
     document.getElementById('modal_job_title').value = jobTitle;
     document.getElementById('modal_stat_code').value = statCode;
+
+    // Reset and set subject checkboxes
+    document.querySelectorAll('.modal-sub-check').forEach(cb => {
+        cb.checked = subjectIds.includes(cb.value);
+    });
+
+    // Reset and set class checkboxes
+    document.querySelectorAll('.modal-cls-check').forEach(cb => {
+        cb.checked = classIds.includes(cb.value);
+    });
 
     const modalEl = document.getElementById('editTeacherModal');
     if (!teacherModalInstance) {
@@ -171,4 +299,3 @@ function openEditTeacherModal(id, firstName, lastName, jobTitle, statCode) {
 }
 </script>
 {% endblock %}
-

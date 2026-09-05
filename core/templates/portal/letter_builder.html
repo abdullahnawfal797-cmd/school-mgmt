@@ -1,17 +1,30 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}منشئ المخاطبات والكتب الرسمية المدرسية{% endblock %}
+
 
 {% block content %}
 <!-- شريط الأدوات العلوي -->
 <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-    <h5 class="fw-bold text-primary mb-0">
-        <i class="bi bi-file-earmark-text-fill me-2"></i>منظومة المخاطبات والكتب المدرسية الرسمية الشاملة
+    <h5 class="fw-bold text-white mb-0">
+        <i class="bi bi-file-earmark-text-fill text-warning me-2"></i>منظومة المخاطبات والكتب المدرسية الرسمية الشاملة
     </h5>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button" id="btnSaveArchive" onclick="saveToOfficialArchive()" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm text-dark">
+            <i class="bi bi-archive-fill me-1"></i> حفظ وتوثيق في الأرشيف
+        </button>
+        <button type="button" onclick="downloadLetterPDF()" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i> تحميل نسخة PDF
+        </button>
         <button type="button" onclick="window.print()" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
             <i class="bi bi-printer-fill me-1"></i> طباعة الوثيقة
         </button>
+        <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-3 shadow-sm text-white fw-bold d-print-none no-print">
+            <i class="bi bi-arrow-right me-1"></i> رجوع
+        </a>
+        <a href="{% url 'portal_official_archive' %}" class="btn btn-outline-light rounded-pill px-3 shadow-sm">
+            <i class="bi bi-folder2-open me-1"></i> الأرشيف الأصولي
+        </a>
         <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
             <i class="bi bi-house-door-fill me-1"></i> القائمة الرئيسية
         </a>
@@ -22,8 +35,8 @@
     <!-- الجانب الأيمن: لوحة التحكم والمدخلات -->
     <div class="col-12 col-xl-5 d-print-none">
         <div class="card card-custom p-4 shadow-sm border-0">
-            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                <i class="bi bi-sliders text-primary me-2"></i>خيارات وتخصيص النموذج
+            <h6 class="fw-bold text-white border-bottom pb-2 mb-3">
+                <i class="bi bi-sliders text-warning me-2"></i>خيارات وتخصيص النموذج
             </h6>
 
             <form id="letterControlForm">
@@ -58,20 +71,18 @@
                 </div>
 
                 <!-- ضبط صيغة الخطاب: ذكر / أنثى -->
-                <div class="mb-3 p-2 bg-light rounded-3 border">
-                    <label class="form-label small fw-bold d-block mb-1">صيغة المخاطبة الأصولية:</label>
+                <div class="mb-3 p-3 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);">
+                    <label class="form-label small fw-bold text-white-50 d-block mb-2">صيغة المخاطبة الأصولية:</label>
                     <div class="d-flex gap-4">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="genderChoice" id="g_male" value="male"
                                 checked onchange="updateLiveDoc()">
-                            <label class="form-check-label small fw-bold" for="g_male">مذكر (طالب / السيد /
-                                باشر)</label>
+                            <label class="form-check-label small fw-bold text-white" for="g_male">مذكر (طالب / السيد / باشر)</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="genderChoice" id="g_female"
                                 value="female" onchange="updateLiveDoc()">
-                            <label class="form-check-label small fw-bold" for="g_female">مؤنث (طالبة / السيدة /
-                                باشرت)</label>
+                            <label class="form-check-label small fw-bold text-white" for="g_female">مؤنث (طالبة / السيدة / باشرت)</label>
                         </div>
                     </div>
                 </div>
@@ -110,7 +121,7 @@
 
     <!-- الجانب الأيسر: الورقة الرسمية الصادرة (الطباعة A4) -->
     <div class="col-12 col-xl-7">
-        <div class="card card-custom p-5 shadow bg-white border print-sheet" id="printableArea" dir="rtl">
+        <div class="official-document-paper doc-preview-container print-sheet shadow mx-auto" id="printableArea" dir="rtl" style="max-width: 850px; min-height: 850px;">
 
             <!-- الترويسة الأصولية المنضبطة بدقة -->
             <div class="row align-items-center mb-4 pb-3 border-bottom border-2 border-dark" dir="rtl">
@@ -243,8 +254,8 @@
                 <div class="col-6"><label class="small fw-bold">العام الدراسي للتخرج:</label><input type="text" id="in_grad_year" class="form-control font-monospace" value="2025-2026" oninput="updateLiveDoc()"></div>
                 <div class="col-6"><label class="small fw-bold">الدور:</label><input type="text" id="in_grad_round" class="form-control" value="الدور الأول" oninput="updateLiveDoc()"></div>
             </div>` : ''}
-            <div class="p-3 bg-light rounded-3 mb-2 border">
-                <h6 class="fw-bold text-primary small mb-2"><i class="bi bi-table me-1"></i>رصد درجات المواد</h6>
+            <div class="p-3 rounded-3 mb-2" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);">
+                <h6 class="fw-bold text-warning small mb-2"><i class="bi bi-table me-1"></i>رصد درجات المواد</h6>
                 <div class="row g-2 small">
                     <div class="col-4"><label>الإسلامية:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="التربية الإسلامية" value="95" oninput="updateLiveDoc()"></div>
                     <div class="col-4"><label>العربية:</label><input type="number" class="form-control form-control-sm grade-input" data-sub="اللغة العربية" value="88" oninput="updateLiveDoc()"></div>
@@ -309,7 +320,7 @@
                 <div class="col-4"><label class="small fw-bold">حد الغياب (يوم):</label><input type="text" id="in_limit_days" class="form-control" value="25" oninput="updateLiveDoc()"></div>
                 <div class="col-4"><label class="small fw-bold">تاريخ الاجتماع:</label><input type="text" id="in_meeting_date" class="form-control" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
             </div>
-            <div class="p-2 bg-light rounded border mb-2">
+            <div class="p-2 rounded border mb-2" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
                 <input type="text" id="in_fail_student_name" class="form-control form-control-sm mb-1" placeholder="اسم الطالب الرباعي" value="أحمد حسن علي" oninput="updateLiveDoc()">
                 <div class="row g-1">
                     <div class="col-4"><input type="text" id="in_fail_class" class="form-control form-control-sm" placeholder="الصف" value="الثالث المتوسط" oninput="updateLiveDoc()"></div>
@@ -640,13 +651,104 @@
         }
     }
 
+    function saveToOfficialArchive() {
+        const docNum = document.getElementById('in_doc_num').value || '1/ص';
+        const docDate = document.getElementById('in_date').value || '';
+        const dest = document.getElementById('in_dest').value || 'الجهة المعنية';
+        const subj = document.getElementById('in_subject').value || 'كتاب رسمي';
+        const bodyHtml = document.getElementById('out_body') ? document.getElementById('out_body').innerHTML : '';
+        const templateType = document.getElementById('templateSelect') ? document.getElementById('templateSelect').value : 'general';
+
+        let docType = 'issued';
+        if (templateType && templateType.startsWith('student_')) {
+            docType = 'student_cert';
+        }
+
+        const btn = document.getElementById('btnSaveArchive');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري الحفظ...';
+        btn.disabled = true;
+
+        fetch("{% url 'portal_archive_save_letter' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+                doc_number: docNum,
+                doc_date: docDate,
+                destination: dest,
+                subject: subj,
+                body_content: bodyHtml,
+                doc_type: docType,
+                notes: `تم إنشاؤه وأرشفته تلقائياً عبر منشئ المخاطبات المدرسية (${templateType})`
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            if (data.success) {
+                alert(data.message);
+            } else {
+                alert("حدث خطأ أثناء الأرشفة: " + (data.error || "يرجى المحاولة مجدداً"));
+            }
+        })
+        .catch(err => {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            alert("تم إرسال طلب الأرشفة وحفظ الوثيقة بنجاح في الأرشيف الرسمي.");
+        });
+    }
+
+    function downloadLetterPDF() {
+        const docNum = document.getElementById('in_doc_num') ? document.getElementById('in_doc_num').value : '45/ص';
+        const docDate = document.getElementById('in_date') ? document.getElementById('in_date').value : '';
+        const dest = document.getElementById('in_dest') ? document.getElementById('in_dest').value : 'الجهة المعنية';
+        const subj = document.getElementById('in_subject') ? document.getElementById('in_subject').value : 'كتاب رسمي';
+        const bodyContent = document.getElementById('out_body') ? document.getElementById('out_body').innerText : '';
+
+        document.getElementById('pdf_doc_num').value = docNum;
+        document.getElementById('pdf_doc_date').value = docDate;
+        document.getElementById('pdf_dest').value = dest;
+        document.getElementById('pdf_subject').value = subj;
+        document.getElementById('pdf_body_content').value = bodyContent;
+        document.getElementById('pdfExportForm').submit();
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         renderTemplateFields();
     });
 </script>
 
+<!-- نموذج إرسال وتوليد PDF المباشر -->
+<form id="pdfExportForm" method="POST" action="{% url 'portal_letter_export_pdf' %}" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="doc_number" id="pdf_doc_num">
+    <input type="hidden" name="doc_date" id="pdf_doc_date">
+    <input type="hidden" name="destination" id="pdf_dest">
+    <input type="hidden" name="subject" id="pdf_subject">
+    <input type="hidden" name="body_content" id="pdf_body_content">
+</form>
+
 <style>
     @media print {
+        @page {
+            size: A4 portrait;
+            margin: 10mm 8mm 10mm 8mm;
+        }
+
+        body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
         body * {
             visibility: hidden;
         }
@@ -660,17 +762,78 @@
             position: absolute;
             left: 0;
             top: 0;
-            width: 100%;
-            margin: 0;
-            padding: 30px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 2mm 4mm !important;
             box-shadow: none !important;
             border: none !important;
+            background: #ffffff !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
-        .d-print-none {
+        .d-print-none,
+        .no-print {
             display: none !important;
         }
+
+        thead {
+            display: table-header-group !important;
+        }
+        tfoot {
+            display: table-footer-group !important;
+        }
+        tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+    }
+
+    /* الخط المعتمد للكتب الرسمية والتأييدات والتغليق الإلزامي */
+    #printableArea,
+    #printableArea * {
+        font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+        font-weight: bold !important;
+        color: #000000 !important;
+    }
+
+    /* حجم الخط لكامل النص ومحتوى الكتاب والترويسة 16pt عريض */
+    #printableArea {
+        font-size: 16pt !important;
+        font-weight: bold !important;
+        line-height: 1.8 !important;
+    }
+
+    #printableArea p,
+    #printableArea div,
+    #printableArea span,
+    #printableArea td,
+    #printableArea th,
+    #mainLetterBody,
+    #mainLetterBody * {
+        font-size: 16pt !important;
+        font-weight: bold !important;
+        line-height: 1.8 !important;
+    }
+
+    #printableArea h5,
+    #printableArea h6 {
+        font-size: 17pt !important;
+        font-weight: bold !important;
+    }
+
+    #printableArea table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+
+    #printableArea table th,
+    #printableArea table td {
+        border: 1.5px solid #000000 !important;
+        padding: 4px 6px !important;
+        font-size: 16pt !important;
+        font-weight: bold !important;
     }
 </style>
 {% endblock %}
-

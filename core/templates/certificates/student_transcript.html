@@ -1,0 +1,101 @@
+{% extends "certificates/base_doc.html" %}
+
+{% block title %}وثيقة درجات وتأييد نجاح ورسوب - {{ student.user.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="doc-title-container">
+    <div class="doc-title">وثيقة درجات وتأييد النتيجة المدرسية</div>
+</div>
+
+<div class="doc-body">
+    <p style="margin-bottom: 15px; font-weight: bold;">
+        إلى / {{ destination|default:"إلى من يهمه الأمر / الإدارة التربوية المعنية" }}
+    </p>
+
+    <p style="margin-bottom: 20px;">
+        نؤيد لكم بأن الطالب/ـة: <strong>{{ student.user.get_full_name }}</strong>
+        المسجل/ة بالصف: <strong>{{ student.current_class.name|default:"---" }}</strong> - الشعبة: <strong>({{ student.section.name|default:"أ" }})</strong>
+        والرقم التعريفي/الوطني: <strong>{{ student.national_id|default:"---" }}</strong>،
+        كانت نتائجه/ا ودرجاته/ا للعام الدراسي <strong>{{ academic_year|default:"2025-2026" }}</strong> كما مبين في السجل الرسمي أدناه:
+    </p>
+
+    <table class="official-table">
+        <thead>
+            <tr>
+                <th style="width: 25%;">المادة الدراسية</th>
+                <th>سعي ف1</th>
+                <th>نصف السنة</th>
+                <th>سعي ف2</th>
+                <th>السعي السنوي</th>
+                <th>الامتحان النهائي</th>
+                <th>درجات القرار</th>
+                <th>الدرجة النهائية</th>
+                <th>النتيجة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for g in grades %}
+            <tr>
+                <td style="text-align: right; font-weight: bold;">{{ g.subject.name }}</td>
+                <td>{{ g.first_term_effort|default:"-" }}</td>
+                <td>{{ g.midyear_exam|default:"-" }}</td>
+                <td>{{ g.second_term_effort|default:"-" }}</td>
+                <td style="background-color: #f7fafc; font-weight: bold;">{{ g.annual_effort|default:"-" }}</td>
+                <td>
+                    {% if g.final_exam_round2 %}
+                        {{ g.final_exam_round2 }} <small>(د2)</small>
+                    {% elif g.final_exam_round1 %}
+                        {{ g.final_exam_round1 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ g.decision_marks|default:"0" }}</td>
+                <td style="font-weight: bold; color: #2b6cb0;">
+                    {{ g.final_grade_after_decision|default:g.final_grade|default:"-" }}
+                </td>
+                <td style="font-weight: bold;">
+                    {% if g.status == 'passed' or g.status == 'passed_by_decision' %}
+                        <span style="color: #276749;">{{ g.get_status_display }}</span>
+                    {% elif g.status == 'supplementary' %}
+                        <span style="color: #c05621;">{{ g.get_status_display }}</span>
+                    {% elif g.status == 'failed' %}
+                        <span style="color: #9b2c2c;">{{ g.get_status_display }}</span>
+                    {% else %}
+                        {{ g.get_status_display }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9">لم يتم إدخال درجات لهذا الطالب بعد.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); background: #f7fafc; padding: 10px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 14px;">
+        <div>المجموع الكلي: <strong>{{ total_sum|default:"---" }}</strong></div>
+        <div>المعدل العام: <strong>{{ total_avg|default:"---" }}%</strong></div>
+        <div>النتيجة العامة: <strong style="color: #2b6cb0;">{{ final_result|default:"---" }}</strong></div>
+    </div>
+
+    <p style="margin-top: 15px; font-size: 13px; color: #4a5568;">
+        * زُوّد الطالب بهذه الوثيقة الرسمية بناءً على طلبه وموافقة الإدارة لتقديمها للجهة المعنية، وتعتبر لاغية في حال وجود أي كشط أو تحبير.
+    </p>
+</div>
+
+<div class="signatures-grid" style="margin-top: 30px;">
+    <div class="sig-box">
+        <div class="sig-title">عضو اللجنة الامتحانية</div>
+        <div class="sig-name">المشرف على السجل</div>
+    </div>
+    <div class="sig-box">
+        <div class="stamp-placeholder">ختم الإدارة المدرسية</div>
+    </div>
+    <div class="sig-box">
+        <div class="sig-title">مدير المدرسة</div>
+        <div class="sig-name">رئيس اللجنة الامتحانية</div>
+    </div>
+</div>
+{% endblock %}

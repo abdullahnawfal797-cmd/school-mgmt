@@ -1,0 +1,557 @@
+{% extends 'portal/base_portal.html' %}
+
+{% block title %}الأرشيف المركزي وسجلات المخاطبات الرسمية{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4" dir="rtl">
+    <!-- الشريط العلوي والعنوان -->
+    <div class="col-12">
+        <div class="card card-custom p-4 shadow-sm border-0">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <div>
+                    <h4 class="fw-bold text-white mb-1">
+                        <i class="bi bi-archive-fill text-warning me-2"></i>
+                        الأرشيف المركزي وسجلات الكتب الرسمية
+                    </h4>
+                    <span class="text-white-50 small">
+                        الأرشفة الرقمية الأصولية للكتب الصادرة، الواردة، وتأييدات ووثائق الطلبة الرسمية
+                    </span>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-warning rounded-pill px-3 fw-bold shadow-sm text-dark" data-bs-toggle="modal" data-bs-target="#addArchiveModal">
+                        <i class="bi bi-plus-circle-fill me-1"></i> أرشفة كتاب / وثيقة جديدة
+                    </button>
+                    <a href="{% url 'portal_letter_builder' %}" class="btn btn-outline-light rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-file-earmark-plus-fill me-1"></i> منشئ المخاطبات المدرسية
+                    </a>
+                    <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill px-3 shadow-sm text-white fw-bold d-print-none no-print">
+                        <i class="bi bi-arrow-right me-1"></i> رجوع
+                    </a>
+                    <a href="{% url 'portal_dashboard' %}" class="btn btn-primary rounded-pill px-3 shadow-sm">
+                        <i class="bi bi-house-door-fill me-1"></i> الرئيسية
+                    </a>
+                </div>
+            </div>
+
+            <!-- بطاقات الإحصاءات السريعة للأرشيف -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-white-50 small fw-bold">إجمالي الأرشيف</div>
+                                <div class="fs-4 fw-bold text-white mt-1 font-monospace">{{ stats.total }}</div>
+                            </div>
+                            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; width: 44px; height: 44px;">
+                                <i class="bi bi-folder-fill fs-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-white-50 small fw-bold">الكتب الصادرة</div>
+                                <div class="fs-4 fw-bold text-success mt-1 font-monospace">{{ stats.issued }}</div>
+                            </div>
+                            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background: rgba(16, 185, 129, 0.2); color: #34d399; width: 44px; height: 44px;">
+                                <i class="bi bi-send-check-fill fs-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-white-50 small fw-bold">الكتب الواردة</div>
+                                <div class="fs-4 fw-bold text-info mt-1 font-monospace">{{ stats.received }}</div>
+                            </div>
+                            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee; width: 44px; height: 44px;">
+                                <i class="bi bi-inbox-fill fs-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 rounded-4" style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-white-50 small fw-bold">وثائق وتأييدات الطلبة</div>
+                                <div class="fs-4 fw-bold text-warning mt-1 font-monospace">{{ stats.student_cert }}</div>
+                            </div>
+                            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; width: 44px; height: 44px;">
+                                <i class="bi bi-file-earmark-person-fill fs-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تبويبات التصفية السريعة -->
+            <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <a href="?tab=all{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm rounded-pill px-3 fw-bold {% if active_tab == 'all' %}btn-warning text-dark{% else %}btn-outline-light{% endif %}">
+                    <i class="bi bi-collection me-1"></i> [الكل] ({{ stats.total }})
+                </a>
+                <a href="?tab=issued{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm rounded-pill px-3 fw-bold {% if active_tab == 'issued' %}btn-warning text-dark{% else %}btn-outline-light{% endif %}">
+                    <i class="bi bi-arrow-up-right-circle me-1"></i> [الكتب الصادرة] ({{ stats.issued }})
+                </a>
+                <a href="?tab=received{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm rounded-pill px-3 fw-bold {% if active_tab == 'received' %}btn-warning text-dark{% else %}btn-outline-light{% endif %}">
+                    <i class="bi bi-arrow-down-left-circle me-1"></i> [الكتب الواردة] ({{ stats.received }})
+                </a>
+                <a href="?tab=student_cert{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm rounded-pill px-3 fw-bold {% if active_tab == 'student_cert' %}btn-warning text-dark{% else %}btn-outline-light{% endif %}">
+                    <i class="bi bi-person-badge me-1"></i> [وثائق وتأييدات الطلبة] ({{ stats.student_cert }})
+                </a>
+                <a href="?tab=circular{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm rounded-pill px-3 fw-bold {% if active_tab == 'circular' %}btn-warning text-dark{% else %}btn-outline-light{% endif %}">
+                    <i class="bi bi-megaphone me-1"></i> [التعاميم الوزارية] ({{ stats.circular }})
+                </a>
+            </div>
+
+            <!-- محرك البحث والفلاتر المتقدمة -->
+            <form method="GET" class="row g-2 mb-4 align-items-center">
+                <input type="hidden" name="tab" value="{{ active_tab }}">
+                <div class="col-12 col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent text-white-50 border-secondary">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="ابحث برقم الكتاب، الموضوع، الجهة المعنية، أو اسم الطالب...">
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <input type="date" name="date_from" value="{{ date_from }}" class="form-control font-monospace" title="من تاريخ">
+                </div>
+                <div class="col-6 col-md-2">
+                    <input type="date" name="date_to" value="{{ date_to }}" class="form-control font-monospace" title="إلى تاريخ">
+                </div>
+                <div class="col-12 col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary rounded-pill w-100 fw-bold">
+                        <i class="bi bi-funnel-fill me-1"></i> تصفية
+                    </button>
+                    {% if query or date_from or date_to or active_tab != 'all' %}
+                    <a href="{% url 'portal_official_archive' %}" class="btn btn-outline-secondary rounded-pill px-3" title="إعادة تعيين">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- جدول وثائق وسجلات الأرشيف -->
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 13.5px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 5%;">ت</th>
+                            <th style="width: 14%;">العدد الأصولي</th>
+                            <th style="width: 11%;">التاريخ</th>
+                            <th style="width: 13%;">نوع الوثيقة</th>
+                            <th style="width: 25%;">الموضوع والبيان</th>
+                            <th style="width: 16%;">الجهة / المعني</th>
+                            <th style="width: 7%;">المرفق</th>
+                            <th style="width: 9%;">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doc in documents %}
+                        <tr>
+                            <td class="fw-bold text-white-50">{{ forloop.counter }}</td>
+                            <td>
+                                <span class="badge font-monospace px-2 py-1" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3);">
+                                    {{ doc.doc_number }}
+                                </span>
+                            </td>
+                            <td class="font-monospace text-white">{{ doc.doc_date|date:"Y/m/d" }}</td>
+                            <td>
+                                {% if doc.doc_type == 'issued' %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success px-2 py-1">
+                                    <i class="bi bi-arrow-up-right me-1"></i>كتاب صادر
+                                </span>
+                                {% elif doc.doc_type == 'received' %}
+                                <span class="badge bg-info bg-opacity-25 text-info border border-info px-2 py-1">
+                                    <i class="bi bi-arrow-down-left me-1"></i>كتاب وارد
+                                </span>
+                                {% elif doc.doc_type == 'student_cert' %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning px-2 py-1">
+                                    <i class="bi bi-mortarboard-fill me-1"></i>تأييد / وثيقة طالب
+                                </span>
+                                {% elif doc.doc_type == 'circular' %}
+                                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary px-2 py-1">
+                                    <i class="bi bi-megaphone-fill me-1"></i>أمر إداري / تعميم
+                                </span>
+                                {% else %}
+                                <span class="badge bg-light text-dark px-2 py-1">{{ doc.get_doc_type_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-start pe-3">
+                                <div class="fw-bold text-white">{{ doc.subject }}</div>
+                                {% if doc.notes %}
+                                <small class="text-white-50 d-block">{{ doc.notes|truncatechars:45 }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-start ps-2">
+                                <div class="fw-bold text-white-50 small">
+                                    <i class="bi bi-building me-1"></i>
+                                    {{ doc.sender_receiver|default:"الجهة المعنية" }}
+                                </div>
+                                {% if doc.student %}
+                                <div class="text-warning small mt-1">
+                                    <i class="bi bi-person-fill me-1"></i>طالب: {{ doc.student.user.get_full_name }}
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if doc.file %}
+                                <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-info rounded-circle p-1" title="عرض المرفق">
+                                    <i class="bi bi-paperclip fs-6"></i>
+                                </a>
+                                {% else %}
+                                <span class="text-white-50 small">---</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <!-- زر تحميل نسخة PDF -->
+                                    <a href="/portal/archive/{{ doc.id }}/pdf/" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1" title="تحميل نسخة PDF أصولية">
+                                        <i class="bi bi-file-earmark-pdf-fill"></i>
+                                    </a>
+
+                                    <!-- زر المعاينة والطباعة الرسمية -->
+                                    <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-2 py-1"
+                                            onclick="openDocPreviewModal('{{ doc.id }}', '{{ doc.doc_number|escapejs }}', '{{ doc.doc_date|date:"Y/m/d"|escapejs }}', '{{ doc.get_doc_type_display|escapejs }}', '{{ doc.sender_receiver|default:"إلى من يهمه الأمر"|escapejs }}', '{{ doc.subject|escapejs }}', '{{ doc.body_content|default:""|escapejs }}', '{{ doc.notes|default:""|escapejs }}', '{% if doc.file %}{{ doc.file.url }}{% endif %}')"
+                                            title="معاينة وطباعة الكتاب الأصولي">
+                                        <i class="bi bi-printer-fill"></i>
+                                    </button>
+
+                                    <!-- زر حذف الوثيقة -->
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1"
+                                            onclick="confirmDeleteDoc('{{ doc.id }}', '{{ doc.doc_number|escapejs }}')"
+                                            title="حذف من الأرشيف">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <div class="text-white-50">
+                                    <i class="bi bi-folder-x fs-1 d-block mb-3 text-warning opacity-75"></i>
+                                    <h6 class="fw-bold">لا توجد قيود أو مخاطبات مؤرشفة تطابق خيارات البحث</h6>
+                                    <p class="small text-white-50 mb-3">يمكنك أرشفة كتب ومستندات جديدة بالنقر على زر (أرشفة كتاب / وثيقة جديدة).</p>
+                                    <button type="button" class="btn btn-warning btn-sm rounded-pill px-4 text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#addArchiveModal">
+                                        <i class="bi bi-plus-circle-fill me-1"></i> أرشفة كتاب الآن
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- الترقيم والتنقل بين الصفحات -->
+            {% if documents.has_other_pages %}
+            <nav class="mt-4" dir="ltr">
+                <ul class="pagination justify-content-center">
+                    {% if documents.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ documents.previous_page_number }}&tab={{ active_tab }}{% if query %}&q={{ query }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">السابق</a>
+                    </li>
+                    {% endif %}
+
+                    {% for i in documents.paginator.page_range %}
+                        {% if documents.number == i %}
+                        <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                        {% elif i > documents.number|add:'-3' and i < documents.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ i }}&tab={{ active_tab }}{% if query %}&q={{ query }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ i }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if documents.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ documents.next_page_number }}&tab={{ active_tab }}{% if query %}&q={{ query }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">التالي</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- نافذة أرشفة وثيقة جديدة (Modal)             -->
+<!-- ========================================== -->
+<div class="modal fade" id="addArchiveModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <h5 class="modal-title fw-bold text-white">
+                    <i class="bi bi-file-earmark-plus text-warning me-2"></i>
+                    تسجيل وأرشفة كتاب / وثيقة أصولية
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'portal_archive_add' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body p-4 text-start" dir="rtl">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-white">العدد الأصولي (رقم الكتاب): <span class="text-danger">*</span></label>
+                            <input type="text" name="doc_number" class="form-control font-monospace" placeholder="مثال: 45 / ص أو 102/و" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-white">تاريخ الكتاب / الوثيقة: <span class="text-danger">*</span></label>
+                            <input type="date" name="doc_date" value="{{ today_date|date:'Y-m-d' }}" class="form-control font-monospace" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-white">نوع الوثيقة الأرشيفية:</label>
+                            <select name="doc_type" class="form-select fw-bold">
+                                <option value="issued" {% if active_tab == 'issued' %}selected{% endif %}>كتاب رسمي صادر</option>
+                                <option value="received" {% if active_tab == 'received' %}selected{% endif %}>كتاب رسمي وارد</option>
+                                <option value="student_cert" {% if active_tab == 'student_cert' %}selected{% endif %}>تأييد / شهادة / وثيقة طالب</option>
+                                <option value="circular" {% if active_tab == 'circular' %}selected{% endif %}>تعميم وزاري / أمر إداري</option>
+                                <option value="other">مستند / وثيقة أخرى</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-white">الجهة المعنية / الصادر إليها أو الوارد منها:</label>
+                            <input type="text" name="sender_receiver" class="form-control" placeholder="مثال: مديرية تربية الكرخ الأولى / ثانوية..." value="الجهة المعنية">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-white">الموضوع (م /): <span class="text-danger">*</span></label>
+                        <input type="text" name="subject" class="form-control" placeholder="مثال: تأييد استمرار بالدوام / إشعار انفكاك / تعميم عطلة..." required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-white">نص الكتاب أو مضمون الوثيقة (اختياري للطباعة لاحقاً):</label>
+                        <textarea name="body_content" class="form-control" rows="4" placeholder="اكتب نص الكتاب الرسمي أو خلاصة المضمون..."></textarea>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-white">إرفاق نسخة ضوئية أو ملف PDF (اختياري):</label>
+                            <input type="file" name="file" class="form-control">
+                            <small class="text-white-50">يقبل ملفات PDF، صور المستندات السكانر JPG/PNG</small>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-white">ملاحظات إضافية / هامش الإدارة:</label>
+                            <input type="text" name="notes" class="form-control" placeholder="أي إشارات أو أرقام إضبارة...">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold rounded-pill px-4 shadow-sm">
+                        <i class="bi bi-check2-circle me-1"></i> حفظ وتوثيق في الأرشيف
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- نافذة المعاينة والطباعة الرسمية (Modal)     -->
+<!-- ========================================== -->
+<div class="modal fade" id="viewDocumentModal" tabindex="-1" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-bottom d-print-none" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <h5 class="modal-title fw-bold text-white">
+                    <i class="bi bi-file-earmark-text text-warning me-2"></i>
+                    معاينة الوثيقة الرسمية الأصولية
+                </h5>
+                <div class="d-flex gap-2">
+                    <a id="modalPdfBtn" href="#" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="bi bi-file-earmark-pdf-fill me-1"></i> تحميل نسخة PDF
+                    </a>
+                    <button type="button" onclick="printModalDoc()" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="bi bi-printer-fill me-1"></i> طباعة الوثيقة A4
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+            <div class="modal-body p-4 text-dark" style="background: rgba(18, 14, 28, 0.65);">
+                <!-- الورقة البيضاء الرسمية A4 القياسية -->
+                <div id="modalPrintArea" class="official-document-paper doc-preview-container bg-white p-5 rounded-3 shadow mx-auto" style="max-width: 850px; color: #000000; font-family: 'Cairo', 'Amiri', Tahoma, sans-serif; min-height: 800px; border: 1px solid #D1D5DB;">
+                    
+                    <!-- الترويسة الوزارية الرسمية الأصولية -->
+                    <div class="row align-items-center mb-4 pb-3 border-bottom border-2 border-dark" dir="rtl">
+                        <div class="col-4 text-start small">
+                            <div class="fw-bold fs-6">جمهورية العراق</div>
+                            <div class="fw-bold fs-6">وزارة التربية</div>
+                            <div class="fw-bold">{{ school.directorate|default:"المديرية العامة للتربية" }}</div>
+                            <div>{{ school.department|default:"قسم الإدارة المدرسية" }}</div>
+                            <div class="fw-bold text-dark">{{ school.school_name }}</div>
+                        </div>
+                        <div class="col-4 text-center">
+                            {% if school.logo %}
+                            <img src="{{ school.logo.url }}" alt="شعار المدرسة" style="max-height: 85px; max-width: 110px; object-fit: contain;">
+                            {% else %}
+                            <div class="border border-dark rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 75px; height: 75px;">
+                                <i class="bi bi-mortarboard-fill fs-2"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-4 text-end small">
+                            <div><strong>العدد الأصولي:</strong> <span id="pv_doc_num" class="font-monospace fw-bold">---</span></div>
+                            <div><strong>التاريخ:</strong> <span id="pv_doc_date" class="font-monospace">---</span></div>
+                            <div><strong>نوع الوثيقة:</strong> <span id="pv_doc_type" class="fw-bold">---</span></div>
+                        </div>
+                    </div>
+
+                    <!-- المخاطبة والموضوع -->
+                    <div class="mb-4 text-start" dir="rtl">
+                        <h6 class="fw-bold mb-3 fs-5">إلى / <span id="pv_destination">الجهة المعنية</span></h6>
+                        <h6 class="fw-bold border-bottom pb-2 border-dark d-inline-block fs-5">م / <span id="pv_subject">الموضوع الأصولي</span></h6>
+                    </div>
+
+                    <!-- نص الوثيقة ومحتواها -->
+                    <div class="my-4 py-3 text-start fs-5" id="pv_body" style="line-height: 2.1; min-height: 220px; white-space: pre-wrap;" dir="rtl">
+                        <!-- النص يتم حقنه عبر جافاسكريبت -->
+                    </div>
+
+                    <div id="pv_attachment_box" class="my-3 text-start small text-muted d-print-none"></div>
+
+                    <!-- تذييل التوقيع والختم الإداري الأصولي -->
+                    <div class="row mt-5 pt-4 text-center align-items-end" dir="rtl">
+                        <div class="col-6 text-start">
+                            <div class="text-muted small">نسخة منه إلى:</div>
+                            <div class="small">- الأرشيف والسجلات الرسمية</div>
+                            <div class="small">- الإضبارة العامة</div>
+                        </div>
+                        <div class="col-6 text-center">
+                            <div class="fw-bold fs-6">إدارة مدرسة</div>
+                            <div class="fw-bold fs-5 text-dark">{{ school.school_name }}</div>
+                            <div class="text-muted small mt-4">الختم والتوقيع الرسمي</div>
+                            <div class="mt-2" style="border-bottom: 2px dashed #999; width: 140px; margin: auto;"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer border-top d-print-none" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" onclick="printModalDoc()" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                    <i class="bi bi-printer-fill me-1"></i> طباعة الوثيقة الأصولية
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نموذج الحذف الخفي -->
+<form id="deleteDocForm" method="POST" action="" style="display:none;">
+    {% csrf_token %}
+</form>
+
+<script>
+function openDocPreviewModal(docId, docNum, docDate, docType, dest, subject, body, notes, fileUrl) {
+    document.getElementById('pv_doc_num').innerText = docNum;
+    document.getElementById('pv_doc_date').innerText = docDate;
+    document.getElementById('pv_doc_type').innerText = docType;
+    document.getElementById('pv_destination').innerText = dest || 'إلى من يهمه الأمر';
+    document.getElementById('pv_subject').innerText = subject;
+    
+    const bodyEl = document.getElementById('pv_body');
+    if (body && body.trim() !== '') {
+        bodyEl.innerHTML = body;
+    } else {
+        bodyEl.innerHTML = `تشهد وتؤيد إدارة <strong>{{ school.school_name }}</strong> بصحة صدور ومطابقة كافة البيانات المتعلقة بموضوع (<strong>${subject}</strong>) أعلاه وفق السجلات والأضابير المدرسية الرسمية لعام <strong>${docDate}</strong>، وزُوّدت الجهة المعنية بهذا الكتاب لغايات العمل الأصولي دون أي مسؤولية أخرى تقع على عاتق المدرسة.`;
+    }
+
+    const attachBox = document.getElementById('pv_attachment_box');
+    if (fileUrl && fileUrl.trim() !== '') {
+        attachBox.innerHTML = `<span class="badge bg-secondary p-2"><i class="bi bi-paperclip me-1"></i> يوجد مرفق رقمي محفوظ مع هذه الوثيقة: <a href="${fileUrl}" target="_blank" class="text-white text-decoration-underline ms-1">فتح المرفق</a></span>`;
+    } else {
+        attachBox.innerHTML = '';
+    }
+
+    const pdfBtn = document.getElementById('modalPdfBtn');
+    if (pdfBtn) {
+        pdfBtn.href = `/portal/archive/${docId}/pdf/`;
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('viewDocumentModal'));
+    modal.show();
+}
+
+function printModalDoc() {
+    window.print();
+}
+
+function confirmDeleteDoc(docId, docNum) {
+    if (confirm(`هل أنت متأكد من حذف الوثيقة رقم (${docNum}) من الأرشيف الرسمي نهائياً؟`)) {
+        const form = document.getElementById('deleteDocForm');
+        form.action = `/portal/archive/${docId}/delete/`;
+        form.submit();
+    }
+}
+</script>
+
+<style>
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm 8mm 10mm 8mm;
+    }
+    body * {
+        visibility: hidden;
+    }
+    #modalPrintArea, #modalPrintArea * {
+        visibility: visible;
+    }
+    #modalPrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 4mm 6mm !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+    .d-print-none, .modal-backdrop {
+        display: none !important;
+    }
+}
+
+#modalPrintArea,
+#modalPrintArea * {
+    font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+    font-weight: bold !important;
+    color: #000000 !important;
+}
+
+#modalPrintArea {
+    font-size: 16px !important;
+    font-weight: bold !important;
+    line-height: 1.8 !important;
+}
+
+#modalPrintArea p,
+#modalPrintArea div,
+#modalPrintArea span,
+#modalPrintArea td,
+#modalPrintArea th {
+    font-size: 16px !important;
+    font-weight: bold !important;
+    line-height: 1.8 !important;
+}
+</style>
+{% endblock %}

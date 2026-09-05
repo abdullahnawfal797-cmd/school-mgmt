@@ -1,114 +1,126 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
-شيت تفقد حضور القاعة الامتحانية - {{ session.title }}{% endblock %}
+{% block title %}طباعة لواصق وبطاقات المقاعد الامتحانية - {{ session.title }}{% endblock %}
 
 {% block extra_css %}
 <style>
     @media print {
         @page {
             size: A4 portrait;
-            margin: 12mm;
+            margin: 10mm 8mm 10mm 8mm;
         }
 
         body {
             background: #ffffff !important;
-            font-size: 12px;
+            font-family: 'Simplified Arabic', 'Traditional Arabic', Tahoma, sans-serif !important;
+            font-weight: bold !important;
+            color: #000 !important;
+        }
+
+        .no-print, .app-header, .bottom-nav {
+            display: none !important;
+        }
+
+        .label-card {
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
     }
 
-    .table-sheet th,
-    .table-sheet td {
-        border: 1px solid #000 !important;
-        vertical-align: middle;
-        text-align: center;
-        padding: 6px;
+    .labels-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
     }
 
-    .table-sheet thead th {
-        background-color: #f2f2f2 !important;
-        font-weight: bold;
+    .label-card {
+        border: 2px solid #000000 !important;
+        border-radius: 8px;
+        padding: 12px 14px;
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        position: relative;
+    }
+
+    .label-card * {
+        color: #000000 !important;
+    }
+
+    .label-header {
+        border-bottom: 1.5px solid #000000;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+    }
+
+    .seat-badge {
+        font-size: 1.75rem;
+        font-weight: 900;
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 2.5px solid #000000 !important;
+        border-radius: 8px;
+        padding: 4px 16px;
+        display: inline-block;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+<div class="d-flex justify-content-between align-items-center mb-3 no-print" dir="rtl">
     <div>
-        <h5 class="fw-bold mb-0">شيت تفقد حضور الطلاب في القاعات الامتحانية</h5>
-        <span class="text-muted small">الدورة: {{ session.title }} | السنة: {{ session.academic_year.name }}</span>
+        <h5 class="fw-bold mb-0"><i class="bi bi-tags-fill text-primary me-2"></i>بطاقات ولواصق مقاعد الطلاب (الرحلات الامتحانية)</h5>
+        <span class="text-muted small">الدورة: {{ session.title }} | السنة: {{ session.academic_year.name }} | العدد الإجمالي: {{ seats|length }} مقعد</span>
     </div>
     <div class="d-flex gap-2">
-        <button onclick="window.print()" class="btn btn-primary fw-bold">
-            <i class="bi bi-printer me-1"></i> طباعة شيت الحضور (A4)
+        <button onclick="window.print()" class="btn btn-primary fw-bold shadow-sm">
+            <i class="bi bi-printer-fill me-1"></i> طباعة لواصق المقاعد (A4)
         </button>
         <a href="{% url 'portal_exam_halls' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-right me-1"></i> عودة
+            <i class="bi bi-arrow-right me-1"></i> عودة للقاعات
         </a>
     </div>
 </div>
 
-<div class="p-3 bg-white border">
-    <!-- الترويسة الرسمية العراقية -->
-    <div class="row align-items-center mb-3 pb-2 border-bottom text-center">
-        <div class="col-4 text-start">
-            <div class="fw-bold">جمهورية العراق</div>
-            <div class="fw-bold">وزارة التربية</div>
-            <div class="small text-muted">اللجنة الامتحانية المدرسية</div>
-        </div>
-        <div class="col-4">
-            <h5 class="fw-bold mb-1">استمارة تفقد حضور وغياب القاعة</h5>
-            <div class="badge bg-dark fs-6">{{ session.title }}</div>
-        </div>
-        <div class="col-4 text-end">
-            <div>التاريخ: {{ today_date }}</div>
-            <div>المادة: ......................</div>
-        </div>
-    </div>
+<div class="labels-container" dir="rtl">
+    <div class="labels-grid">
+        {% for seat in seats %}
+        <div class="label-card paper-white">
+            <div class="label-header d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold" style="font-size: 14px; color: #000000 !important;">{{ school.school_name }}</div>
+                    <div class="small fw-bold" style="font-size: 11px; color: #000000 !important;">اللجنة الامتحانية المدرسية | {{ session.title }}</div>
+                </div>
+                <div class="text-end">
+                    <span class="px-3 py-1 border border-2 border-dark rounded-pill fw-bold" style="background: #f8fafc; font-size: 13px; color: #000000 !important;">{{ seat.exam_hall.name }}</span>
+                </div>
+            </div>
 
-    <!-- جدول حضور الطلاب -->
-    <table class="table table-sheet w-100 mb-4">
-        <thead>
-            <tr>
-                <th style="width: 8%;">رقم المقعد</th>
-                <th style="width: 14%;">القاعة</th>
-                <th style="width: 30%;">اسم الطالب الرباعي واللقب</th>
-                <th style="width: 16%;">المرحلة والشعبة</th>
-                <th style="width: 14%;">الموقف (حاضر/غائب)</th>
-                <th style="width: 18%;">توقيع الطالب</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for seat in seats %}
-            <tr>
-                <td class="fw-bold fs-6">{{ seat.seat_number }}</td>
-                <td>{{ seat.exam_hall.name }}</td>
-                <td class="text-start fw-bold pe-2">{{ seat.student.full_name }}</td>
-                <td>{{ seat.student.current_class.name }} - {{ seat.student.section.name|default:"أ" }}</td>
-                <td>[ &nbsp; ] حاضر &nbsp;&nbsp; [ &nbsp; ] غائب</td>
-                <td></td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="6" class="py-4 text-muted">لا يوجد طلاب مسجلون على مقاعد هذه القاعة.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            <div class="d-flex align-items-center justify-content-between my-2">
+                <div class="flex-grow-1 pe-2">
+                    <div class="small fw-bold mb-1" style="font-size: 11px; color: #000000 !important;">اسم الطالب:</div>
+                    <div class="fw-bold fs-5" style="color: #000000 !important;">{{ seat.student.full_name }}</div>
+                    <div class="mt-2">
+                        <span class="px-2 py-1 border border-dark rounded fw-bold" style="background: #ffffff; color: #000000 !important; font-size: 12px;">
+                            الصف: {{ seat.student.current_class.name }} - شعبة {{ seat.student.section.name|default:"أ" }}
+                        </span>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <div class="small fw-bold mb-1" style="font-size: 12px; color: #000000 !important;">رقم المقعد</div>
+                    <div class="seat-badge">{{ seat.seat_number }}</div>
+                </div>
+            </div>
 
-    <!-- تواقيع اللجنة الامتحانية -->
-    <div class="row mt-4 pt-3 text-center">
-        <div class="col-4">
-            <div class="fw-bold">مراقب القاعة الأول</div>
-            <div class="mt-4">التوقيع: .....................</div>
+            <div class="text-center pt-2 border-top border-dark fw-bold" style="font-size: 10px; color: #000000 !important;">
+                يرجى الالتزام بالجلوس في المقعد المخصص طيلة فترة الامتحان
+            </div>
         </div>
-        <div class="col-4">
-            <div class="fw-bold">مراقب القاعة الثاني</div>
-            <div class="mt-4">التوقيع: .....................</div>
+        {% empty %}
+        <div class="col-12 text-center py-5 rounded-4 border" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+            <i class="bi bi-inbox fs-1 text-muted"></i>
+            <p class="text-white-50 mt-2">لا توجد مقاعد مسجلة في هذه الدورة الامتحانية حالياً.</p>
         </div>
-        <div class="col-4">
-            <div class="fw-bold">مدير المركز / رئيس اللجنة الامتحانية</div>
-            <div class="mt-4">الختم والتوقيع: .....................</div>
-        </div>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

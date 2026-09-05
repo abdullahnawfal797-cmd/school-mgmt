@@ -1,6 +1,7 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}مولد تراخيص المنظومة - خاص بالمالك{% endblock %}
+
 
 {% block content %}
 <div class="row justify-content-center">
@@ -66,17 +67,25 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-warning btn-lg rounded-pill w-100 fw-bold shadow-sm">
-                    <i class="bi bi-gear-wide-connected me-1"></i> توليد كود التفعيل
-                </button>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="submit" name="action_type" value="generate" class="btn btn-warning btn-lg rounded-pill flex-grow-1 fw-bold shadow-sm text-dark">
+                        <i class="bi bi-key-fill me-1"></i> توليد كود التفعيل
+                    </button>
+                    <button type="submit" name="action_type" value="download_lic" class="btn btn-success btn-lg rounded-pill flex-grow-1 fw-bold shadow-sm">
+                        <i class="bi bi-file-earmark-arrow-down-fill me-1"></i> تحميل ملف ترخيص (.lic)
+                    </button>
+                </div>
             </form>
 
             {% if generated_key %}
-            <div class="mt-4 p-3 bg-light rounded-4 border text-start">
-                <label class="form-label small fw-bold text-success">مفتاح التفعيل المولّد بنجاح (قم بنسخه وتزويده
-                    للمدرسة):</label>
-                <textarea class="form-control font-monospace text-center fw-bold" rows="3"
-                    readonly>{{ generated_key }}</textarea>
+            <div class="mt-4 p-3 rounded-4 border text-start" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                <label class="form-label small fw-bold text-success">مفتاح التفعيل المولّد بنجاح (قم بنسخه وتزويده للمدرسة):</label>
+                <textarea class="form-control font-monospace text-center fw-bold mb-2" rows="3" readonly>{{ generated_key }}</textarea>
+                <div class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3" onclick="navigator.clipboard.writeText('{{ generated_key }}'); alert('تم نسخ الكود بنجاح!');">
+                        <i class="bi bi-clipboard me-1"></i> نسخ الكود
+                    </button>
+                </div>
             </div>
             {% endif %}
             {% endif %}
@@ -85,4 +94,3 @@
     </div>
 </div>
 {% endblock %}
-

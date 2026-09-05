@@ -1,0 +1,26 @@
+{
+    "name": "منظومة الإدارة المدرسية العراقية",
+    "short_name": "المدرسة الرقمية",
+    "description": "نظام الإدارة المدرسية الشامل وسجلات الدرجات والقيد العام المعتمد وفق معايير وزارة التربية العراقية",
+    "start_url": "/portal/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0d6efd",
+    "orientation": "portrait-primary",
+    "lang": "ar",
+    "dir": "rtl",
+    "icons": [
+        {
+            "src": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/mortarboard-fill.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/icons/mortarboard-fill.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

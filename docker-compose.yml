@@ -1,0 +1,53 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: school_db
+      POSTGRES_USER: school_user
+      POSTGRES_PASSWORD: school_pass
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    command: sh -c "python manage.py migrate && gunicorn school_mgmt.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_NAME=school_db
+      - DATABASE_USER=school_user
+      - DATABASE_PASS=school_pass
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+
+  celery:
+    build: .
+    command: celery -A school_mgmt worker -l info
+    volumes:
+      - .:/code
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_NAME=school_db
+      - DATABASE_USER=school_user
+      - DATABASE_PASS=school_pass
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+      - web
+
+volumes:
+  db_data:

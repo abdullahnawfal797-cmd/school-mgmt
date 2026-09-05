@@ -1,0 +1,22 @@
+# Ignore Python cache and environment
+__pycache__/
+*.py[cod]
+*.egg-info/
+.python-version
+.env
+.venv
+env/
+venv/
+# Docker
+*.pem
+# Byte-compiled / optimized / DLL files
+*.pyc
+
+# Django
+local_settings.py
+db.sqlite3
+/media
+/staticfiles
+
+# VSCode
+.vscode/

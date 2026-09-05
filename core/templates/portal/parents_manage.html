@@ -1,6 +1,7 @@
-﻿{% extends 'portal/base_portal.html' %}
+{% extends 'portal/base_portal.html' %}
 
 {% block title %}سجل أولياء الأمور والاتصال{% endblock %}
+
 
 {% block content %}
 <div class="row g-4 mb-4" dir="rtl">
@@ -27,7 +28,7 @@
             <form method="GET" class="row g-2 mb-4 d-print-none">
                 <div class="col-12 col-md-10">
                     <div class="input-group">
-                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" class="form-control fw-bold" value="{{ query }}"
                             placeholder="ابحث باسم ولي الأمر، رقم الهاتف، أو اسم الطالب...">
                     </div>
@@ -43,7 +44,7 @@
             <!-- جدول أولياء الأمور -->
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle mb-0 text-center" style="font-size: 14px;">
-                    <thead class="table-light fw-bold">
+                    <thead>
                         <tr>
                             <th style="width: 5%;">ت</th>
                             <th style="width: 25%;">اسم ولي الأمر</th>
@@ -57,15 +58,21 @@
                         {% for p in parents %}
                         <tr>
                             <td class="fw-bold">{{ forloop.counter }}</td>
-                            <td class="fw-bold text-start ps-3 text-dark">
-                                <i class="bi bi-person-badge text-primary me-1"></i>
+                            <td class="fw-bold text-start ps-3 text-white">
+                                <i class="bi bi-person-badge text-warning me-1"></i>
                                 {{ p.user.get_full_name|default:p.user.username }}
                             </td>
                             <td>
                                 {% if p.phone %}
-                                <a href="tel:{{ p.phone }}" class="text-decoration-none font-monospace fw-bold text-success">
-                                    <i class="bi bi-telephone-fill me-1"></i>{{ p.phone }}
-                                </a>
+                                <div class="d-inline-flex align-items-center gap-2">
+                                    <a href="tel:{{ p.phone }}" class="text-decoration-none font-monospace fw-bold text-success">
+                                        <i class="bi bi-telephone-fill me-1"></i>{{ p.phone }}
+                                    </a>
+                                    <a href="https://wa.me/{% if p.phone|slice:':1' == '0' %}964{{ p.phone|slice:'1:' }}{% else %}964{{ p.phone }}{% endif %}?text=السلام%20عليكم%20ورحمة%20الله%20وبركاته%20من%20إدارة%20مدرسة%20{{ school.school_name|urlencode }}" 
+                                       target="_blank" class="btn btn-sm btn-outline-success rounded-circle p-0 d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 26px; height: 26px;" title="مراسلة ولي الأمر عبر واتساب">
+                                        <i class="bi bi-whatsapp" style="font-size: 13px;"></i>
+                                    </a>
+                                </div>
                                 {% else %}
                                 <span class="text-muted small">غير مسجل</span>
                                 {% endif %}
@@ -77,10 +84,10 @@
                                 {% if p.student_set.all %}
                                 <div class="d-flex flex-wrap gap-1">
                                     {% for st in p.student_set.all %}
-                                    <span class="badge bg-light text-dark border p-2">
-                                        <i class="bi bi-mortarboard-fill text-primary me-1"></i>
+                                    <span class="badge p-2" style="background: rgba(255, 255, 255, 0.12); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.18);">
+                                        <i class="bi bi-mortarboard-fill text-warning me-1"></i>
                                         {{ st.user.get_full_name }}
-                                        <small class="text-muted">({{ st.current_class.name|default:"بدون صف" }})</small>
+                                        <small class="text-white-50">({{ st.current_class.name|default:"بدون صف" }})</small>
                                     </span>
                                     {% endfor %}
                                 </div>
@@ -115,9 +122,9 @@
 <div class="modal fade" id="unifiedParentModal" tabindex="-1" aria-hidden="true" dir="rtl">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header bg-light">
-                <h6 class="modal-title fw-bold text-dark">
-                    <i class="bi bi-pencil-square text-warning me-1"></i> تعديل بيانات ولي الأمر: <span id="modalParentName" class="text-primary"></span>
+            <div class="modal-header border-bottom" style="border-color: rgba(255, 255, 255, 0.1) !important;">
+                <h6 class="modal-title fw-bold text-white">
+                    <i class="bi bi-pencil-square text-warning me-1"></i> تعديل بيانات ولي الأمر: <span id="modalParentName" class="text-warning"></span>
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
             </div>
@@ -137,9 +144,9 @@
                         <input type="text" name="address" id="modalInputAddress" class="form-control fw-bold">
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer border-top" style="border-color: rgba(255, 255, 255, 0.1) !important;">
                     <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">إلغاء</button>
-                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">حفظ التعديلات</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">حفظ التعديلات</button>
                 </div>
             </form>
         </div>
@@ -166,4 +173,3 @@ function openEditParentModal(parentId, name, phone, address) {
 }
 </script>
 {% endblock %}
-
