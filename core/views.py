@@ -1,5 +1,5 @@
 import math
-import random
+import secrets
 import os
 import shutil
 import zipfile
@@ -46,6 +46,24 @@ from .licensing import (
     verify_and_apply_license_file,
     generate_license_file_data
 )
+
+def secure_randint(a, b):
+    """توليد رقم عشوائي مشفر وآمن أمنياً بين a و b شاملاً الطرفين"""
+    return a + secrets.randbelow(b - a + 1)
+
+def secure_shuffle(lst):
+    """خلط عناصر القائمة بشكل مشفر وآمن (Fisher-Yates via secrets)"""
+    for i in range(len(lst) - 1, 0, -1):
+        j = secrets.randbelow(i + 1)
+        lst[i], lst[j] = lst[j], lst[i]
+
+def safe_path_join(base_dir, user_input_path):
+    """التحقق الصارم من مسار الملف ومنع ثغرات Path Traversal والوصول غير المصرح"""
+    base = os.path.abspath(str(base_dir))
+    target = os.path.abspath(os.path.join(base, str(user_input_path)))
+    if not (target == base or target.startswith(base + os.sep)):
+        raise ValueError("Access denied: Invalid file path")
+    return target
 
 # قائمة الصفوف العراقية الرسمية الـ 15 الثابتة
 IRAQI_STANDARD_CLASSES = [
@@ -1126,10 +1144,13 @@ def portal_set_current_year(request):
 
 def generate_stress_test_data(target_count=1200):
     """توليد سريع بدفعات ضخمة لـ 1,200 طالب مع درجات كاملة لجميع المواد لاختبار الضغط"""
-    import random
+    import secrets
     from decimal import Decimal
     from django.contrib.auth import get_user_model
     User = get_user_model()
+
+    def secure_randint(a, b):
+        return a + secrets.randbelow(b - a + 1)
 
     FIRST_NAMES = [
         "محمد", "علي", "أحمد", "حسين", "حسن", "عمر", "يوسف", "زيد", "مصطفى", "كرار",
@@ -1163,10 +1184,10 @@ def generate_stress_test_data(target_count=1200):
 
     for i in range(1, target_count + 1):
         uname = f"stress_std_{current_time_str}_{i:04d}"
-        f_name = random.choice(FIRST_NAMES)
-        m_name = random.choice(MID_NAMES)
-        l_name = random.choice(LAST_NAMES)
-        full_quad = f"{f_name} {m_name} {random.choice(MID_NAMES)}"
+        f_name = secrets.choice(FIRST_NAMES)
+        m_name = secrets.choice(MID_NAMES)
+        l_name = secrets.choice(LAST_NAMES)
+        full_quad = f"{f_name} {m_name} {secrets.choice(MID_NAMES)}"
         users_to_create.append(User(
             username=uname,
             first_name=full_quad,
@@ -1189,7 +1210,7 @@ def generate_stress_test_data(target_count=1200):
             current_class=cls,
             section=sec,
             registration_number=f"REG-2026-{idx:04d}",
-            national_id=f"199{random.randint(100000000, 999999999)}",
+            national_id=f"199{secure_randint(100000000, 999999999)}",
             student_status='active'
         ))
 
@@ -1199,11 +1220,11 @@ def generate_stress_test_data(target_count=1200):
     for st in created_students:
         cls_subs = class_subjects_map.get(st.current_class_id, [])
         for sub in cls_subs:
-            f1 = Decimal(str(random.randint(45, 98)))
-            mid = Decimal(str(random.randint(45, 95)))
-            f2 = Decimal(str(random.randint(45, 98)))
+            f1 = Decimal(str(secure_randint(45, 98)))
+            mid = Decimal(str(secure_randint(45, 95)))
+            f2 = Decimal(str(secure_randint(45, 98)))
             ann = round_integer((f1 + mid + f2) / Decimal('3'))
-            fin = Decimal(str(random.randint(45, 98)))
+            fin = Decimal(str(secure_randint(45, 98)))
             tot_final = round_integer((ann + fin) / Decimal('2'))
 
             dec = Decimal('0')
@@ -1825,7 +1846,7 @@ def exam_halls_view(request):
             class_students = {}
             for cls in selected_classes:
                 st_list = list(Student.objects.filter(current_class=cls, student_status='active', is_deleted=False).select_related('user', 'current_class', 'section'))
-                random.shuffle(st_list)
+                secure_shuffle(st_list)
                 if st_list:
                     class_students[cls.id] = st_list
 
@@ -2857,12 +2878,12 @@ def portal_students_manage(request):
             final_nat_id = national_id if national_id else None
 
             with transaction.atomic():
-                username = f"std_{random.randint(100000, 999999)}"
+                username = f"std_{secure_randint(100000, 999999)}"
                 u = User.objects.create_user(username=username, first_name=first_name, last_name=last_name, is_student=True)
 
                 parent_obj = None
                 if parent_name or parent_phone:
-                    p_uname = f"prnt_{parent_phone}" if parent_phone else f"prnt_{random.randint(100000, 999999)}"
+                    p_uname = f"prnt_{parent_phone}" if parent_phone else f"prnt_{secure_randint(100000, 999999)}"
                     p_user = User.objects.filter(username=p_uname).first()
                     if not p_user:
                         p_user = User.objects.create_user(
@@ -2965,10 +2986,10 @@ def portal_students_manage(request):
 
                         final_reg_num = st_data['registration_number']
                         if final_reg_num and Student.objects.filter(registration_number=final_reg_num).exists():
-                            final_reg_num = f"{final_reg_num}-{random.randint(10, 99)}"
+                            final_reg_num = f"{final_reg_num}-{secure_randint(10, 99)}"
 
                         u = User.objects.create_user(
-                            username=f"std_{random.randint(100000, 999999)}",
+                            username=f"std_{secure_randint(100000, 999999)}",
                             first_name=st_data['first_name'],
                             last_name=st_data['last_name'],
                             is_student=True
@@ -3228,7 +3249,7 @@ def portal_teachers_manage(request):
         class_ids = request.POST.getlist('classes')
 
         with transaction.atomic():
-            username = f"tch_{random.randint(10000, 99999)}"
+            username = f"tch_{secure_randint(10000, 99999)}"
             u = User.objects.create_user(username=username, first_name=first_name, last_name=last_name, is_teacher=True)
             tch = Teacher.objects.create(user=u, job_title=job_title, statistical_code=stat_code)
             if subject_ids:
@@ -3434,8 +3455,11 @@ def upload_patch_view(request):
             messages.error(request, "يرجى رفع حزمة تحديث صالحة.")
             return redirect('portal_settings')
         try:
+            base_dir = os.path.abspath(str(settings.BASE_DIR))
             with zipfile.ZipFile(patch_file, 'r') as zip_ref:
-                zip_ref.extractall(settings.BASE_DIR)
+                for member in zip_ref.namelist():
+                    safe_path_join(base_dir, member)
+                zip_ref.extractall(base_dir)
             messages.success(request, "تم تثبيت حزمة التحديث بنجاح.")
         except Exception as e:
             messages.error(request, f"حدث خطأ أثناء فك الحزمة: {str(e)}")
@@ -3606,10 +3630,11 @@ def apply_system_update_view(request):
 
         try:
             import tempfile
-            temp_dir = os.path.join(tempfile.gettempdir(), 'Madrasati_Updates')
+            temp_dir = os.path.abspath(os.path.join(tempfile.gettempdir(), 'Madrasati_Updates'))
             os.makedirs(temp_dir, exist_ok=True)
-            filename = download_url.split('/')[-1] or 'Madrasati_Update.zip'
-            target_path = os.path.join(temp_dir, filename)
+            raw_filename = download_url.split('?')[0].split('/')[-1] or 'Madrasati_Update.zip'
+            safe_filename = os.path.basename(raw_filename)
+            target_path = safe_path_join(temp_dir, safe_filename)
 
             req = urllib.request.Request(download_url, headers={'User-Agent': 'Madrasati-App-Updater'})
             with urllib.request.urlopen(req, timeout=30) as resp, open(target_path, 'wb') as out_f:
@@ -3630,10 +3655,10 @@ def apply_system_update_view(request):
 # معالجة تعديل الصفوف الدراسية المفقودة
 # ======================================================================
 
-def portal_class_edit(request, pk=None):
+def portal_class_edit(request, class_id=None, *args, **kwargs):
     """تعديل بيانات الصف الدراسي وتفادي أخطاء الاستيراد في urls.py"""
-    class_id = pk or request.POST.get('class_id')
-    school_class = get_object_or_404(SchoolClass, pk=class_id)
+    c_id = class_id or request.POST.get('class_id')
+    school_class = get_object_or_404(SchoolClass, pk=c_id)
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()

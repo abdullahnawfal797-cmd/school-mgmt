@@ -15,10 +15,7 @@ else:
     BUNDLE_DIR = BASE_DIR
     EXE_DIR = BASE_DIR
 
-SECRET_KEY = os.getenv(
-    'DJANGO_SECRET_KEY',
-    'mq8!xK@2v#LpZ7$wRnYe&3uQb9^TjHd6sEcFo4Ag1Nm0Xz5Ik'
-)
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dev-only-secret-key-change-in-production')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() not in ('false', '0', 'no')
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '::1', '*']
 

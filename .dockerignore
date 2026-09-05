@@ -1,22 +1,46 @@
-# Ignore Python cache and environment
+# Python cache & environments
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
 .python-version
-.env
-.venv
+.venv/
 env/
 venv/
-# Docker
+
+# Environment and secrets
+.env*
 *.pem
-# Byte-compiled / optimized / DLL files
-*.pyc
+*.key
+*.crt
+*.cert
 
-# Django
+# Database & local dynamic files
+*.sqlite3*
+*.db*
+*.log
 local_settings.py
-db.sqlite3
-/media
-/staticfiles
+/media/
+/staticfiles/
+Backups/
+license.txt
+last_sync_status.json
 
-# VSCode
+# Builds & installation artifacts
+dist/
+build/
+*.spec
+*.zip
+*.exe
+
+# Git & CI/CD tools
+.git/
+.gitignore
+.dockerignore
+.sonarcloud.properties
+sonar-project.properties
+scratch/
+
+# IDE & Editor
 .vscode/
+.idea/

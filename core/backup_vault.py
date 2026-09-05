@@ -151,6 +151,14 @@ def get_removable_drives():
             pass
     return drives
 
+def safe_join(base_dir, user_input_path):
+    """التحقق الصارم من مسار الملف ومنع ثغرات Path Traversal والوصول غير المصرح"""
+    base = os.path.abspath(str(base_dir))
+    target = os.path.abspath(os.path.join(base, str(user_input_path)))
+    if not (target == base or target.startswith(base + os.sep)):
+        raise ValueError("Access denied: Invalid file path")
+    return target
+
 def save_backup_to_usb(target_directory):
     """
     حفظ نسخة احتياطية مباشرة على فلاش ميموري USB أو مسار مخصص
@@ -159,27 +167,26 @@ def save_backup_to_usb(target_directory):
         if not target_directory:
             return False, "لم يتم تحديد مسار الفلاش ميموري أو القرص الخارجي."
 
-        clean_dir = os.path.normpath(target_directory.strip())
-        # إنشاء مجلد منظم داخل الفلاش
-        dest_folder = os.path.join(clean_dir, "Madrasati_Backups")
-        os.makedirs(dest_folder, exist_ok=True)
+        base_dir = os.path.abspath(target_directory.strip())
+        target_path = safe_join(base_dir, "Madrasati_Backups")
+        os.makedirs(target_path, exist_ok=True)
 
         timestamp = timezone.now().strftime("%Y_%m_%d_%H%M%S")
         dest_filename = f"backup_madrasati_{timestamp}.db"
-        dest_path = os.path.join(dest_folder, dest_filename)
+        dest_file_path = safe_join(target_path, dest_filename)
 
         db_path = str(settings.DATABASES['default']['NAME'])
         if not os.path.exists(db_path):
             return False, "ملف قاعدة البيانات الأساسي غير موجود."
 
         src_conn = sqlite3.connect(db_path)
-        dst_conn = sqlite3.connect(dest_path)
+        dst_conn = sqlite3.connect(dest_file_path)
         with dst_conn:
             src_conn.backup(dst_conn)
         dst_conn.close()
         src_conn.close()
 
-        size_kb = round(os.path.getsize(dest_path) / 1024, 2)
-        return True, f"تم بنجاح حفظ النسخة الاحتياطية على الفلاش ميموري: ({dest_path}) بحجم {size_kb} KB."
+        size_kb = round(os.path.getsize(dest_file_path) / 1024, 2)
+        return True, f"تم بنجاح حفظ النسخة الاحتياطية على الفلاش ميموري: ({dest_file_path}) بحجم {size_kb} KB."
     except Exception as e:
         return False, f"فشل الحفظ على الفلاش ميموري: {str(e)}"

@@ -13,13 +13,16 @@ RUN apk update && apk add --no-cache \
     python3-dev \
     libffi-dev
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-# تشغيل التطبيق بمستخدم آمن غير جذري
+# إنشاء مستخدم آمن غير جذري مسبقاً
 RUN adduser -D appuser && chown -R appuser /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# نسخ الملفات بملكية المستخدم غير الجذري مباشرة لتفادي الطبقات الزائدة
+COPY --chown=appuser:appuser . .
+
 USER appuser
 
 EXPOSE 8000
