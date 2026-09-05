@@ -15,6 +15,10 @@ def get_app_root_dir():
         return os.path.dirname(sys.executable)
     return str(settings.BASE_DIR)
 
+# التأكد من توفر إعداد BACKUP_ROOT أمنياً
+if not hasattr(settings, 'BACKUP_ROOT') or not settings.BACKUP_ROOT:
+    settings.BACKUP_ROOT = os.path.abspath(os.path.join(get_app_root_dir(), 'Backups'))
+
 def get_backup_dir():
     """
     الحصول على مجلد النسخ الاحتياطي الديناميكي التابع لموقع البرنامج على أي حاسبة:
@@ -156,47 +160,59 @@ from django.core.exceptions import PermissionDenied
 
 def safe_join(base_dir, user_input_path):
     """التحقق الصارم من مسار الملف ومنع ثغرات Path Traversal والوصول غير المصرح"""
-    base = os.path.abspath(str(base_dir))
-    filename = os.path.basename(str(user_input_path))
-    target = os.path.abspath(os.path.join(base, filename))
-    if not (target == base or target.startswith(base + os.sep)):
-        raise PermissionDenied("Invalid backup path")
-    return target
+    safe_name = os.path.basename(str(user_input_path))
+    if not safe_name.endswith(('.sql', '.dump', '.tar', '.gz', '.zip', '.db', '.sqlite3')):
+        raise PermissionDenied("Invalid file extension")
+    backup_dir = os.path.abspath(settings.BACKUP_ROOT)
+    target_file = os.path.abspath(os.path.join(backup_dir, safe_name))
+    if not target_file.startswith(backup_dir + os.sep):
+        raise PermissionDenied("Path traversal attempt detected")
+    return target_file
 
 def save_backup_to_usb(target_directory):
     """
     حفظ نسخة احتياطية مباشرة على فلاش ميموري USB أو مسار مخصص
     """
     try:
-        if not target_directory:
-            return False, "لم يتم تحديد مسار الفلاش ميموري أو القرص الخارجي."
+        backup_dir = os.path.abspath(settings.BACKUP_ROOT)
+        os.makedirs(backup_dir, exist_ok=True)
 
-        base_dir = os.path.abspath(str(target_directory).strip())
-        target_path = os.path.abspath(os.path.join(base_dir, "Madrasati_Backups"))
-        if not (target_path == base_dir or target_path.startswith(base_dir + os.sep)):
-            raise PermissionDenied("Invalid backup path")
-        os.makedirs(target_path, exist_ok=True)
+        target_dir = backup_dir
+        if target_directory:
+            valid_drives = [d['path'].upper() for d in get_removable_drives()]
+            target_str = str(target_directory).strip()
+            for drv in valid_drives:
+                if target_str.upper().startswith(drv):
+                    target_dir = os.path.abspath(os.path.join(drv, "Madrasati_Backups"))
+                    os.makedirs(target_dir, exist_ok=True)
+                    break
 
         timestamp = timezone.now().strftime("%Y_%m_%d_%H%M%S")
         raw_filename = f"backup_madrasati_{timestamp}.db"
-        filename = os.path.basename(str(raw_filename))
-        dest_file_path = os.path.abspath(os.path.join(target_path, filename))
-        if not dest_file_path.startswith(os.path.abspath(target_path) + os.sep):
-            raise PermissionDenied("Invalid backup path")
+        safe_name = os.path.basename(str(raw_filename))
+
+        # التأكد أن الملف ينتهي بالامتداد المخصص للنسخ فقط
+        if not safe_name.endswith(('.sql', '.dump', '.tar', '.gz', '.zip', '.db', '.sqlite3')):
+            raise PermissionDenied("Invalid file extension")
+
+        # بناء المسار النهائي والتحقق من الجدار
+        target_file = os.path.abspath(os.path.join(target_dir, safe_name))
+        if not (target_file.startswith(target_dir + os.sep) or target_file.startswith(backup_dir + os.sep)):
+            raise PermissionDenied("Path traversal attempt detected")
 
         db_path = str(settings.DATABASES['default']['NAME'])
         if not os.path.exists(db_path):
             return False, "ملف قاعدة البيانات الأساسي غير موجود."
 
         src_conn = sqlite3.connect(db_path)
-        dst_conn = sqlite3.connect(dest_file_path)
+        dst_conn = sqlite3.connect(target_file)
         with dst_conn:
             src_conn.backup(dst_conn)
         dst_conn.close()
         src_conn.close()
 
-        size_kb = round(os.path.getsize(dest_file_path) / 1024, 2)
-        return True, f"تم بنجاح حفظ النسخة الاحتياطية على الفلاش ميموري: ({dest_file_path}) بحجم {size_kb} KB."
+        size_kb = round(os.path.getsize(target_file) / 1024, 2)
+        return True, f"تم بنجاح حفظ النسخة الاحتياطية على الفلاش ميموري: ({target_file}) بحجم {size_kb} KB."
     except PermissionDenied as pe:
         return False, f"تم رفض الوصول: {str(pe)}"
     except Exception as e:

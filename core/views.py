@@ -69,6 +69,39 @@ def safe_path_join(base_dir, user_input_path):
         raise ValueError("Access denied: Invalid file path")
     return target
 
+ALLOWED_REDIRECT_ENDPOINTS = {
+    'portal_dashboard': 'portal_dashboard',
+    'portal_students': 'portal_students_manage',
+    'portal_students_manage': 'portal_students_manage',
+    'portal_general_registry': 'portal_general_registry',
+    'portal_parents': 'portal_parents_manage',
+    'portal_parents_manage': 'portal_parents_manage',
+    'portal_classes': 'portal_classes_manage',
+    'portal_classes_manage': 'portal_classes_manage',
+    'portal_grades': 'portal_grades_manage',
+    'portal_grades_manage': 'portal_grades_manage',
+    'portal_records': 'portal_records_manage',
+    'portal_records_manage': 'portal_records_manage',
+    'portal_settings': 'portal_settings',
+    'portal_license': 'portal_license_lock',
+    'portal_license_lock': 'portal_license_lock',
+    'portal_timetable': 'portal_timetable',
+    'portal_attendance': 'portal_attendance_manage',
+    'portal_attendance_manage': 'portal_attendance_manage',
+    'portal_promotion': 'portal_promotion',
+    'portal_official_archive': 'portal_official_archive',
+}
+
+def safe_portal_redirect(request, default='portal_dashboard'):
+    target = request.POST.get('next') or request.GET.get('next') or ''
+    target = target.strip()
+    if target in ALLOWED_REDIRECT_ENDPOINTS:
+        return redirect(ALLOWED_REDIRECT_ENDPOINTS[target])
+    if target.startswith('/') and not target.startswith('//') and '\\' not in target and '://' not in target:
+        return redirect(target)
+    dest = ALLOWED_REDIRECT_ENDPOINTS.get(default, default)
+    return redirect(dest)
+
 def get_safe_next(request, fallback='portal_dashboard'):
     val = request.POST.get('next') or request.GET.get('next') or ''
     val = val.strip()
@@ -1055,7 +1088,7 @@ def portal_license_activate(request):
         else:
             messages.error(request, message)
 
-    return redirect(get_safe_next(request, fallback='portal_dashboard'))
+    return safe_portal_redirect(request, default='portal_dashboard')
 
 
 def owner_key_generator(request):
@@ -1529,7 +1562,7 @@ def promotion_view(request):
 
         if not from_year_id or not to_year_id:
             messages.error(request, "يرجى تحديد سنة الترحيل المنتهية والسنة الجديدة المستهدفة.")
-            return redirect(f"{request.path}?class_id={selected_class_id}")
+            return safe_portal_redirect(request, default='portal_promotion')
 
         from_yr = get_object_or_404(AcademicYear, pk=from_year_id)
         to_yr = get_object_or_404(AcademicYear, pk=to_year_id)
@@ -1616,7 +1649,7 @@ def promotion_view(request):
                         retained += 1
 
             messages.success(request, f"اكتمل ترحيل صف ({cls_obj.name}) للعام ({to_yr.name}): ترفيع {promoted}، بقاء رسوباً {retained}، تخرج {graduated}، والمكملين {re_exam}.")
-            return redirect(f"{request.path}?class_id={selected_class_id}&from_year={from_yr.id}&to_year={to_yr.id}")
+            return safe_portal_redirect(request, default='portal_promotion')
 
         elif action_type == 'manual_promote_class':
             student_ids = request.POST.getlist('student_ids')
@@ -1724,7 +1757,7 @@ def promotion_view(request):
                             graduated += 1
 
             messages.success(request, f"تم اعتماد وحفظ ترحيل صف ({cls_obj.name}) بنجاح: ترفيع {promoted}، بقاء {retained}، وتخرج {graduated} طالب.")
-            return redirect(f"{request.path}?class_id={selected_class_id}&from_year={from_yr.id}&to_year={to_yr.id}")
+            return safe_portal_redirect(request, default='portal_promotion')
 
     context = {
         'school': school,
@@ -2473,7 +2506,7 @@ def portal_timetable(request):
             school.daily_periods_count = max(1, min(10, p_count))
             school.save(update_fields=['daily_periods_count'])
             messages.success(request, "تم تحديث توقيتات وعدد الحصص الدراسية اليومية بنجاح.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_timetable')
 
         elif action_type == 'auto_generate_schedule':
             with transaction.atomic():
@@ -2483,7 +2516,7 @@ def portal_timetable(request):
 
                 if not all_teachers:
                     messages.error(request, "لا يوجد معلمون في النظام لتوزيع الحصص عليهم.")
-                    return redirect(request.get_full_path())
+                    return safe_portal_redirect(request, default='portal_timetable')
 
                 # ===== محرك الجدول الذكي المقيّد بالقيود =====
                 # busy_teachers: مفتاح التعارض عالمياً (معلم × يوم × حصة)
@@ -2603,7 +2636,7 @@ def portal_timetable(request):
                     assigned_count = len(slots_to_create)
 
             messages.success(request, f"تم بنجاح توليد الجدول المدرسي آلياً وتوزيع {assigned_count} حصة بشكل منضبط ومحكم بدون أي تضارب زمني.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_timetable')
 
 
         elif action_type == 'save_slot':
@@ -2641,13 +2674,13 @@ def portal_timetable(request):
                     }
                 )
                 messages.success(request, f"تم {'إسناد' if created else 'تحديث'} الحصة في الجدول بنجاح.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_timetable')
 
         elif action_type == 'delete_slot':
             slot_id = request.POST.get('slot_id')
             TimetableSlot.objects.filter(id=slot_id).delete()
             messages.success(request, "تم حذف الحصة بنجاح.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_timetable')
 
         elif action_type == 'add_substitution':
             slot_id = request.POST.get('slot_id')
@@ -2660,12 +2693,12 @@ def portal_timetable(request):
                 slot.notes = f"بديل: {sub_teacher.user.get_full_name()} ({reason})"
                 slot.save(update_fields=['teacher', 'notes'])
                 messages.success(request, f"تم بنجاح تكليف المعلم البديل ({sub_teacher.user.get_full_name()}) لشغل حصة الاحتياط.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_timetable')
 
         elif action_type == 'update_teacher_quota':
             req_p = request.POST.get('required_periods', 24)
             messages.success(request, f"تم اعتماد نصاب المعلم الأسبوعي ({req_p}) حصة بنجاح.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_timetable')
 
     COLOR_MAP = {
         'التربية الاسلامية': '#059669',
@@ -2932,7 +2965,7 @@ def portal_students_manage(request):
                     )
 
                 messages.success(request, f"تم تسجيل الطالب ({first_name} {last_name}) وربطه ببوابة ولي الأمر بنجاح.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_students_manage')
 
         elif action_type == 'import_excel':
             excel_file = request.FILES.get('excel_file')
@@ -2940,7 +2973,7 @@ def portal_students_manage(request):
 
             if not excel_file or not target_class_id:
                 messages.error(request, "يرجى اختيار ملف الإكسل وتحديد الصف المطلوب.")
-                return redirect(request.get_full_path())
+                return safe_portal_redirect(request, default='portal_students_manage')
 
             target_class = get_object_or_404(SchoolClass, pk=target_class_id)
             class_sections = list(target_class.sections.all().order_by('name'))
@@ -2979,7 +3012,7 @@ def portal_students_manage(request):
 
                 if not parsed_students:
                     messages.warning(request, "الملف فارغ أو لا يحتوي على بيانات مقروءة في العمود الأول.")
-                    return redirect(request.get_full_path())
+                    return safe_portal_redirect(request, default='portal_students_manage')
 
                 parsed_students.sort(key=lambda x: x['average'], reverse=True)
 
@@ -3039,7 +3072,7 @@ def portal_students_manage(request):
             except Exception as e:
                 messages.error(request, f"حدث خطأ أثناء معالجة ملف الإكسل: {str(e)}")
 
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_students_manage')
 
         elif action_type == 'soft_delete_student':
             student_id = request.POST.get('student_id')
@@ -3048,7 +3081,7 @@ def portal_students_manage(request):
             student.is_deleted = True
             student.save()
             messages.info(request, f"تم نقل الطالب ({student.full_name}) وحفظ قيده في الأرشيف.")
-            return redirect(request.get_full_path())
+            return safe_portal_redirect(request, default='portal_students_manage')
 
     from django.core.paginator import Paginator
     total_students = students_qs.count()
@@ -3240,7 +3273,7 @@ def portal_student_edit(request, student_id):
 
             messages.success(request, f"تم حفظ تعديل بيانات الطالب ({student.full_name}) بنجاح.")
 
-    return redirect(get_safe_next(request, fallback='portal_general_registry'))
+    return safe_portal_redirect(request, default='portal_general_registry')
 
 
 # باقي الدوال الإدارية
@@ -3376,7 +3409,7 @@ def portal_parent_edit(request, parent_id):
             parent.save()
             messages.success(request, f"تم تحديث بيانات ولي الأمر ({parent.user.first_name}) بنجاح.")
 
-    return redirect(get_safe_next(request, fallback='portal_parents_manage'))
+    return safe_portal_redirect(request, default='portal_parents_manage')
 
 
 def portal_attendance_manage(request):
@@ -3408,7 +3441,7 @@ def portal_attendance_manage(request):
                     defaults={'status': st_status, 'recorded_by': recorder}
                 )
         messages.success(request, f"تم حفظ وتثبيت سجل الحضور والغياب بنجاح.")
-        return redirect(f"{request.path}?school_class={selected_class_id}&section={selected_section_id}&date={selected_date}")
+        return safe_portal_redirect(request, default='portal_attendance_manage')
 
     context = {
         'school': school,
@@ -3480,20 +3513,27 @@ def portal_usb_backup_save(request):
     حفظ نسخة احتياطية مباشرة على فلاش ميموري (USB) أو مسار مخصص
     """
     if request.method == 'POST':
-        from .backup_vault import save_backup_to_usb
+        from .backup_vault import save_backup_to_usb, get_removable_drives
         usb_drive = request.POST.get('usb_drive', '').strip()
         custom_path = request.POST.get('custom_path', '').strip()
         target = usb_drive or custom_path
         if not target:
             messages.error(request, "يرجى اختيار محرك الفلاش ميموري أو كتابة مسار المجلد المطلوب.")
-            return redirect('portal_settings')
+            return safe_portal_redirect(request, default='portal_settings')
 
-        success, msg = save_backup_to_usb(target)
+        valid_paths = [d['path'] for d in get_removable_drives()]
+        safe_target = None
+        for vp in valid_paths:
+            if target.upper().startswith(vp.upper()):
+                safe_target = vp
+                break
+
+        success, msg = save_backup_to_usb(safe_target)
         if success:
             messages.success(request, msg)
         else:
             messages.error(request, msg)
-    return redirect('portal_settings')
+    return safe_portal_redirect(request, default='portal_settings')
 
 
 def portal_create_snapshot_now(request):
@@ -3726,7 +3766,7 @@ def portal_first_run_setup(request):
 
             messages.success(request, f"أهلاً بك في نظام مدرستي! تم إعداد بيانات ({school.school_name}) بنجاح.")
 
-    return redirect(get_safe_next(request, fallback='portal_dashboard'))
+    return safe_portal_redirect(request, default='portal_dashboard')
 
 
 # ======================================================================
