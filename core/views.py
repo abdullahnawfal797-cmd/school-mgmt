@@ -1044,10 +1044,10 @@ def portal_license_activate(request):
         else:
             messages.error(request, message)
 
-    redirect_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER')
-    if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts={request.get_host()}):
-        redirect_url = '/'  # التوجيه للرئيسية كمسار آمن افتراضي
-    return redirect(redirect_url)
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = 'portal_dashboard'
+    return redirect(next_url or 'portal_dashboard')
 
 
 def owner_key_generator(request):
@@ -3232,10 +3232,10 @@ def portal_student_edit(request, student_id):
 
             messages.success(request, f"تم حفظ تعديل بيانات الطالب ({student.full_name}) بنجاح.")
 
-    redirect_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER')
-    if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts={request.get_host()}):
-        redirect_url = '/'  # التوجيه للرئيسية كمسار آمن افتراضي
-    return redirect(redirect_url)
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = 'portal_general_registry'
+    return redirect(next_url or 'portal_general_registry')
 
 
 # باقي الدوال الإدارية
@@ -3371,10 +3371,10 @@ def portal_parent_edit(request, parent_id):
             parent.save()
             messages.success(request, f"تم تحديث بيانات ولي الأمر ({parent.user.first_name}) بنجاح.")
 
-    redirect_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER')
-    if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts={request.get_host()}):
-        redirect_url = '/'  # التوجيه للرئيسية كمسار آمن افتراضي
-    return redirect(redirect_url)
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = 'portal_parents_manage'
+    return redirect(next_url or 'portal_parents_manage')
 
 
 def portal_attendance_manage(request):
@@ -3631,42 +3631,30 @@ def apply_system_update_view(request):
     تحميل مثبت التحديث أو حزمة التعديلات في مجلد مؤقت دون مساس بقاعدة البيانات المحلية db.sqlite3
     """
     if request.method == 'POST':
-        download_url = (request.POST.get('download_url') or '').strip()
-        if not download_url:
+        target_url = (request.GET.get('url') or request.POST.get('url') or request.POST.get('download_url') or '').strip()
+        if not target_url:
             return JsonResponse({'success': False, 'error': 'رابط التحديث غير متوفر'})
 
         from urllib.parse import urlparse
-        import ipaddress
+        from django.core.exceptions import PermissionDenied
 
-        parsed = urlparse(download_url)
-        if parsed.scheme not in ('http', 'https') or parsed.hostname in ('localhost', '127.0.0.1', '0.0.0.0'):
-            return JsonResponse({'status': 'error', 'message': 'Disallowed host'}, status=400)
-
+        parsed = urlparse(target_url)
         allowed_hosts = {'github.com', 'api.github.com', 'raw.githubusercontent.com', 'objects.githubusercontent.com'}
-        if parsed.hostname not in allowed_hosts:
-            return JsonResponse({'status': 'error', 'message': 'Disallowed host'}, status=400)
+        if parsed.scheme not in ('https',) or parsed.netloc.lower() not in allowed_hosts:
+            raise PermissionDenied("Restricted external URL")
 
         try:
-            hostname = (parsed.hostname or '').lower()
-            try:
-                ip = ipaddress.ip_address(hostname)
-                if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
-                    return JsonResponse({'status': 'error', 'message': 'Disallowed host'}, status=400)
-            except ValueError:
-                pass
-
             import tempfile
             temp_dir = os.path.abspath(os.path.join(tempfile.gettempdir(), 'Madrasati_Updates'))
             os.makedirs(temp_dir, exist_ok=True)
-            raw_filename = download_url.split('?')[0].split('/')[-1] or 'Madrasati_Update.zip'
+            raw_filename = target_url.split('?')[0].split('/')[-1] or 'Madrasati_Update.zip'
             safe_filename = os.path.basename(raw_filename)
             target_path = safe_path_join(temp_dir, safe_filename)
 
-            # التحقق النهائي المباشر قبل استدعاء الطلب الشبكي
-            if parsed.hostname not in allowed_hosts:
-                return JsonResponse({'status': 'error', 'message': 'Disallowed host'}, status=400)
+            if parsed.scheme not in ('https',) or parsed.netloc.lower() not in allowed_hosts:
+                raise PermissionDenied("Restricted external URL")
 
-            req = urllib.request.Request(download_url, headers={'User-Agent': 'Madrasati-App-Updater'})
+            req = urllib.request.Request(target_url, headers={'User-Agent': 'Madrasati-App-Updater'})
             with urllib.request.urlopen(req, timeout=30) as resp, open(target_path, 'wb') as out_f:
                 shutil.copyfileobj(resp, out_f)
 
@@ -3753,10 +3741,10 @@ def portal_first_run_setup(request):
 
             messages.success(request, f"أهلاً بك في نظام مدرستي! تم إعداد بيانات ({school.school_name}) بنجاح.")
 
-    redirect_url = request.POST.get('next') or request.GET.get('next') or request.META.get('HTTP_REFERER')
-    if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts={request.get_host()}):
-        redirect_url = '/'  # التوجيه للرئيسية كمسار آمن افتراضي
-    return redirect(redirect_url)
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = 'portal_dashboard'
+    return redirect(next_url or 'portal_dashboard')
 
 
 # ======================================================================

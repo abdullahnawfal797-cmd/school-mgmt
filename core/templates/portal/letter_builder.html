@@ -614,7 +614,7 @@
             const docIssuedDate = sanitizeHtml(document.getElementById('in_doc_issued_date').value) || '(          )';
             const name = sanitizeHtml(document.getElementById('in_name').value) || '(                      )';
 
-            body.innerHTML = `كتابكم ذي العدد ( <u>${refNum}</u> ) في ( <u>${refDate}</u> )، نؤيد لكم صحة صدور الوثيقة ذات العدد ( <u>${docIssuedNum}</u> ) والمرقمة بالرقم ( <u>${docIssuedNum}</u> ) في ( <u>${docIssuedDate}</u> ) ${studentWord ? 'للطالب/ة' : 'للطالب'} ( <u>${name}</u> ) ${transferredWord} من مدرستنا إلى مدرستكم.`;
+            body.textContent = `كتابكم ذي العدد ( ${refNum} ) في ( ${refDate} )، نؤيد لكم صحة صدور الوثيقة ذات العدد ( ${docIssuedNum} ) والمرقمة بالرقم ( ${docIssuedNum} ) في ( ${docIssuedDate} ) ${studentWord ? 'للطالب/ة' : 'للطالب'} ( ${name} ) ${transferredWord} من مدرستنا إلى مدرستكم.`;
             closing.textContent = "للتفضل بالاطلاع مع فائق الشكر والتقدير.";
         } else if (t === 'teacher_commence') {
             const ord = sanitizeHtml(document.getElementById('in_admin_order').value) || '(          )';
@@ -624,14 +624,14 @@
             const day = sanitizeHtml(document.getElementById('in_commence_day').value) || '(          )';
             const cDate = sanitizeHtml(document.getElementById('in_commence_date').value) || '(          )';
 
-            body.innerHTML = `استناداً إلى الأمر الإداري المرقم ( <u>${ord}</u> ) في ( <u>${ordDate}</u> )، والمتضمن (أمر إداري)، ${commenceWord} ${mrWord} ( <u>${name}</u> ) العنوان الوظيفي ( <u>${job}</u> )، في مدرستنا يوم ( <u>${day}</u> ) الموافق ( <u>${cDate}</u> ).`;
+            body.textContent = `استناداً إلى الأمر الإداري المرقم ( ${ord} ) في ( ${ordDate} )، والمتضمن (أمر إداري)، ${commenceWord} ${mrWord} ( ${name} ) العنوان الوظيفي ( ${job} )، في مدرستنا يوم ( ${day} ) الموافق ( ${cDate} ).`;
         } else if (t === 'teacher_detach') {
             const ord = sanitizeHtml(document.getElementById('in_admin_order').value) || '(          )';
             const ordDate = sanitizeHtml(document.getElementById('in_admin_date').value) || '(          )';
             const name = sanitizeHtml(document.getElementById('in_name').value) || '(                      )';
             const dDate = sanitizeHtml(document.getElementById('in_detach_date').value) || '(          )';
 
-            body.innerHTML = `استناداً إلى الأمر الإداري المرقم ( <u>${ord}</u> ) في ( <u>${ordDate}</u> ) ${detachWord} ${mrWord} ( <u>${name}</u> ) في مدرستنا بتاريخ ( <u>${dDate}</u> ).`;
+            body.textContent = `استناداً إلى الأمر الإداري المرقم ( ${ord} ) في ( ${ordDate} ) ${detachWord} ${mrWord} ( ${name} ) في مدرستنا بتاريخ ( ${dDate} ).`;
         } else if (t === 'teacher_service') {
             const name = sanitizeHtml(document.getElementById('in_name').value) || '................................';
             const job = sanitizeHtml(document.getElementById('in_job_title').value) || '................';
