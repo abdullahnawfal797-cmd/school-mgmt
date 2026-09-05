@@ -3,23 +3,24 @@ FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# تحديث الحزم وسد الثغرات الأمنية مع تنظيف الكاش لتقليل الحجم
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# تحديث حزم النظام فوراً لتطبيق الترقيعات الأمنية لـ zlib و util-linux
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# إنشاء مستخدم غير جذري (Non-root user) لتشغيل التطبيق بأمان وفق معايير Snyk
-RUN groupadd -r appuser && useradd -r -g appuser -d /code -s /sbin/nologin appuser
+WORKDIR /app
 
-WORKDIR /code
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY requirements.txt /code/
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+COPY . .
 
-COPY . /code/
-RUN chown -R appuser:appuser /code
-
-# تشغيل التطبيق بمستخدم غير جذري
+# تشغيل التطبيق بحساب غير جذري
+RUN useradd -m appuser && chown -R appuser /app
 USER appuser
+
+EXPOSE 8000
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

@@ -20,7 +20,7 @@ services:
     build: .
     command: sh -c "python manage.py migrate && gunicorn school_mgmt.wsgi:application --bind 0.0.0.0:8000"
     volumes:
-      - .:/code
+      - .:/app
     ports:
       - "8000:8000"
     environment:
@@ -37,7 +37,7 @@ services:
     build: .
     command: celery -A school_mgmt worker -l info
     volumes:
-      - .:/code
+      - .:/app
     environment:
       - DATABASE_HOST=db
       - DATABASE_NAME=school_db
