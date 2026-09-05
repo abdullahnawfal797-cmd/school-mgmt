@@ -3624,11 +3624,35 @@ def apply_system_update_view(request):
     تحميل مثبت التحديث أو حزمة التعديلات في مجلد مؤقت دون مساس بقاعدة البيانات المحلية db.sqlite3
     """
     if request.method == 'POST':
-        download_url = request.POST.get('download_url')
+        download_url = (request.POST.get('download_url') or '').strip()
         if not download_url:
             return JsonResponse({'success': False, 'error': 'رابط التحديث غير متوفر'})
 
         try:
+            from urllib.parse import urlparse
+            import ipaddress
+
+            parsed = urlparse(download_url)
+            if parsed.scheme not in ('http', 'https') or parsed.hostname in ('localhost', '127.0.0.1', '0.0.0.0'):
+                raise ValueError("Invalid or restricted URL")
+
+            hostname = (parsed.hostname or '').lower()
+            if not hostname or hostname in ('localhost', '127.0.0.1', '0.0.0.0', '::1', '169.254.169.254'):
+                raise ValueError("Restricted hostname")
+
+            try:
+                ip = ipaddress.ip_address(hostname)
+                if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+                    raise ValueError("Restricted IP address")
+            except ValueError as ip_err:
+                if "Restricted" in str(ip_err):
+                    raise
+
+            allowed_hosts = ('github.com', 'api.github.com', 'objects.githubusercontent.com', 'raw.githubusercontent.com')
+            is_allowed_host = hostname in allowed_hosts or any(hostname.endswith('.' + h) for h in allowed_hosts)
+            if not is_allowed_host:
+                raise ValueError("URL domain is not in allowed update sources")
+
             import tempfile
             temp_dir = os.path.abspath(os.path.join(tempfile.gettempdir(), 'Madrasati_Updates'))
             os.makedirs(temp_dir, exist_ok=True)

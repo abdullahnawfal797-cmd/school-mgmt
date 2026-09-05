@@ -216,6 +216,16 @@
 </div>
 
 <script>
+    function sanitizeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function renderTemplateFields() {
         const t = document.getElementById('templateSelect').value;
         const container = document.getElementById('dynamicInputsContainer');
@@ -421,10 +431,10 @@
         const isFemale = document.getElementById('g_female').checked;
 
         // تحديث العدد والتاريخ
-        document.getElementById('out_doc_num').innerText = document.getElementById('in_doc_num').value || '---';
-        document.getElementById('out_date').innerText = (document.getElementById('in_date').value || '---') + " م";
-        document.getElementById('out_dest').innerText = "إلى / " + (document.getElementById('in_dest').value || '...');
-        document.getElementById('out_subject').innerText = "م / " + (document.getElementById('in_subject').value || '');
+        document.getElementById('out_doc_num').textContent = document.getElementById('in_doc_num').value || '---';
+        document.getElementById('out_date').textContent = (document.getElementById('in_date').value || '---') + " م";
+        document.getElementById('out_dest').textContent = "إلى / " + (document.getElementById('in_dest').value || '...');
+        document.getElementById('out_subject').textContent = "م / " + (document.getElementById('in_subject').value || '');
 
         const body = document.getElementById('mainLetterBody');
         const tblSec = document.getElementById('specialTablesSection');
@@ -435,7 +445,7 @@
         tblSec.classList.add('d-none');
         tblSec.innerHTML = '';
         ccContainer.classList.add('d-none');
-        closing.innerText = "للتفضل بالاطلاع واتخاذ ما يلزم ...";
+        closing.textContent = "للتفضل بالاطلاع واتخاذ ما يلزم ...";
 
         const studentWord = isFemale ? "الطالبة" : "الطالب";
         const mrWord = isFemale ? "السيدة" : "السيد";
@@ -446,20 +456,20 @@
 
         if (t === 'custom_blank') {
             const txt = document.getElementById('in_custom_text') ? document.getElementById('in_custom_text').value : '';
-            body.innerHTML = txt.replace(/\n/g, '<br>');
-            closing.innerText = document.getElementById('in_closing') ? document.getElementById('in_closing').value : "للتفضل بالاطلاع واتخاذ ما يلزم ...";
+            body.innerHTML = sanitizeHtml(txt).replace(/\n/g, '<br>');
+            closing.textContent = document.getElementById('in_closing') ? document.getElementById('in_closing').value : "للتفضل بالاطلاع واتخاذ ما يلزم ...";
             const ccVal = document.getElementById('in_cc') ? document.getElementById('in_cc').value : '';
             if (ccVal.trim()) {
                 ccContainer.classList.remove('d-none');
-                ccList.innerHTML = ccVal.split('\n').map(item => `<div>- ${item}</div>`).join('');
+                ccList.innerHTML = ccVal.split('\n').map(item => `<div>- ${sanitizeHtml(item)}</div>`).join('');
             }
         } else if (t.includes('grades')) {
-            const name = document.getElementById('in_name').value || '................................';
-            const cls = document.getElementById('in_class').value || '................';
-            const reg = document.getElementById('in_reg').value || '........';
-            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة المعنية';
-            const gradYear = document.getElementById('in_grad_year') ? document.getElementById('in_grad_year').value : '';
-            const gradRound = document.getElementById('in_grad_round') ? document.getElementById('in_grad_round').value : '';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '................................';
+            const cls = sanitizeHtml(document.getElementById('in_class').value) || '................';
+            const reg = sanitizeHtml(document.getElementById('in_reg').value) || '........';
+            const purp = sanitizeHtml(document.getElementById('in_purpose').value) || 'تقديمه إلى الجهة المعنية';
+            const gradYear = sanitizeHtml(document.getElementById('in_grad_year') ? document.getElementById('in_grad_year').value : '');
+            const gradRound = sanitizeHtml(document.getElementById('in_grad_round') ? document.getElementById('in_grad_round').value : '');
 
             if (t === 'student_grades_graduated') {
                 body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا برقم قيد (<strong>${reg}</strong>) كان أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، وقد <strong>تخرج بنجاح</strong> للعام الدراسي (<strong>${gradYear}</strong>) - (<strong>${gradRound}</strong>) وكانت درجاته كما مبين في الجدول أدناه، وزوّد بهذا التأييد بناءً على طلبه لغرض (<span>${purp}</span>).`;
@@ -475,7 +485,7 @@
 
             inputs.forEach(input => {
                 const val = parseFloat(input.value) || 0;
-                ths += `<th style="font-size: 11px;">${input.getAttribute('data-sub')}</th>`;
+                ths += `<th style="font-size: 11px;">${sanitizeHtml(input.getAttribute('data-sub'))}</th>`;
                 tds += `<td class="fw-bold font-monospace">${val}</td>`;
                 total += val;
                 count++;
@@ -495,25 +505,26 @@
             </div>
         `;
         } else if (t === 'student_graduated') {
-            const name = document.getElementById('in_name').value || '(                    )';
-            const cls = document.getElementById('in_class').value || '(          )';
-            const reg = document.getElementById('in_reg').value || '(        )';
-            const gradYear = document.getElementById('in_grad_year').value || '2025-2026';
-            const gradRound = document.getElementById('in_grad_round').value || 'الدور الأول';
-            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة المعنية';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '(                    )';
+            const cls = sanitizeHtml(document.getElementById('in_class').value) || '(          )';
+            const reg = sanitizeHtml(document.getElementById('in_reg').value) || '(        )';
+            const gradYear = sanitizeHtml(document.getElementById('in_grad_year').value) || '2025-2026';
+            const gradRound = sanitizeHtml(document.getElementById('in_grad_round').value) || 'الدور الأول';
+            const purp = sanitizeHtml(document.getElementById('in_purpose').value) || 'تقديمه إلى الجهة المعنية';
 
             body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا بالسجل العام برقم قيد (<strong>${reg}</strong>) كان أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، وقد <strong>تخرج وأكمل متطلبات الدراسة بنجاح</strong> خلال العام الدراسي (<strong>${gradYear}</strong>) - (<strong>${gradRound}</strong>)، وزُوّد بهذا التأييد بناءً على طلبه لغرض (<span>${purp}</span>) دون أن تتحمل المدرسة أي تبعة مالية أو قانونية.`;
         } else if (t === 'student_punish_transfer') {
-            const art = document.getElementById('in_law_art').value || '(    )';
-            const ord = document.getElementById('in_order_num').value || '(    )';
-            const name = document.getElementById('in_name').value || '(                    )';
-            const cls = document.getElementById('in_class').value || '(          )';
-            const target = document.getElementById('in_target_school').value || '(                    )';
-            const reason = document.getElementById('in_reason').value || 'لتجاوزه على إدارة المدرسة وأعضاء الهيئة التدريسية';
-            const center = document.getElementById('in_exam_center').value || 'المتوسطة';
-            const branch = document.getElementById('in_branch').value || 'العام';
+            const art = sanitizeHtml(document.getElementById('in_law_art').value) || '(    )';
+            const ord = sanitizeHtml(document.getElementById('in_order_num').value) || '(    )';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '(                    )';
+            const cls = sanitizeHtml(document.getElementById('in_class').value) || '(          )';
+            const target = sanitizeHtml(document.getElementById('in_target_school').value) || '(                    )';
+            const reason = sanitizeHtml(document.getElementById('in_reason').value) || 'لتجاوزه على إدارة المدرسة وأعضاء الهيئة التدريسية';
+            const center = sanitizeHtml(document.getElementById('in_exam_center').value) || 'المتوسطة';
+            const branch = sanitizeHtml(document.getElementById('in_branch').value) || 'العام';
+            const schoolName = sanitizeHtml(document.querySelector('.text-primary.fw-bold') ? document.querySelector('.text-primary.fw-bold').innerText : 'مدرستنا');
 
-            body.innerHTML = `استناداً إلى أحكام المادة <u>${art}</u> من نظام المدارس الثانوية لسنة 1977 <u>المعدل</u>، قرر مجلس المدرسين لمدرسة (<u>${document.querySelector('.text-primary.fw-bold') ? document.querySelector('.text-primary.fw-bold').innerText : 'مدرستنا'}</u>) بالأمر المدرسي <u>${ord}</u> نقل ${studentWord} (<u>${name}</u>) ${isFemale ? 'المقيدة' : 'المقيد'} في الصف <u>${cls}</u> إلى ثانوية <u>${target}</u> وذلك ${hisHerWord} على إدارة المدرسة وأعضاء الهيئة التدريسية.`;
+            body.innerHTML = `استناداً إلى أحكام المادة <u>${art}</u> من نظام المدارس الثانوية لسنة 1977 <u>المعدل</u>، قرر مجلس المدرسين لمدرسة (<u>${schoolName}</u>) بالأمر المدرسي <u>${ord}</u> نقل ${studentWord} (<u>${name}</u>) ${isFemale ? 'المقيدة' : 'المقيد'} في الصف <u>${cls}</u> إلى ثانوية <u>${target}</u> وذلك ${hisHerWord} على إدارة المدرسة وأعضاء الهيئة التدريسية.`;
 
             ccContainer.classList.remove('d-none');
             ccList.innerHTML = `
@@ -521,9 +532,9 @@
             <div>- مركز فحص الدراسة ( <u>${center}</u> ) - الفرع ( <u>${branch}</u> ) لاتخاذ ما يلزم مع التقدير...</div>
         `;
         } else if (t === 'student_no_objection') {
-            const name = document.getElementById('in_name').value || '(                     )';
-            const cls = document.getElementById('in_class').value || '(           )';
-            const yr = document.getElementById('in_year').value || '( 2026-2027 )';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '(                     )';
+            const cls = sanitizeHtml(document.getElementById('in_class').value) || '(           )';
+            const yr = sanitizeHtml(document.getElementById('in_year').value) || '( 2026-2027 )';
 
             body.innerHTML = `
             <div>لا مانع من قبول ${studentWord} ( <u>${name}</u> ) في الصف ( <u>${cls}</u> ) للعام الدراسي ( <u>${yr}</u> ) مع إرسال:</div>
@@ -534,15 +545,15 @@
                 4- تأييد بالدرجات.
             </div>
         `;
-            closing.innerText = "مع جزيل الشكر والتقدير...";
+            closing.textContent = "مع جزيل الشكر والتقدير...";
         } else if (t === 'student_fail_absence') {
-            const art = document.getElementById('in_law_num').value || '45';
-            const days = document.getElementById('in_limit_days').value || '25';
-            const mDate = document.getElementById('in_meeting_date').value || '---';
-            const stName = document.getElementById('in_fail_student_name').value || '---';
-            const stClass = document.getElementById('in_fail_class').value || '---';
-            const stSec = document.getElementById('in_fail_sec').value || '---';
-            const stReg = document.getElementById('in_fail_reg').value || '---';
+            const art = sanitizeHtml(document.getElementById('in_law_num').value) || '45';
+            const days = sanitizeHtml(document.getElementById('in_limit_days').value) || '25';
+            const mDate = sanitizeHtml(document.getElementById('in_meeting_date').value) || '---';
+            const stName = sanitizeHtml(document.getElementById('in_fail_student_name').value) || '---';
+            const stClass = sanitizeHtml(document.getElementById('in_fail_class').value) || '---';
+            const stSec = sanitizeHtml(document.getElementById('in_fail_sec').value) || '---';
+            const stReg = sanitizeHtml(document.getElementById('in_fail_reg').value) || '---';
 
             body.innerHTML = `استناداً إلى الفقرة (2) من المادة ( <u>${art}</u> ) من نظام المدارس الثانوية رقم (2) لسنة 1977 المعدل، وبالنظر لتجاوز غياب الطلبة المدرجة أسماؤهم أدناه الحد المقرر والبالغ ( <u>${days}</u> ) يوماً ودرس، فقد قرر مجلس المدرسين المنعقد بتاريخ أعلاه ( <u>${mDate}</u> ) اعتبارهم راسبين في صفوفهم للعام الدراسي، بسبب الغياب <u>المتواصل</u>.`;
 
@@ -595,57 +606,57 @@
                 </tbody>
             </table>
         `;
-            closing.innerText = "للعمل بموجبه مع التقدير...";
+            closing.textContent = "للعمل بموجبه مع التقدير...";
         } else if (t === 'validity_check') {
-            const refNum = document.getElementById('in_ref_num').value || '(          )';
-            const refDate = document.getElementById('in_ref_date').value || '(          )';
-            const docIssuedNum = document.getElementById('in_doc_issued_num').value || '(          )';
-            const docIssuedDate = document.getElementById('in_doc_issued_date').value || '(          )';
-            const name = document.getElementById('in_name').value || '(                      )';
+            const refNum = sanitizeHtml(document.getElementById('in_ref_num').value) || '(          )';
+            const refDate = sanitizeHtml(document.getElementById('in_ref_date').value) || '(          )';
+            const docIssuedNum = sanitizeHtml(document.getElementById('in_doc_issued_num').value) || '(          )';
+            const docIssuedDate = sanitizeHtml(document.getElementById('in_doc_issued_date').value) || '(          )';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '(                      )';
 
             body.innerHTML = `كتابكم ذي العدد ( <u>${refNum}</u> ) في ( <u>${refDate}</u> )، نؤيد لكم صحة صدور الوثيقة ذات العدد ( <u>${docIssuedNum}</u> ) والمرقمة بالرقم ( <u>${docIssuedNum}</u> ) في ( <u>${docIssuedDate}</u> ) ${studentWord ? 'للطالب/ة' : 'للطالب'} ( <u>${name}</u> ) ${transferredWord} من مدرستنا إلى مدرستكم.`;
-            closing.innerText = "للتفضل بالاطلاع مع فائق الشكر والتقدير.";
+            closing.textContent = "للتفضل بالاطلاع مع فائق الشكر والتقدير.";
         } else if (t === 'teacher_commence') {
-            const ord = document.getElementById('in_admin_order').value || '(          )';
-            const ordDate = document.getElementById('in_admin_date').value || '(          )';
-            const name = document.getElementById('in_name').value || '(                      )';
-            const job = document.getElementById('in_job_title').value || '(                )';
-            const day = document.getElementById('in_commence_day').value || '(          )';
-            const cDate = document.getElementById('in_commence_date').value || '(          )';
+            const ord = sanitizeHtml(document.getElementById('in_admin_order').value) || '(          )';
+            const ordDate = sanitizeHtml(document.getElementById('in_admin_date').value) || '(          )';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '(                      )';
+            const job = sanitizeHtml(document.getElementById('in_job_title').value) || '(                )';
+            const day = sanitizeHtml(document.getElementById('in_commence_day').value) || '(          )';
+            const cDate = sanitizeHtml(document.getElementById('in_commence_date').value) || '(          )';
 
             body.innerHTML = `استناداً إلى الأمر الإداري المرقم ( <u>${ord}</u> ) في ( <u>${ordDate}</u> )، والمتضمن (أمر إداري)، ${commenceWord} ${mrWord} ( <u>${name}</u> ) العنوان الوظيفي ( <u>${job}</u> )، في مدرستنا يوم ( <u>${day}</u> ) الموافق ( <u>${cDate}</u> ).`;
         } else if (t === 'teacher_detach') {
-            const ord = document.getElementById('in_admin_order').value || '(          )';
-            const ordDate = document.getElementById('in_admin_date').value || '(          )';
-            const name = document.getElementById('in_name').value || '(                      )';
-            const dDate = document.getElementById('in_detach_date').value || '(          )';
+            const ord = sanitizeHtml(document.getElementById('in_admin_order').value) || '(          )';
+            const ordDate = sanitizeHtml(document.getElementById('in_admin_date').value) || '(          )';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '(                      )';
+            const dDate = sanitizeHtml(document.getElementById('in_detach_date').value) || '(          )';
 
             body.innerHTML = `استناداً إلى الأمر الإداري المرقم ( <u>${ord}</u> ) في ( <u>${ordDate}</u> ) ${detachWord} ${mrWord} ( <u>${name}</u> ) في مدرستنا بتاريخ ( <u>${dDate}</u> ).`;
         } else if (t === 'teacher_service') {
-            const name = document.getElementById('in_name').value || '................................';
-            const job = document.getElementById('in_job_title').value || '................';
-            const reg = document.getElementById('in_reg').value || '........';
-            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الدائرة المعنية';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '................................';
+            const job = sanitizeHtml(document.getElementById('in_job_title').value) || '................';
+            const reg = sanitizeHtml(document.getElementById('in_reg').value) || '........';
+            const purp = sanitizeHtml(document.getElementById('in_purpose').value) || 'تقديمه إلى الدائرة المعنية';
 
             body.innerHTML = `نؤيد لكم بأن ${mrWord} (<strong>${name}</strong>) بعنوان وظيفي (<strong>${job}</strong>) والرقم الإحصائي (<strong>${reg}</strong>) هو أحد كوادر مدرستنا ومستمر بالخدمة الفعلية والدوام الرسمي لغاية تاريخ تحرير هذا الكتاب، وقد أعطي هذا التأييد بناءً على طلبه لغرض (<span>${purp}</span>).`;
         } else if (t === 'teacher_clearance') {
-            const name = document.getElementById('in_name').value || '................................';
-            const job = document.getElementById('in_job_title').value || '................';
-            const purp = document.getElementById('in_purpose').value || 'لأغراض النقل والانفكاك';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '................................';
+            const job = sanitizeHtml(document.getElementById('in_job_title').value) || '................';
+            const purp = sanitizeHtml(document.getElementById('in_purpose').value) || 'لأغراض النقل والانفكاك';
 
             body.innerHTML = `تشهد إدارة المدرسة ببراءة ذمة ${mrWord} (<strong>${name}</strong>) بعنوان وظيفي (<strong>${job}</strong>) من أي عهدة أو مستحقات مالية أو سجلات مدرسية أو مقتنيات عائدة للمدرسة حتى تاريخ انفكاكه الأصولي، وزوّد ببراءة الذمة هذه لغرض (<span>${purp}</span>).`;
         } else if (t === 'student_conduct') {
-            const name = document.getElementById('in_name').value || '................................';
-            const cls = document.getElementById('in_class').value || '................';
-            const reg = document.getElementById('in_reg').value || '........';
-            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة الطالبة';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '................................';
+            const cls = sanitizeHtml(document.getElementById('in_class').value) || '................';
+            const reg = sanitizeHtml(document.getElementById('in_reg').value) || '........';
+            const purp = sanitizeHtml(document.getElementById('in_purpose').value) || 'تقديمه إلى الجهة الطالبة';
 
             body.innerHTML = `تشهد إدارة المدرسة بأن ${studentWord} (<strong>${name}</strong>) المقيد لدينا برقم قيد (<strong>${reg}</strong>) في الصف (<strong>${cls}</strong>) كان طيلة فترة دراسته حسن السيرة والسلوك وملتزماً بالأنظمة والتعليمات التربوية ولم يصدر بحقه أي عقوبة انضباطية، وبناءً على طلبه زوّد بهذه الشهادة لغرض (<span>${purp}</span>).`;
         } else {
-            const name = document.getElementById('in_name').value || '................................';
-            const cls = document.getElementById('in_class').value || '................';
-            const reg = document.getElementById('in_reg').value || '........';
-            const purp = document.getElementById('in_purpose').value || 'تقديمه إلى الجهة المعنية';
+            const name = sanitizeHtml(document.getElementById('in_name').value) || '................................';
+            const cls = sanitizeHtml(document.getElementById('in_class').value) || '................';
+            const reg = sanitizeHtml(document.getElementById('in_reg').value) || '........';
+            const purp = sanitizeHtml(document.getElementById('in_purpose').value) || 'تقديمه إلى الجهة المعنية';
 
             body.innerHTML = `نؤيد لكم بأن ${studentWord} (<strong>${name}</strong>) ${isFemale ? 'المقيدة' : 'المقيد'} لدينا برقم قيد (<strong>${reg}</strong>) هي/هو أحد طلبة مدرستنا في الصف (<strong>${cls}</strong>)، ومستمر/ة بالدوام الرسمي للعام الدراسي الحالي حتى تاريخ تحرير هذا الكتاب، وقد زُوّد/ت بهذا التأييد بناءً على طلبها/طلبه لغرض (<span>${purp}</span>) دون أن تتحمل المدرسة أي تبعة مالية أو قانونية.`;
         }
