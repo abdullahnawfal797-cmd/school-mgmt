@@ -328,7 +328,7 @@
             <div class="row g-2 mb-2">
                 <div class="col-4"><label class="small fw-bold">المادة القانونية:</label><input type="text" id="in_law_num" class="form-control" value="45" oninput="updateLiveDoc()"></div>
                 <div class="col-4"><label class="small fw-bold">حد الغياب (يوم):</label><input type="text" id="in_limit_days" class="form-control" value="25" oninput="updateLiveDoc()"></div>
-                <div class="col-4"><label class="small fw-bold">تاريخ الاجتماع:</label><input type="text" id="in_meeting_date" class="form-control" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
+                <div class="col-4"><label class="small fw-bold">تاريخ الاجتماع:</label><input type="text" id="in_meeting_date" class="form-control" value="" oninput="updateLiveDoc()"></div>
             </div>
             <div class="p-2 rounded border mb-2" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
                 <input type="text" id="in_fail_student_name" class="form-control form-control-sm mb-1" placeholder="اسم الطالب الرباعي" value="أحمد حسن علي" oninput="updateLiveDoc()">
@@ -366,7 +366,7 @@
                 <div class="col-6"><label class="small fw-bold">العنوان الوظيفي:</label><input type="text" id="in_job_title" class="form-control" placeholder="مدرس / معلم جامعي" oninput="updateLiveDoc()"></div>
                 <div class="col-6"><label class="small fw-bold">يوم المباشرة:</label><input type="text" id="in_commence_day" class="form-control" placeholder="مثال: الأحد" oninput="updateLiveDoc()"></div>
             </div>
-            <div class="mb-2"><label class="small fw-bold">تاريخ المباشرة:</label><input type="text" id="in_commence_date" class="form-control font-monospace" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
+            <div class="mb-2"><label class="small fw-bold">تاريخ المباشرة:</label><input type="text" id="in_commence_date" class="form-control font-monospace" value="" oninput="updateLiveDoc()"></div>
         `;
         } else if (t === 'teacher_detach') {
             inSub.value = "انفكاك";
@@ -377,7 +377,7 @@
                 <div class="col-6"><label class="small fw-bold">تاريخ الأمر الإداري:</label><input type="text" id="in_admin_date" class="form-control" placeholder="تاريخ الأمر" oninput="updateLiveDoc()"></div>
             </div>
             <div class="mb-2"><label class="small fw-bold">اسم المنفك / المنفكة:</label><input type="text" id="in_name" class="form-control" placeholder="الاسم الرباعي واللقب" oninput="updateLiveDoc()"></div>
-            <div class="mb-2"><label class="small fw-bold">تاريخ الانفكاك:</label><input type="text" id="in_detach_date" class="form-control font-monospace" value="${document.getElementById('in_date').value}" oninput="updateLiveDoc()"></div>
+            <div class="mb-2"><label class="small fw-bold">تاريخ الانفكاك:</label><input type="text" id="in_detach_date" class="form-control font-monospace" value="" oninput="updateLiveDoc()"></div>
         `;
         } else if (t === 'teacher_service') {
             inSub.value = "تأييد خدمة واستمرار بالعمل";
@@ -422,7 +422,17 @@
         `;
         }
 
-        container.innerHTML = html;
+        const parser = new DOMParser();
+        const parsedDoc = parser.parseFromString(html, 'text/html');
+        container.textContent = '';
+        container.append(...parsedDoc.body.childNodes);
+
+        // تعيين التواريخ الافتراضية بأمان دون خلط نصوص DOM مع HTML
+        const curDate = (document.getElementById('in_date') && document.getElementById('in_date').value) || '';
+        if (document.getElementById('in_meeting_date')) document.getElementById('in_meeting_date').value = curDate;
+        if (document.getElementById('in_commence_date')) document.getElementById('in_commence_date').value = curDate;
+        if (document.getElementById('in_detach_date')) document.getElementById('in_detach_date').value = curDate;
+
         updateLiveDoc();
     }
 

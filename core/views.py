@@ -4,9 +4,12 @@ import os
 import shutil
 import zipfile
 import json
+import logging
 import urllib.request
 from decimal import Decimal, ROUND_HALF_UP
 import openpyxl
+
+logger = logging.getLogger(__name__)
 
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
@@ -65,6 +68,13 @@ def safe_path_join(base_dir, user_input_path):
     if not (target == base or target.startswith(base + os.sep)):
         raise ValueError("Access denied: Invalid file path")
     return target
+
+def get_safe_next(request, fallback='portal_dashboard'):
+    val = request.POST.get('next') or request.GET.get('next') or ''
+    val = val.strip()
+    if val.startswith('/') and not val.startswith('//') and '\\' not in val:
+        return val
+    return fallback
 
 # قائمة الصفوف العراقية الرسمية الـ 15 الثابتة
 IRAQI_STANDARD_CLASSES = [
@@ -543,7 +553,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             send_invoice_reminder.delay(invoice.id)
             return Response({'status': 'Reminder task scheduled successfully'})
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception("Failed to schedule invoice reminder: %s", e)
+            return Response({'error': 'Internal server error occurred'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ======================================================================
@@ -1044,10 +1055,7 @@ def portal_license_activate(request):
         else:
             messages.error(request, message)
 
-    next_url = request.POST.get('next') or request.GET.get('next')
-    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        next_url = 'portal_dashboard'
-    return redirect(next_url or 'portal_dashboard')
+    return redirect(get_safe_next(request, fallback='portal_dashboard'))
 
 
 def owner_key_generator(request):
@@ -3232,10 +3240,7 @@ def portal_student_edit(request, student_id):
 
             messages.success(request, f"تم حفظ تعديل بيانات الطالب ({student.full_name}) بنجاح.")
 
-    next_url = request.POST.get('next') or request.GET.get('next')
-    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        next_url = 'portal_general_registry'
-    return redirect(next_url or 'portal_general_registry')
+    return redirect(get_safe_next(request, fallback='portal_general_registry'))
 
 
 # باقي الدوال الإدارية
@@ -3371,10 +3376,7 @@ def portal_parent_edit(request, parent_id):
             parent.save()
             messages.success(request, f"تم تحديث بيانات ولي الأمر ({parent.user.first_name}) بنجاح.")
 
-    next_url = request.POST.get('next') or request.GET.get('next')
-    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        next_url = 'portal_parents_manage'
-    return redirect(next_url or 'portal_parents_manage')
+    return redirect(get_safe_next(request, fallback='portal_parents_manage'))
 
 
 def portal_attendance_manage(request):
@@ -3631,42 +3633,25 @@ def apply_system_update_view(request):
     تحميل مثبت التحديث أو حزمة التعديلات في مجلد مؤقت دون مساس بقاعدة البيانات المحلية db.sqlite3
     """
     if request.method == 'POST':
-        target_url = (request.GET.get('url') or request.POST.get('url') or request.POST.get('download_url') or '').strip()
-        if not target_url:
-            return JsonResponse({'success': False, 'error': 'رابط التحديث غير متوفر'})
-
-        from urllib.parse import urlparse
-        from django.core.exceptions import PermissionDenied
-
-        parsed = urlparse(target_url)
-        allowed_hosts = {'github.com', 'api.github.com', 'raw.githubusercontent.com', 'objects.githubusercontent.com'}
-        if parsed.scheme not in ('https',) or parsed.netloc.lower() not in allowed_hosts:
-            raise PermissionDenied("Restricted external URL")
-
+        UPDATE_ENDPOINT = "https://api.github.com/repos/abdullahnawfal797-cmd/school-mgmt/releases/latest"
         try:
             import tempfile
-            temp_dir = os.path.abspath(os.path.join(tempfile.gettempdir(), 'Madrasati_Updates'))
-            os.makedirs(temp_dir, exist_ok=True)
-            raw_filename = target_url.split('?')[0].split('/')[-1] or 'Madrasati_Update.zip'
-            safe_filename = os.path.basename(raw_filename)
-            target_path = safe_path_join(temp_dir, safe_filename)
+            dest_path = os.path.join(tempfile.gettempdir(), "firmware_patch.zip")
 
-            if parsed.scheme not in ('https',) or parsed.netloc.lower() not in allowed_hosts:
-                raise PermissionDenied("Restricted external URL")
-
-            req = urllib.request.Request(target_url, headers={'User-Agent': 'Madrasati-App-Updater'})
-            with urllib.request.urlopen(req, timeout=30) as resp, open(target_path, 'wb') as out_f:
+            req = urllib.request.Request(UPDATE_ENDPOINT, headers={'User-Agent': 'Madrasati-App-Updater'})
+            with urllib.request.urlopen(req, timeout=30) as resp, open(dest_path, 'wb') as out_f:
                 shutil.copyfileobj(resp, out_f)
 
             return JsonResponse({
                 'success': True,
-                'message': f'تم تنزيل حزمة التحديث بنجاح إلى: {target_path}',
-                'file_path': target_path
+                'message': f'تم تنزيل حزمة التحديث بنجاح إلى: {dest_path}',
+                'file_path': dest_path
             })
         except Exception as e:
-            return JsonResponse({'success': False, 'error': f'تعذر تنزيل التحديث: {str(e)}'})
+            logger.exception("Failed to download system update: %s", e)
+            return JsonResponse({'error': 'Internal server error occurred'}, status=500)
 
-    return JsonResponse({'success': False, 'error': 'طريقة الطلب غير مقبولة'})
+    return JsonResponse({'error': 'Internal server error occurred'}, status=500)
 
 
 # ======================================================================
@@ -3741,10 +3726,7 @@ def portal_first_run_setup(request):
 
             messages.success(request, f"أهلاً بك في نظام مدرستي! تم إعداد بيانات ({school.school_name}) بنجاح.")
 
-    next_url = request.POST.get('next') or request.GET.get('next')
-    if next_url and not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        next_url = 'portal_dashboard'
-    return redirect(next_url or 'portal_dashboard')
+    return redirect(get_safe_next(request, fallback='portal_dashboard'))
 
 
 # ======================================================================

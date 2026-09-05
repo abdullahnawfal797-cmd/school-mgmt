@@ -151,12 +151,16 @@ def get_removable_drives():
             pass
     return drives
 
+from django.core.exceptions import PermissionDenied
+
+
 def safe_join(base_dir, user_input_path):
     """التحقق الصارم من مسار الملف ومنع ثغرات Path Traversal والوصول غير المصرح"""
     base = os.path.abspath(str(base_dir))
-    target = os.path.abspath(os.path.join(base, str(user_input_path)))
+    filename = os.path.basename(str(user_input_path))
+    target = os.path.abspath(os.path.join(base, filename))
     if not (target == base or target.startswith(base + os.sep)):
-        raise ValueError("Access denied: Invalid file path")
+        raise PermissionDenied("Invalid backup path")
     return target
 
 def save_backup_to_usb(target_directory):
@@ -167,13 +171,18 @@ def save_backup_to_usb(target_directory):
         if not target_directory:
             return False, "لم يتم تحديد مسار الفلاش ميموري أو القرص الخارجي."
 
-        base_dir = os.path.abspath(target_directory.strip())
-        target_path = safe_join(base_dir, "Madrasati_Backups")
+        base_dir = os.path.abspath(str(target_directory).strip())
+        target_path = os.path.abspath(os.path.join(base_dir, "Madrasati_Backups"))
+        if not (target_path == base_dir or target_path.startswith(base_dir + os.sep)):
+            raise PermissionDenied("Invalid backup path")
         os.makedirs(target_path, exist_ok=True)
 
         timestamp = timezone.now().strftime("%Y_%m_%d_%H%M%S")
-        dest_filename = f"backup_madrasati_{timestamp}.db"
-        dest_file_path = safe_join(target_path, dest_filename)
+        raw_filename = f"backup_madrasati_{timestamp}.db"
+        filename = os.path.basename(str(raw_filename))
+        dest_file_path = os.path.abspath(os.path.join(target_path, filename))
+        if not dest_file_path.startswith(os.path.abspath(target_path) + os.sep):
+            raise PermissionDenied("Invalid backup path")
 
         db_path = str(settings.DATABASES['default']['NAME'])
         if not os.path.exists(db_path):
@@ -188,5 +197,8 @@ def save_backup_to_usb(target_directory):
 
         size_kb = round(os.path.getsize(dest_file_path) / 1024, 2)
         return True, f"تم بنجاح حفظ النسخة الاحتياطية على الفلاش ميموري: ({dest_file_path}) بحجم {size_kb} KB."
+    except PermissionDenied as pe:
+        return False, f"تم رفض الوصول: {str(pe)}"
     except Exception as e:
         return False, f"فشل الحفظ على الفلاش ميموري: {str(e)}"
+

@@ -77,14 +77,23 @@ def ar(text):
 
 
 def clean_html_tags(text):
-    """إزالة وسوم HTML من النصوص مع الحفاظ على الأسطر الجديدة"""
+    """إزالة وسوم HTML من النصوص مع الحفاظ على الأسطر الجديدة وتجنب التكرار الكارثي (ReDoS)"""
     if not text:
         return ''
     t = str(text)
-    t = re.sub(r'<br\s*/?>', '\n', t, flags=re.IGNORECASE)
-    t = re.sub(r'</p>', '\n', t, flags=re.IGNORECASE)
-    t = re.sub(r'<[^>]+>', '', t)
-    return t.strip()
+    t = t.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
+    t = t.replace('<BR>', '\n').replace('<BR/>', '\n').replace('<BR />', '\n')
+    t = t.replace('</p>', '\n').replace('</P>', '\n')
+    chars = []
+    inside_tag = False
+    for ch in t:
+        if ch == '<':
+            inside_tag = True
+        elif ch == '>':
+            inside_tag = False
+        elif not inside_tag:
+            chars.append(ch)
+    return ''.join(chars).strip()
 
 
 def wrap_arabic_lines(text, font_name, font_size, max_width):
