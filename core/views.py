@@ -95,32 +95,33 @@ ALLOWED_REDIRECT_ENDPOINTS = {
 def safe_portal_redirect(request, default='portal_dashboard'):
     target = (request.POST.get('next') or request.GET.get('next') or '').strip()
 
-    # فحص القائمة البيضاء للنقاط المعرفة
+    # فحص القائمة البيضاء لنقاط النهاية المعرفة
     if target in ALLOWED_REDIRECT_ENDPOINTS:
         return redirect(ALLOWED_REDIRECT_ENDPOINTS[target])
 
-    # فحص أمان الرابط وفق معايير Django الرسمية المعتمدة لدى CodeQL
-    if target and url_has_allowed_host_and_scheme(
-        url=target,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure()
-    ):
-        return redirect(target)
+    # التحقق الصارم من أن الرابط مسار نسبي داخلي محلي فقط
+    if target and target.startswith('/') and not target.startswith('//') and '\\' not in target and '://' not in target:
+        if url_has_allowed_host_and_scheme(
+            url=target,
+            allowed_hosts=None,
+            require_https=False
+        ):
+            return redirect(target)
 
-    dest = ALLOWED_REDIRECT_ENDPOINTS.get(default, default)
-    return redirect(dest)
+    return redirect(default)
 
 def get_safe_next(request, fallback='portal_dashboard'):
     target = (request.POST.get('next') or request.GET.get('next') or '').strip()
     if target in ALLOWED_REDIRECT_ENDPOINTS:
         return ALLOWED_REDIRECT_ENDPOINTS[target]
-    if target and url_has_allowed_host_and_scheme(
-        url=target,
-        allowed_hosts={request.get_host()},
-        require_https=request.is_secure()
-    ):
-        return target
-    return ALLOWED_REDIRECT_ENDPOINTS.get(fallback, fallback)
+    if target and target.startswith('/') and not target.startswith('//') and '\\' not in target and '://' not in target:
+        if url_has_allowed_host_and_scheme(
+            url=target,
+            allowed_hosts=None,
+            require_https=False
+        ):
+            return target
+    return fallback
 
 # قائمة الصفوف العراقية الرسمية الـ 15 الثابتة
 IRAQI_STANDARD_CLASSES = [
