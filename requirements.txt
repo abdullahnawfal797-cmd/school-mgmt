@@ -8,3 +8,4 @@ openpyxl>=3.1.5
 waitress>=3.0.2
 pyinstaller>=6.11.1
 pywebview>=5.3
+django-cors-headers
