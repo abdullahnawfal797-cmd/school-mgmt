@@ -30,9 +30,7 @@ except Exception:
     pass
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school_mgmt.settings')
-
-PORT = 8000
-URL = f"http://127.0.0.1:{PORT}/portal/"
+URL = "https://school-mgmt-l0gu.onrender.com/portal/"
 
 server_error_message = None
 
