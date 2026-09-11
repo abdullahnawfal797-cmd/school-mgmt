@@ -1,0 +1,6 @@
+{
+  "cloud_url": "",
+  "description": "ضع هنا رابط السيرفر السحابي بعد نشره (مثلاً: https://your-school-cloud.com أو https://your-app.onrender.com). عند وضع الرابط سيتصل برنامج سطح المكتب بالسحابة مباشرة دون تشغيل السيرفر المحلي.",
+  "enabled": true,
+  "fallback_to_local": true
+}
