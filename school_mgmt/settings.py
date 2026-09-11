@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import timedelta
-import dj_database_url
+from urllib.parse import urlparse
 
 # تحديد المسار التنفيذي الحقيقي للبرنامج في بيئة التطوير وبيئة التجميع PyInstaller
 if getattr(sys, 'frozen', False):
@@ -16,7 +16,6 @@ else:
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', os.getenv('SECRET_KEY', 'django-insecure-dev-only-secret-key-change-in-production'))
 
-# تفعيل وضع التطوير لطباعة تفاصيل أي خطأ صراحة
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
@@ -42,13 +41,11 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    # تم تعطيل فحص رخصة الويندوز الأوفلاين مؤقتاً لبيئة السحابة
     # 'core.middleware.LicenseEnforcementMiddleware',
 ]
 
 ROOT_URLCONF = 'school_mgmt.urls'
 
-# تجميع مسارات القوالب بدون تكرار
 TEMPLATE_DIRS = list(dict.fromkeys([
     BUNDLE_DIR / 'core' / 'templates',
     BUNDLE_DIR / 'templates',
@@ -75,7 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'school_mgmt.wsgi.application'
 
-# مسار التخزين للبيانات والوسائط
 LOCALAPPDATA = os.environ.get('LOCALAPPDATA')
 if LOCALAPPDATA:
     MADRASATI_DATA_DIR = Path(LOCALAPPDATA) / 'Madrasati' / 'data'
@@ -88,11 +84,20 @@ MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = MADRASATI_DATA_DIR / 'db.sqlite3'
 
-# الربط التلقائي بقاعدة بيانات Render (PostgreSQL) أو الاحتياطية (SQLite)
+# قراءة إعدادات PostgreSQL عبر مكتبة urllib القياسية دون الحاجة لتثبيت أي حزم خارجية
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
+    url = urlparse(database_url)
     DATABASES = {
-        'default': dj_database_url.parse(database_url, conn_max_age=600)
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': url.path[1:],
+            'USER': url.username,
+            'PASSWORD': url.password,
+            'HOST': url.hostname,
+            'PORT': url.port or 5432,
+            'CONN_MAX_AGE': 600,
+        }
     }
 else:
     DATABASES = {
@@ -126,7 +131,6 @@ STATICFILES_DIRS = list(dict.fromkeys([
     ] if d.exists() and d.is_dir()
 ]))
 
-# خدمة الملفات الثابتة عبر WhiteNoise بنمط متسامح لا يرمي خطأ 500
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 MEDIA_URL = '/media/'
@@ -151,7 +155,6 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# إعدادات Celery
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_ACCEPT_CONTENT = ['json']
