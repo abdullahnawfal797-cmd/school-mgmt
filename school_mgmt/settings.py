@@ -2,12 +2,11 @@ import os
 import sys
 from pathlib import Path
 from datetime import timedelta
+import dj_database_url
 
 # تحديد المسار التنفيذي الحقيقي للبرنامج في بيئة التطوير وبيئة التجميع PyInstaller
 if getattr(sys, 'frozen', False):
-    # مسار المجلد الحاوي للملف التنفيذي (.exe)
     EXE_DIR = Path(sys.executable).resolve().parent
-    # مسار الحزم والمكتبات المجمعة داخل _internal أو _MEIPASS
     BUNDLE_DIR = Path(getattr(sys, '_MEIPASS', EXE_DIR / '_internal'))
     BASE_DIR = EXE_DIR
 else:
@@ -15,9 +14,12 @@ else:
     BUNDLE_DIR = BASE_DIR
     EXE_DIR = BASE_DIR
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dev-only-secret-key-change-in-production')
-DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() not in ('false', '0', 'no')
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '::1', '*']
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', os.getenv('SECRET_KEY', 'django-insecure-dev-only-secret-key-change-in-production'))
+
+# تفعيل وضع التطوير لطباعة تفاصيل أي خطأ صراحة
+DEBUG = True
+
+ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -40,7 +42,8 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'core.middleware.LicenseEnforcementMiddleware',
+    # تم تعطيل فحص رخصة الويندوز الأوفلاين مؤقتاً لبيئة السحابة
+    # 'core.middleware.LicenseEnforcementMiddleware',
 ]
 
 ROOT_URLCONF = 'school_mgmt.urls'
@@ -72,7 +75,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'school_mgmt.wsgi.application'
 
-# مسار التخزين الدائم المعتمد لمنع فقدان البيانات نهائياً (Data Persistence)
+# مسار التخزين للبيانات والوسائط
 LOCALAPPDATA = os.environ.get('LOCALAPPDATA')
 if LOCALAPPDATA:
     MADRASATI_DATA_DIR = Path(LOCALAPPDATA) / 'Madrasati' / 'data'
@@ -83,28 +86,23 @@ MADRASATI_DATA_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_DIR = MADRASATI_DATA_DIR / 'media'
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
 
-# قاعدة البيانات الدائمة
 DB_PATH = MADRASATI_DATA_DIR / 'db.sqlite3'
 
-# هجرة البيانات التلقائية عند أول تشغيل من مجلد المشروع إلى المسار الدائم لضمان عدم فقدان أي بيانات
-SOURCE_DB = BASE_DIR / 'db.sqlite3'
-if not DB_PATH.exists() and SOURCE_DB.exists():
-    import shutil
-    try:
-        shutil.copy2(SOURCE_DB, DB_PATH)
-    except Exception:
-        pass
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': DB_PATH,
-        'OPTIONS': {
-            'timeout': 20,
-        },
-        'ATOMIC_REQUESTS': True,
+# الربط التلقائي بقاعدة بيانات Render (PostgreSQL) أو الاحتياطية (SQLite)
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    DATABASES = {
+        'default': dj_database_url.parse(database_url, conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': DB_PATH,
+            'OPTIONS': {'timeout': 20},
+            'ATOMIC_REQUESTS': True,
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -128,6 +126,9 @@ STATICFILES_DIRS = list(dict.fromkeys([
     ] if d.exists() and d.is_dir()
 ]))
 
+# خدمة الملفات الثابتة عبر WhiteNoise بنمط متسامح لا يرمي خطأ 500
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = MEDIA_DIR
 
@@ -150,7 +151,7 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# Celery أوفلاين فوري للمنظومة المكتبية
+# إعدادات Celery
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_ACCEPT_CONTENT = ['json']
@@ -161,6 +162,8 @@ CELERY_TIMEZONE = TIME_ZONE
 AUTH_USER_MODEL = 'core.User'
 
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = ['https://school-mgmt-l0gu.onrender.com']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+CSRF_TRUSTED_ORIGINS = [
+    'https://school-mgmt-l0gu.onrender.com',
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+]
