@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import Sum, Count, Q
 
 from core.models import (
@@ -1082,6 +1083,7 @@ def generate_activation_code_view(request):
 
 @csrf_exempt
 @require_mobile_auth(allowed_roles=[UserRole.PARENT])
+@transaction.atomic
 def submit_activation_code_view(request):
     """
     تطبيق ولي الأمر: إدخال كود التفعيل
@@ -1099,12 +1101,23 @@ def submit_activation_code_view(request):
         if not code:
             return JsonResponse({'error': 'يرجى إدخال كود التفعيل المستلم من المدرسة'}, status=400)
 
-        activation = StudentActivation.objects.filter(activation_code=code).first()
+        activation = StudentActivation.objects.select_for_update().filter(activation_code=code).first()
         if not activation:
             return JsonResponse({'error': 'كود التفعيل غير صحيح أو لم يصدر من المنظومة'}, status=404)
 
         if activation.status == SubscriptionStatus.ACTIVE or activation.is_used:
             return JsonResponse({'error': 'هذا الكود تم استخدامه وتفعيله مسبقاً ولا يمكن استخدامه مرة أخرى'}, status=400)
+
+        parent_profile = request.user_profile
+        if activation.status == SubscriptionStatus.PENDING and activation.parent_id is not None:
+            if activation.parent_id == parent_profile.id:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'تم تقديم طلب التفعيل مسبقاً، وهو بانتظار اعتماد وموافقة المالك.'
+                })
+            return JsonResponse({
+                'error': 'هذا الكود مرتبط بطلب تفعيل آخر وهو بانتظار الموافقة'
+            }, status=400)
 
         if activation.academic_year:
             if activation.academic_year.is_archived:
@@ -1116,7 +1129,6 @@ def submit_activation_code_view(request):
         if sch and activation.academic_year and not sch.is_year_subscription_active(activation.academic_year):
             return JsonResponse({'error': f'اشتراك المدرسة للعام ({activation.academic_year.name}) غير مفعل حالياً. يرجى مراجعة إدارة المدرسة.'}, status=403)
 
-        parent_profile = request.user_profile
         activation.parent = parent_profile
         activation.status = SubscriptionStatus.PENDING
         activation.requested_at = timezone.now()
@@ -2668,4 +2680,3 @@ def homework_view(request):
         'date': h.created_at.strftime('%Y-%m-%d') if h.created_at else ''
     } for h in hws]
     return JsonResponse({'status': 'success', 'homeworks': data})
-
