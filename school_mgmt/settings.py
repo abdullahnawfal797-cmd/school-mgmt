@@ -14,11 +14,36 @@ else:
     BUNDLE_DIR = BASE_DIR
     EXE_DIR = BASE_DIR
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', os.getenv('SECRET_KEY', 'django-insecure-dev-only-secret-key-change-in-production'))
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
-DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+def _env_list(name, default):
+    value = os.getenv(name)
+    if value is None:
+        return list(default)
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+DEBUG = _env_bool('DEBUG', default=False)
+
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY') or os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-local-development-only'
+    else:
+        raise SystemExit(
+            'DJANGO_SECRET_KEY or SECRET_KEY must be set when DEBUG is False.'
+        )
+
+ALLOWED_HOSTS = _env_list('DJANGO_ALLOWED_HOSTS', [
+    'school-mgmt-l0gu.onrender.com',
+    'localhost',
+    '127.0.0.1',
+])
 
 INSTALLED_APPS = [
     'mobile_api',
@@ -167,8 +192,8 @@ CELERY_TIMEZONE = TIME_ZONE
 AUTH_USER_MODEL = 'core.User'
 
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = _env_list('DJANGO_CSRF_TRUSTED_ORIGINS', [
     'https://school-mgmt-l0gu.onrender.com',
     'http://127.0.0.1:8000',
     'http://localhost:8000',
-]
+])
