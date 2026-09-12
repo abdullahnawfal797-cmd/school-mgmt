@@ -21,6 +21,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'mobile_api',
     'simple_history',
     'django.contrib.admin',
     'django.contrib.auth',
