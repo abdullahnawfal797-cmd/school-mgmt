@@ -1,4 +1,13 @@
+import os
+
 from django.apps import AppConfig
+
+
+def desktop_cloud_sync_enabled():
+    """Return True only when desktop startup backup/sync is explicitly enabled."""
+    value = os.environ.get('ENABLE_DESKTOP_CLOUD_SYNC', '')
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
 
 class CoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -6,6 +15,11 @@ class CoreConfig(AppConfig):
 
     def ready(self):
         import sys
+
+        # Server-safe default: desktop backup/sync must be explicitly enabled.
+        if not desktop_cloud_sync_enabled():
+            return
+
         # Avoid running in management commands like migrate, makemigrations, check
         if any(cmd in sys.argv for cmd in ['makemigrations', 'migrate', 'check', 'test', 'shell']):
             return
