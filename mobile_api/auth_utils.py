@@ -59,7 +59,7 @@ def verify_token(token, max_age_seconds=86400 * 30):  # صالح لـ 30 يوم�
     try:
         raw_payload = signer.unsign(token, max_age=max_age_seconds)
         data = json.loads(base64.urlsafe_b64decode(raw_payload.encode()).decode())
-        
+
         # فحص معرف jti في البلاك ليست
         jti = data.get('jti')
         if jti and RevokedToken.objects.filter(token_jti=jti).exists():

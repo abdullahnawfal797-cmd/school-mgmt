@@ -232,4 +232,3 @@ class RevokedToken(models.Model):
 
     def __str__(self):
         return f"RevokedToken: {self.token_jti[:12]}... at {self.revoked_at}"
-

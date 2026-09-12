@@ -378,7 +378,7 @@ def owner_school_details_view(request, school_id):
     school = get_object_or_404(SchoolSettings, pk=school_id)
     year_id = request.GET.get('year_id') or request.GET.get('year')
     current_year = AcademicYear.objects.filter(is_current=True).first()
-    
+
     if year_id:
         if str(year_id).isdigit():
             target_year = AcademicYear.objects.filter(id=int(year_id)).first()
@@ -443,7 +443,7 @@ def owner_school_yearly_statement_view(request, school_id):
     school = get_object_or_404(SchoolSettings, pk=school_id)
     year_id = request.GET.get('year_id') or request.GET.get('year')
     current_year = AcademicYear.objects.filter(is_current=True).first()
-    
+
     if year_id:
         if str(year_id).isdigit():
             target_year = AcademicYear.objects.filter(id=int(year_id)).first()

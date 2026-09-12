@@ -22,7 +22,7 @@ urlpatterns = [
     path('owner/schools/<int:school_id>/payments/add/', views.owner_add_payment_view, name='owner_add_payment'),
     path('owner/schools/<int:school_id>/adjustments/add/', views.owner_add_adjustment_view, name='owner_add_adjustment'),
     path('owner/schools/<int:school_id>/managers/create/', views.owner_create_manager_view, name='owner_create_manager'),
-    
+
     # إدارة تفعيل أولياء الأمور من المالك
     path('owner/activations/pending/', views.owner_pending_activations_view, name='owner_pending_activations'),
     path('owner/activations/<int:activation_id>/decide/', views.owner_decide_activation_view, name='owner_decide_activation'),

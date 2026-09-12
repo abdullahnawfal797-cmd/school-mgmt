@@ -13,13 +13,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         year = options['year']
         count = options['count']
-        
+
         generated = []
         for i in range(1, count + 1):
             raw_code = f'MDR-{secrets.token_hex(3).upper()}'
             student_name = f'طالب تجريبي {i}'
             classroom = f'الصف {((i-1)%6)+1}'
-            
+
             act, created = StudentActivation.objects.get_or_create(
                 student_name=student_name,
                 academic_year=year,
