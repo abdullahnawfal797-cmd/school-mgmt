@@ -35,6 +35,12 @@ urlpatterns = [
     path('owner/support/tickets/<int:ticket_id>/reply/', views.owner_support_ticket_reply_view, name='owner_support_ticket_reply'),
     path('owner/support/tickets/<int:ticket_id>/update/', views.owner_support_ticket_update_view, name='owner_support_ticket_update'),
 
+    # مركز دعم مدير المدرسة، مع عزل التذاكر حسب مدرسة الحساب
+    path('manager/support/tickets/create/', views.manager_support_ticket_create_view, name='manager_support_ticket_create'),
+    path('manager/support/tickets/', views.manager_support_tickets_view, name='manager_support_tickets'),
+    path('manager/support/tickets/<int:ticket_id>/', views.manager_support_ticket_detail_view, name='manager_support_ticket_detail'),
+    path('manager/support/tickets/<int:ticket_id>/reply/', views.manager_support_ticket_reply_view, name='manager_support_ticket_reply'),
+
     # 3. توليد كود التفعيل من سطح المكتب
     path('activations/generate/', views.generate_activation_code_view, name='generate_activation_code'),
 

@@ -151,6 +151,138 @@ def _ticket_item(ticket, messages=False):
     return item
 
 
+def _audit_support(user, action, ticket, details):
+    AuditTrailLog.objects.create(
+        user=user,
+        action=action,
+        entity_name='SupportTicket',
+        entity_id=str(ticket.id),
+        details=json.dumps(details, ensure_ascii=False),
+    )
+
+
+def _manager_ticket(request, ticket_id, messages=False):
+    if not request.school_id:
+        return None, JsonResponse({'error': 'حساب المدير غير مرتبط بمدرسة'}, status=403)
+    queryset = SupportTicket.objects.select_related(
+        'school', 'created_by', 'created_by__mobile_profile'
+    )
+    if messages:
+        queryset = queryset.prefetch_related('messages__sender', 'messages__sender__mobile_profile')
+    try:
+        ticket = queryset.get(pk=ticket_id)
+    except SupportTicket.DoesNotExist:
+        return None, JsonResponse({'error': 'التذكرة غير موجودة'}, status=404)
+    if ticket.school_id != request.school_id:
+        return None, JsonResponse({'error': 'غير مصرح لك بالوصول إلى تذكرة مدرسة أخرى'}, status=403)
+    return ticket, None
+
+
+@csrf_exempt
+@require_mobile_auth(allowed_roles=[UserRole.MANAGER])
+def manager_support_ticket_create_view(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    if not request.school_id:
+        return JsonResponse({'error': 'حساب المدير غير مرتبط بمدرسة'}, status=403)
+    data, error = _json_body(request)
+    if error:
+        return error
+    allowed = {'subject', 'description', 'category', 'priority'}
+    if not isinstance(data, dict) or any(key not in allowed for key in data):
+        return JsonResponse({'error': 'الحقول المسموحة هي subject وdescription وcategory وpriority فقط'}, status=400)
+    subject = str(data.get('subject', '')).strip()
+    description = str(data.get('description', '')).strip()
+    category = str(data.get('category', 'GENERAL')).strip()
+    priority = str(data.get('priority', 'MEDIUM')).strip().upper()
+    if not subject or len(subject) > 200:
+        return JsonResponse({'error': 'الموضوع مطلوب وبحد أقصى 200 حرف'}, status=400)
+    if not description or len(description) > 5000:
+        return JsonResponse({'error': 'وصف المشكلة مطلوب وبحد أقصى 5000 حرف'}, status=400)
+    if not category or len(category) > 50:
+        return JsonResponse({'error': 'التصنيف مطلوب وبحد أقصى 50 حرفًا'}, status=400)
+    if priority not in dict(SupportTicket.PRIORITY_CHOICES):
+        return JsonResponse({'error': 'أولوية التذكرة غير صالحة'}, status=400)
+    ticket = SupportTicket.objects.create(
+        school=request.user_profile.school,
+        created_by=request.user,
+        subject=subject,
+        description=description,
+        category=category,
+        priority=priority,
+    )
+    _audit_support(request.user, 'MANAGER_SUPPORT_TICKET_CREATED', ticket, {
+        'school_id': ticket.school_id,
+        'category': ticket.category,
+        'priority': ticket.priority,
+    })
+    return JsonResponse({'status': 'success', 'ticket': _ticket_item(ticket)}, status=201)
+
+
+@csrf_exempt
+@require_mobile_auth(allowed_roles=[UserRole.MANAGER])
+def manager_support_tickets_view(request):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET required'}, status=405)
+    if not request.school_id:
+        return JsonResponse({'error': 'حساب المدير غير مرتبط بمدرسة'}, status=403)
+    qs = SupportTicket.objects.select_related(
+        'school', 'created_by', 'created_by__mobile_profile'
+    ).filter(school_id=request.school_id).order_by('-updated_at', '-id')
+    for field in ('status', 'priority', 'category'):
+        if request.GET.get(field):
+            qs = qs.filter(**{field: request.GET[field]})
+    search = request.GET.get('search', '').strip()[:200]
+    if search:
+        qs = qs.filter(Q(subject__icontains=search) | Q(description__icontains=search))
+    page, page_size = _page_params(request)
+    page_obj = _get_page(qs, page, page_size)
+    return _pagination(page_obj, page_size, 'tickets', [_ticket_item(row) for row in page_obj.object_list])
+
+
+@csrf_exempt
+@require_mobile_auth(allowed_roles=[UserRole.MANAGER])
+def manager_support_ticket_detail_view(request, ticket_id):
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET required'}, status=405)
+    ticket, error = _manager_ticket(request, ticket_id, messages=True)
+    if error:
+        return error
+    return JsonResponse({'status': 'success', 'ticket': _ticket_item(ticket, True)})
+
+
+@csrf_exempt
+@require_mobile_auth(allowed_roles=[UserRole.MANAGER])
+def manager_support_ticket_reply_view(request, ticket_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    ticket, error = _manager_ticket(request, ticket_id)
+    if error:
+        return error
+    data, error = _json_body(request)
+    if error:
+        return error
+    if not isinstance(data, dict) or set(data) != {'message'}:
+        return JsonResponse({'error': 'الحقل المسموح هو message فقط'}, status=400)
+    message = str(data.get('message', '')).strip()
+    if not message or len(message) > 5000:
+        return JsonResponse({'error': 'نص الرد مطلوب وبحد أقصى 5000 حرف'}, status=400)
+    row = SupportTicketMessage.objects.create(
+        ticket=ticket, sender=request.user, message=message, is_internal_note=False
+    )
+    ticket.save(update_fields=['updated_at'])
+    _audit_support(request.user, 'MANAGER_SUPPORT_TICKET_REPLIED', ticket, {
+        'school_id': ticket.school_id,
+        'message_id': row.id,
+    })
+    return JsonResponse({'status': 'success', 'message': 'تمت إضافة الرد', 'reply': {
+        'id': row.id,
+        'message': _safe_text(row.message),
+        'created_at': row.created_at.isoformat(),
+        'is_internal_note': False,
+    }})
+
+
 @csrf_exempt
 @require_mobile_auth(allowed_roles=[UserRole.OWNER])
 def owner_support_tickets_view(request):
@@ -195,6 +327,11 @@ def owner_support_ticket_reply_view(request, ticket_id):
     if not message or len(message) > 5000: return JsonResponse({'error': 'نص الرد مطلوب وبحد أقصى 5000 حرف'}, status=400)
     row = SupportTicketMessage.objects.create(ticket=ticket, sender=request.user, message=message, is_internal_note=bool(data.get('is_internal_note', False)))
     ticket.save(update_fields=['updated_at'])
+    _audit_support(request.user, 'OWNER_SUPPORT_TICKET_REPLIED', ticket, {
+        'school_id': ticket.school_id,
+        'message_id': row.id,
+        'is_internal_note': row.is_internal_note,
+    })
     return JsonResponse({'status': 'success', 'message': 'تمت إضافة الرد', 'reply': {'id': row.id, 'message': _safe_text(row.message), 'created_at': row.created_at.isoformat(), 'is_internal_note': row.is_internal_note}})
 
 
@@ -211,8 +348,16 @@ def owner_support_ticket_update_view(request, ticket_id):
     if 'status' in data and data['status'] not in dict(SupportTicket.STATUS_CHOICES): return JsonResponse({'error': 'حالة التذكرة غير صالحة'}, status=400)
     if 'priority' in data and data['priority'] not in dict(SupportTicket.PRIORITY_CHOICES): return JsonResponse({'error': 'أولوية التذكرة غير صالحة'}, status=400)
     if 'category' in data and (not str(data['category']).strip() or len(str(data['category'])) > 50): return JsonResponse({'error': 'تصنيف التذكرة غير صالح'}, status=400)
-    previous = ticket.status
+    previous = {'status': ticket.status, 'priority': ticket.priority, 'category': ticket.category}
     for field in allowed.intersection(data): setattr(ticket, field, str(data[field]).strip().upper() if field in {'status', 'priority'} else str(data[field]).strip())
-    ticket.closed_at = timezone.now() if ticket.status == 'CLOSED' and previous != 'CLOSED' else (None if ticket.status != 'CLOSED' else ticket.closed_at)
+    ticket.closed_at = timezone.now() if ticket.status == 'CLOSED' and previous['status'] != 'CLOSED' else (None if ticket.status != 'CLOSED' else ticket.closed_at)
     ticket.save()
+    changed = {
+        field: {'from': previous[field], 'to': getattr(ticket, field)}
+        for field in allowed if previous[field] != getattr(ticket, field)
+    }
+    _audit_support(request.user, 'OWNER_SUPPORT_TICKET_UPDATED', ticket, {
+        'school_id': ticket.school_id,
+        'changed': changed,
+    })
     return JsonResponse({'status': 'success', 'message': 'تم تحديث التذكرة', 'ticket': _ticket_item(ticket)})
