@@ -27,6 +27,14 @@ urlpatterns = [
     path('owner/activations/pending/', views.owner_pending_activations_view, name='owner_pending_activations'),
     path('owner/activations/<int:activation_id>/decide/', views.owner_decide_activation_view, name='owner_decide_activation'),
 
+    # مركز عمليات المالك: الدعم والتدقيق والأمان
+    path('owner/audit-logs/', views.owner_audit_logs_view, name='owner_audit_logs'),
+    path('owner/security-events/', views.owner_security_events_view, name='owner_security_events'),
+    path('owner/support/tickets/', views.owner_support_tickets_view, name='owner_support_tickets'),
+    path('owner/support/tickets/<int:ticket_id>/', views.owner_support_ticket_detail_view, name='owner_support_ticket_detail'),
+    path('owner/support/tickets/<int:ticket_id>/reply/', views.owner_support_ticket_reply_view, name='owner_support_ticket_reply'),
+    path('owner/support/tickets/<int:ticket_id>/update/', views.owner_support_ticket_update_view, name='owner_support_ticket_update'),
+
     # 3. توليد كود التفعيل من سطح المكتب
     path('activations/generate/', views.generate_activation_code_view, name='generate_activation_code'),
 

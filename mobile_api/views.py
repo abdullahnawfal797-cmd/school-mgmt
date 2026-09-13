@@ -26,6 +26,11 @@ from .auth_utils import (
     require_mobile_auth, verify_school_access,
     verify_parent_student_access
 )
+from .owner_operations_views import (
+    owner_audit_logs_view, owner_security_events_view,
+    owner_support_tickets_view, owner_support_ticket_detail_view,
+    owner_support_ticket_reply_view, owner_support_ticket_update_view,
+)
 
 User = get_user_model()
 

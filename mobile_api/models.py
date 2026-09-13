@@ -220,6 +220,45 @@ class AuditTrailLog(models.Model):
         verbose_name_plural = 'سجل تدقيق العمليات'
 
 
+class SupportTicket(models.Model):
+    PRIORITY_CHOICES = (('LOW', 'منخفضة'), ('MEDIUM', 'متوسطة'), ('HIGH', 'عالية'), ('URGENT', 'عاجلة'))
+    STATUS_CHOICES = (('OPEN', 'مفتوحة'), ('IN_PROGRESS', 'قيد المعالجة'), ('RESOLVED', 'تم الحل'), ('CLOSED', 'مغلقة'))
+    school = models.ForeignKey('core.SchoolSettings', on_delete=models.SET_NULL, null=True, blank=True, related_name='support_tickets', verbose_name='المدرسة')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_support_tickets', verbose_name='منشئ التذكرة')
+    category = models.CharField(max_length=50, default='GENERAL', db_index=True, verbose_name='التصنيف')
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='MEDIUM', db_index=True, verbose_name='الأولوية')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='OPEN', db_index=True, verbose_name='الحالة')
+    subject = models.CharField(max_length=200, verbose_name='الموضوع')
+    description = models.TextField(verbose_name='وصف المشكلة')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-id']
+        verbose_name = 'تذكرة دعم مركزية'
+        verbose_name_plural = 'تذاكر الدعم المركزية'
+
+    def __str__(self):
+        return f'#{self.pk} {self.subject}'
+
+
+class SupportTicketMessage(models.Model):
+    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name='messages', verbose_name='التذكرة')
+    sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_ticket_messages', verbose_name='المرسل')
+    message = models.TextField(verbose_name='الرسالة')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    is_internal_note = models.BooleanField(default=False, verbose_name='ملاحظة داخلية')
+
+    class Meta:
+        ordering = ['created_at', 'id']
+        verbose_name = 'رسالة تذكرة دعم'
+        verbose_name_plural = 'رسائل تذاكر الدعم'
+
+    def __str__(self):
+        return f'رسالة في التذكرة #{self.ticket_id}'
+
+
 class RevokedToken(models.Model):
     token_jti = models.CharField(max_length=64, unique=True, db_index=True, verbose_name='معرف التوكن الفريد')
     revoked_at = models.DateTimeField(auto_now_add=True, verbose_name='تاريخ الإبطال')
