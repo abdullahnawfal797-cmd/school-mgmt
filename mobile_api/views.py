@@ -2310,8 +2310,9 @@ def parent_student_detail_view(request, student_id):
 @require_mobile_auth()
 def list_notifications_view(request):
     """قائمة إشعارات المستخدم بما فيها طلبات التفعيل للمالك"""
-    notes = MobileNotification.objects.filter(user=request.user).order_by('-created_at')[:30]
-    unread_count = notes.filter(is_read=False).count()
+    user_notifications = MobileNotification.objects.filter(user=request.user)
+    unread_count = user_notifications.filter(is_read=False).count()
+    notes = user_notifications.order_by('-created_at')[:30]
 
     data = [{
         'id': n.id,
