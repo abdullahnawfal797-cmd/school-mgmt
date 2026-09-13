@@ -33,6 +33,26 @@ else:
 PY
 
 python manage.py migrate --noinput
+
+# Optional one-time superuser password reset.
+if [ "${RESET_SUPERUSER_PASSWORD_ON_START:-0}" = "1" ]; then
+    python manage.py shell <<'PY'
+import os
+from django.contrib.auth import get_user_model
+
+username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
+password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "")
+
+if not password:
+    raise RuntimeError("DJANGO_SUPERUSER_PASSWORD is empty.")
+
+User = get_user_model()
+user = User.objects.get(username=username)
+user.set_password(password)
+user.save(update_fields=["password"])
+print(f"Password reset successfully for superuser: {username}")
+PY
+fi
 python manage.py collectstatic --noinput
 
 echo "Starting School Management System with Waitress..."
