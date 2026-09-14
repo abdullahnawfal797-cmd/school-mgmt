@@ -116,6 +116,35 @@ class ManagerSupportApiTests(TestCase):
         self.assertEqual(reply.status_code, 403)
         self.assertFalse(SupportTicketMessage.objects.filter(ticket=other).exists())
 
+    def test_manager_detail_excludes_internal_notes_while_owner_can_see_them(self):
+        ticket = self._create_ticket()
+        normal = SupportTicketMessage.objects.create(
+            ticket=ticket, sender=self.owner, message='Visible owner response'
+        )
+        internal = SupportTicketMessage.objects.create(
+            ticket=ticket, sender=self.owner, message='Owner-only internal note',
+            is_internal_note=True,
+        )
+
+        manager_response = self.client.get(
+            f'/api/mobile/manager/support/tickets/{ticket.id}/',
+            **self._auth(self.manager_one, self.manager_one_profile),
+        )
+        self.assertEqual(manager_response.status_code, 200)
+        manager_messages = manager_response.json()['ticket']['messages']
+        self.assertIn(normal.id, [message['id'] for message in manager_messages])
+        self.assertNotIn(internal.id, [message['id'] for message in manager_messages])
+        self.assertNotContains(manager_response, 'Owner-only internal note')
+
+        owner_response = self.client.get(
+            f'/api/mobile/owner/support/tickets/{ticket.id}/',
+            **self._auth(self.owner, self.owner_profile),
+        )
+        self.assertEqual(owner_response.status_code, 200)
+        owner_messages = owner_response.json()['ticket']['messages']
+        self.assertIn(internal.id, [message['id'] for message in owner_messages])
+        self.assertContains(owner_response, 'Owner-only internal note')
+
     def test_manager_reply_rejects_internal_note_and_audits_normal_reply(self):
         ticket = self._create_ticket()
         url = f'/api/mobile/manager/support/tickets/{ticket.id}/reply/'
@@ -172,4 +201,3 @@ class ManagerSupportApiTests(TestCase):
             content_type='application/json', **self._auth(manager, profile)
         )
         self.assertEqual(response.status_code, 403)
-

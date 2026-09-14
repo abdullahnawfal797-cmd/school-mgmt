@@ -2,7 +2,7 @@ import json
 import re
 
 from django.core.paginator import EmptyPage, Paginator
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -168,7 +168,14 @@ def _manager_ticket(request, ticket_id, messages=False):
         'school', 'created_by', 'created_by__mobile_profile'
     )
     if messages:
-        queryset = queryset.prefetch_related('messages__sender', 'messages__sender__mobile_profile')
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                'messages',
+                queryset=SupportTicketMessage.objects.filter(is_internal_note=False).select_related(
+                    'sender', 'sender__mobile_profile'
+                ),
+            )
+        )
     try:
         ticket = queryset.get(pk=ticket_id)
     except SupportTicket.DoesNotExist:
